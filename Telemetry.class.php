@@ -1078,6 +1078,12 @@ ENDLUA;
 	static function self_tests() {
 		self::test_paths();
 		self::test_datapoints();
+		try {
+			self::db_connect();
+			self::vlog("DB connection: PASS");
+		} catch (Exception $e) {
+			die("DB Connection to ".self::$CFG['DB']['host']." FAILED - ".$e->getMessage());
+		}
 		self::vlog("Self-tests: \x1b[48;5;70;30;1mPASS\x1b[0m");
 	}
 
