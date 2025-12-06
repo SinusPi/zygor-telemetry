@@ -39,8 +39,6 @@ class Telemetry {
 		self::$CFG = [];
 
 		self::$CFG = (array)(include "config.inc.php") + self::$CFG;
-		self::$CFG = (array)(@include "config-dev.inc.php") + self::$CFG;
-		self::$CFG = (array)(@include "config-live.inc.php") + self::$CFG;
 
 		self::$CFG = $cfg + self::$CFG;
 	}
@@ -393,9 +391,10 @@ class TelemetryScrapeSVs extends Telemetry {
 		self::$CFG = $cfg + self::$CFG;
 
 		self::$CFG = (array)(@include "config-scrape.inc.php") + self::$CFG;
-		self::$CFG = (array)(@include "config-scrape-live.inc.php") + $SYNC_CFG;
 
+		// load sync config
 		@include self::$CFG['SV_STORAGE_ROOT']."/config.inc.php"; // defines SYNC_CFG
+		if (!$SYNC_CFG) throw new Exception("Failed to load sync config from ".self::$CFG['SV_STORAGE_ROOT']."/config.inc.php");
 		self::$CFG['SV_STORAGE_DATA_PATH'] = self::cfgstr('SV_STORAGE_DATA_PATH',['SYNC_FOLDER'=>$SYNC_CFG['folder']]);
 
 		if (self::$CFG['verbose']) {
@@ -1128,7 +1127,7 @@ ENDLUA;
 	}
 
 	static function group_ranges($arr) {
-		// join consecutive values with "-", replacing 3,4,5,6,7 with "3-7"
+		// join consecutive yyyymmdd values with "-", replacing 3,4,5,6,7 with "3-7"
 		$grouped = [];
 		$current_range = [];
 		foreach ($arr as $value) {
@@ -1137,15 +1136,15 @@ ENDLUA;
 				$current_range = [$value];
 			} elseif ($value == $last + 1) {
 				$current_range[] = $value;
-			} elseif (($last%10000==0131 && $value%10000==0291)
-			       || ($last%10000==0228+(floor($value/10000)%4==0?1:0) && $value%10000==0301)
-				   || ($last%10000==0331 && $value%10000==0401)
-				   || ($last%10000==0430 && $value%10000==0501)
-				   || ($last%10000==0531 && $value%10000==0601)
-				   || ($last%10000==0630 && $value%10000==0701)
-				   || ($last%10000==0731 && $value%10000==0801)
-				   || ($last%10000==0831 && $value%10000==0901)
-				   || ($last%10000==0930 && $value%10000==1001)
+			} elseif (($last%10000== 131 && $value%10000== 201)
+			       || ($last%10000== 228+(floor($value/10000)%4==0?1:0) && $value%10000== 301)
+				   || ($last%10000== 331 && $value%10000== 401)
+				   || ($last%10000== 430 && $value%10000== 501)
+				   || ($last%10000== 531 && $value%10000== 601)
+				   || ($last%10000== 630 && $value%10000== 701)
+				   || ($last%10000== 731 && $value%10000== 801)
+				   || ($last%10000== 831 && $value%10000== 901)
+				   || ($last%10000== 930 && $value%10000==1001)
 				   || ($last%10000==1031 && $value%10000==1101)
 				   || ($last%10000==1130 && $value%10000==1201)
 				   || ($last%10000==1231 && $value%10000==0101)) {
