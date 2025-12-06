@@ -1,6 +1,6 @@
 <?php
 return [
-	"SV_STORAGE_ROOT" => __DIR__."/source_svs", //overridden
+	"SV_STORAGE_ROOT" => __DIR__."/mock_storage", //overridden
 	"SV_STORAGE_DATA_PATH" => "<SV_STORAGE_ROOT>/<SYNC_FOLDER>", // set with SV_STORAGE_ROOT/config.inc.php
 	"SV_STORAGE_FLAVOUR_PATH" => "<SV_STORAGE_DATA_PATH>/<FLAVOUR>",
 
