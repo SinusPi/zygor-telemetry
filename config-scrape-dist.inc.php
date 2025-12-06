@@ -9,6 +9,7 @@ return [
 	"STATUS_INTERVAL" => 1,
 	"STATUS_FILENAME" => "telemetry_scrape.status.json", // Telemetry writes here
 	"MTIMES_WRITE_INTERVAL" => 10,
+	"LUA_PATH" => "lua",
 	
 	"WOW_FLAVOUR_DATA" => [
 		'wow' => ['ZGVS_VAR' => "ZygorGuidesViewerSettings"],

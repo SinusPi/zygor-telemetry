@@ -36,11 +36,8 @@ class Telemetry {
 	static $db = null;
 
 	static function config($cfg) {
-		self::$CFG = [];
-
-		self::$CFG = (array)(include "config.inc.php") + self::$CFG;
-
-		self::$CFG = $cfg + self::$CFG;
+		$configfile = (array)(require "config.inc.php");
+		self::$CFG = $configfile + $cfg + self::$CFG;
 	}
 
 	static function load_topics() {
@@ -79,8 +76,9 @@ class Telemetry {
 
 	static function status($tag,$data,$keep=false) {
 		$filename = self::$CFG['TELEMETRY_ROOT']."/".self::$CFG['STATUS_FILENAME'];
+		touch($filename);
 		$F = fopen($filename, "r");
-		if (!flock($F, LOCK_EX)) { fclose($F); throw new Exception("Cannot set status!"); }
+		if (!flock($F, LOCK_EX)) { fclose($F); throw new Exception("Cannot set status lock: $filename"); }
 		$last_status = file_get_contents($filename) ?: '{}';
 		$last_status_j = json_decode($last_status, true) ?: [];
 		$last_status_j_t = $keep ? ($last_status_j[$tag] ?: []) : [];
@@ -218,7 +216,7 @@ class Telemetry {
 			date("Y-m-d H:i:s").".".sprintf("%03d",explode(" ", microtime())[0]*1000)." [$tag] ".$s."\n",
 			FILE_APPEND|LOCK_EX
 		);
-		if (posix_isatty(STDIN)) echo $s."\n";
+		if (function_exists('posix_isatty') ? posix_isatty(STDIN) : (php_sapi_name() === 'cli')) echo $s."\n";
 	}
 
 	static function vlog($s) {
@@ -388,9 +386,9 @@ class TelemetryScrapeSVs extends Telemetry {
 	static $tag = "SCRAPE";
 
 	static function config($cfg=[],$sync_cfg=[]) {
-		self::$CFG = $cfg + self::$CFG;
+		parent::config($cfg);
 
-		self::$CFG = (array)(@include "config-scrape.inc.php") + self::$CFG;
+		self::$CFG = $cfg + (array)(@include "config-scrape.inc.php") + self::$CFG;
 
 		// load sync config
 		@include self::$CFG['SV_STORAGE_ROOT']."/config.inc.php"; // defines SYNC_CFG
@@ -1030,7 +1028,7 @@ class TelemetryScrapeSVs extends Telemetry {
 			1 => ["pipe", "w"],  // stdout is a pipe that the child will write to
 			2 => ["pipe", "w"]  // NOPE:pipe // stderr is a file to write to
 		];
-		$process = proc_open("lua", $descriptorspec, $pipes, __DIR__, []);
+		$process = proc_open(self::$CFG['LUA_PATH'], $descriptorspec, $pipes, __DIR__, []);
 	
 		
 		$lua_head=<<<ENDLUA
@@ -1099,12 +1097,14 @@ ENDLUA;
 			if (!is_dir($svpath)) die("Missing SV storage flavour folder: ".$svpath."\n");
 			self::vlog("     - Reading SVs from: \x1b[33m$svpath\x1b[0m");
 
+			/*
 			$scrapepath = self::cfgstr('SCRAPES_PATH',['FLAVOUR'=>$flav,'DAY'=>"YYYYMMDD"]);
 			self::vlog("     - Temporary scrape folder: \x1b[33m$scrapepath\x1b[0m");
 
 			$telepath = self::cfgstr('FLAVOUR_PATH',['FLAVOUR'=>$flav]);
 			if (!is_dir($telepath)) die("Missing Telemetry output flavour folder: ".$telepath."\n");
 			self::vlog("     - Saving telemetry data into: \x1b[33m$telepath\x1b[0m");
+			*/
 		}
 		return true;
 	}

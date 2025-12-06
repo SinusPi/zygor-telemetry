@@ -22,7 +22,7 @@ require_once "includes/zygor.class.inc.php";
 //pcntl_signal(SIGINT,function() { write_error_to_status(E_ERROR,"Terminated",__FILE__,__LINE__); die(); return true; });
 
 $OPTS = \Zygor\Shell::better_getopt([
-	['f:','flavour:',     $TELEMETRY_CFG['WOW_FLAVOURS']],
+	['f:','flavour:',     ['wow','wow-classic','wow-classic-tbc']],
 	['', 'norender',      false],
 	['', 'maxrenderdays:',999999],
 	['', 'debug',         false],
