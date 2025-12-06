@@ -1,0 +1,4 @@
+config-live.inc.php
+config-scrape-live.inc.php
+*.log
+*.status.json
