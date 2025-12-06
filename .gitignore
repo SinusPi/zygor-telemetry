@@ -1,4 +1,4 @@
-config-db.inc.php
+config.inc.php
 config-scrape.inc.php
 *.log
 *.status.json
