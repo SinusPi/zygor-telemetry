@@ -2,3 +2,4 @@
 /config-scrape.inc.php
 *.log
 *.status.json
+mock_storage/**/*.lua.gz
