@@ -412,6 +412,18 @@ class TelemetryScrapeSVs extends Telemetry {
 	}
 
 	static function find_files($path, $days_old=null, $filemask, $loud=false) {
+		$files = self::rglob($path."/**/".$filemask, 10);
+		if ($days_old!==null) {
+			$time_limit = time() - ($days_old * DAY);
+			$files = array_filter($files, function($f) use ($time_limit) {
+				return filemtime($f) >= $time_limit;
+			});
+		}
+		return array_values($files);
+
+
+
+		/*
 		$find_cmd = "find ".escapeshellarg($path)." ".($days_old ? "-mtime -$days_old " : "")." -name ".escapeshellarg($filemask);
 		$proc = popen($find_cmd, 'r');
 		if (!$proc) throw new Exception("Failed to execute find command");
@@ -426,6 +438,7 @@ class TelemetryScrapeSVs extends Telemetry {
 		echo "\r          \r";
 		pclose($proc);
 		return $files;
+		*/
 	}
 
 	/**
@@ -447,13 +460,12 @@ class TelemetryScrapeSVs extends Telemetry {
 		$days_old = intval(self::$CFG['TELEMETRY_FILE_AGE']/DAY)+1;
 		self::log("Enumerating files $days_old days old matching ".self::$CFG['filemask']);
 
-		
 		$t1 = microtime(true);
 		$files = self::find_files($sync_path, $days_old, self::$CFG['filemask'], true); // FINDING FILES. TAKES LONG.
 		$t2 = microtime(true);
 		self::vlog("Found ".count($files)." files in ".round($t2-$t1,2)."s");
 
-		while ($files[0]=="") array_shift($files);
+		while ($files[0]==="") array_shift($files);
 		//$files = str_replace($sync_path."/","",$files);
 
 		self::stat(['files_total'=>count($files)],true);
@@ -1073,6 +1085,7 @@ ENDLUA;
 	static function init() {
 		self::set_error_reporting();
 		self::self_tests();
+		self::create_db();
 	}
 
 	static function self_tests() {
@@ -1238,5 +1251,31 @@ ENDLUA;
 				};
 			};
 		};
+	}
+
+	static function create_db() {
+		self::db_connect();
+		$schema_sql = "
+			CREATE TABLE IF NOT EXISTS `sv_files` (
+			`id` int(11) NOT NULL AUTO_INCREMENT,
+			`file` char(50) NOT NULL,
+			`scrape_time` int(11) DEFAULT NULL,
+			`mtime` int(10) DEFAULT NULL,
+			`last_event_time` int(10) DEFAULT NULL,
+			UNIQUE KEY `file` (`file`),
+			UNIQUE KEY `id` (`id`)
+			)
+			ENGINE=InnoDB
+			DEFAULT CHARSET=latin1
+			COLLATE=latin1_swedish_ci
+			COMMENT='used to mark which SV files have been processed and when';
+		";
+		self::$db->query($schema_sql);
+		if (self::$db->error) {
+			throw new Exception("Failed to create DB schema: ".self::$db->error);
+		}
+		if (self::$db->affected_rows>=0) {
+			self::vlog("DB schema created.");
+		}
 	}
 }

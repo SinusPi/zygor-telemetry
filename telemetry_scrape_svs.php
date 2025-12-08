@@ -51,7 +51,7 @@ TelemetryScrapeSVs::stat([
 	'stage'=>2,
 	'stageof'=>2,
 ]);
-die("NO SCRAPEY");
+
 foreach ($FLAVOURS as $flav) TelemetryScrapeSVs::scrape_flavour($flav);
 
 /*
