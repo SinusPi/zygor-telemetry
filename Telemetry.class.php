@@ -649,11 +649,13 @@ class TelemetryScrapeSVs extends Telemetry {
 			self::vlog("Scraping SV: \x1b[38;5;110m$user\x1b[0m/\x1b[38;5;116m$bnet\x1b[0m\x1b[30;1m--SavedVariables...\x1b[0m");
 
 			try { // flock block
-				$fl = fopen($userfolder, 'rb');
-				if (!$fl || !flock($fl, LOCK_EX | LOCK_NB)) {
-					fclose($fl);
-					self::vlog(C_MTHD."Input folder locked: $userfolder".C_R);
-					throw new FileLockedException("Input folder locked: $userfolder");
+				if (strpos(PHP_OS, 'WIN') !== 0) {
+					$fl = fopen($userfolder, 'rb');
+					if (!$fl) throw new FileLockedException("Cannot open input folder for locking: $userfolder");
+					if (!flock($fl, LOCK_EX | LOCK_NB)) {
+						fclose($fl);
+						throw new FileLockedException("Input folder locked: $userfolder");
+					}
 				}
 
 				self::$db->begin_transaction();
