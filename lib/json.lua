@@ -67,20 +67,27 @@ local function encode_table(val, stack)
 
   if rawget(val, 1) ~= nil or next(val) == nil then
     -- Treat as array -- check keys are valid and it is not sparse
+--[[
     local n = 0
+--t={}
     for k in pairs(val) do
       if type(k) ~= "number" then
         error("invalid table: mixed or invalid key types")
       end
       n = n + 1
+--t[#t+1]=k..":"..encode(val[k],stack)
     end
     if n ~= #val then
-      error("invalid table: sparse array")
+      error("invalid table: sparse array; expected "..#val.." items, got "..n) --..": "..#t.."="..table.concat(t,",")..".")
     end
     -- Encode
     for i, v in ipairs(val) do
       table.insert(res, encode(v, stack))
     end
+--]]
+	for i=1,#val do
+		table.insert(res, encode(val[i], stack))
+	end
     stack[val] = nil
     return "[" .. table.concat(res, ",") .. "]"
 
