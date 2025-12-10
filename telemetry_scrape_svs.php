@@ -46,12 +46,6 @@ TelemetryScrapeSVs::init();
 
 // PHASE ONE: SCRAPE
 
-TelemetryScrapeSVs::stat([
-	'status'=>"CRUNCHING_LISTING",
-	'stage'=>2,
-	'stageof'=>2,
-]);
-
 foreach ($FLAVOURS as $flav) TelemetryScrapeSVs::scrape_flavour($flav);
 
 /*
