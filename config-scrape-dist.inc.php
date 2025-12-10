@@ -10,6 +10,8 @@ return [
 	"STATUS_FILENAME" => "telemetry_scrape.status.json", // Telemetry writes here
 	"MTIMES_WRITE_INTERVAL" => 10,
 	"LUA_PATH" => "lua",
+	"LUA_JSON_MODULE_REQUIRE" => "json = require 'JSON'",
+	// Windows? "LUA_JSON_MODULE_REQUIRE" => "json = require 'lib/json'  if (not json) then error('Cannot load json module') end   local exjsonencode=json.encode  json.encode=function(_,...) return exjsonencode(...) end  -- wrapper to call as :",
 	
 	"WOW_FLAVOUR_DATA" => [
 		'wow' => ['ZGVS_VAR' => "ZygorGuidesViewerSettings"],

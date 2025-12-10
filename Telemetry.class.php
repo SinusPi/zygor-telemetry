@@ -1032,7 +1032,7 @@ class TelemetryScrapeSVs extends Telemetry {
 	* @param string $sv_raw 
 	* @param string $flavour 
 	* @param array $datapoint_defs
-	* @return array 
+	* @return array ['status'=>"ok",'datapoints'=>[...], 'times'=>[...] ] or ['status'=>"err", 'err'=>...]
 	*/
 	static function extract_datapoints_with_lua($sv_raw,$flavour,$topic_defs) {
 		$descriptorspec = [
@@ -1042,10 +1042,10 @@ class TelemetryScrapeSVs extends Telemetry {
 		];
 		$process = proc_open(self::$CFG['LUA_PATH'], $descriptorspec, $pipes, __DIR__, []);
 	
-		
+		$json_req = self::$CFG['LUA_JSON_MODULE_REQUIRE'];
 		$lua_head=<<<ENDLUA
 		   if not %ZGVS_VAR% then print('{"status":"err","err":"no_zgvs"}') return end
-		   json = require "JSON"
+		   $json_req
 		   print('{"status":"ok","datapoints":[')
 		   count=0
 ENDLUA;
