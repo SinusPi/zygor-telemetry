@@ -25,7 +25,6 @@ define("C_R","\x1b[0m");
 class Telemetry {
 	static $CFG = [
 		'TELEMETRY_ROOT' => "telemetry",
-		'STATUS_FILENAME' => "default.status.json",
 		'LOG_FILENAME' => "telemetry.log",
 		'MAX_RENDER_DAYS' => 30,
 		'VERBOSE_FLAGS' => [],
@@ -75,23 +74,27 @@ class Telemetry {
 	}
 
 	static function status($tag,$data,$keep=false) {
-		$filename = self::$CFG['TELEMETRY_ROOT']."/".self::$CFG['STATUS_FILENAME'];
-		touch($filename);
-		$F = fopen($filename, "r");
-		if (!flock($F, LOCK_EX)) { fclose($F); throw new Exception("Cannot set status lock: $filename"); }
-		$last_status = file_get_contents($filename) ?: '{}';
-		$last_status_j = json_decode($last_status, true) ?: [];
-		$last_status_j_t = $keep ? ($last_status_j[$tag] ?: []) : [];
-		$last_status_j_t = array_replace_recursive($last_status_j_t,$data);
-		$last_status_j[$tag] = $last_status_j_t;
-		self::$last_status = $last_status_j;
-		file_put_contents($filename,json_encode($last_status_j));
-		flock($F, LOCK_UN);
-		fclose($F);
+		$last_status_t = $keep ? (@json_decode(self::db_qesc_one("SELECT status FROM status WHERE tag={s} LIMIT 1", $tag)) ?: []) : [];
+		$last_status_t = array_replace_recursive($last_status_t,$data);
+
+		self::$last_status[$tag] = $last_status_t;
+
+		self::db_qesc_one("INSERT INTO status (tag,status) VALUES ({s},{s}) ON DUPLICATE KEY UPDATE status={s}", $tag, json_encode($last_status_t), json_encode($last_status_t));
 	}
 	static function &get_last_status($tag) {
 		if (!self::$last_status[$tag]) self::$last_status[$tag] = [];
 		return self::$last_status[$tag];
+	}
+	static function test_status() {
+		self::status("TEST",['status'=>"TESTING1"]);
+		$status = self::db_query_one("SELECT status FROM status WHERE tag='TEST' LIMIT 1");
+		$status = json_decode($status, true);
+		if ($status['status']!="TESTING1") throw new Exception("Status test failed 1: ".print_r($status,true));
+
+		self::status("TEST",['status'=>"TESTING2"]);
+		$status = self::db_query_one("SELECT status FROM status WHERE tag='TEST' LIMIT 1");
+		$status = json_decode($status, true);
+		if ($status['status']!="TESTING2") throw new Exception("Status test failed 2: ".print_r($status,true));
 	}
 
 	/**
@@ -283,10 +286,60 @@ class Telemetry {
 		return $res;
 	}
 
+	static function db_qesc_one($query,...$args) {
+		$query = self::qesc($query, ...$args);
+		return self::$db->query($query);
+	}
+
 	static function db_query_one($query) {
 		$r = self::$db->query($query);
 		if (!$r) throw new Exception("DB error: ".self::$db->error);
 		return $r->fetch_row()[0];
+	}
+
+	static function db_create() {
+		self::$db->query("SHOW CREATE TABLE status;");
+		if (self::$db->error) {
+			$schema_sql = "
+				CREATE TABLE `status` (
+					`tag` char(20) NOT NULL,
+					`status` varchar(200) DEFAULT NULL,
+					UNIQUE KEY `tag` (`tag`)
+				)
+				ENGINE=InnoDB
+				DEFAULT CHARSET=latin1
+				COLLATE=latin1_swedish_ci
+				COMMENT='used to mark which SV files have been processed and when';
+			";
+			self::$db->query($schema_sql);
+			if (self::$db->error) 
+				throw new Exception("Failed to create table `status`: ".self::$db->error);
+		}
+		self::$db->query("SHOW CREATE TABLE events;");
+		if (self::$db->error) {
+			$schema_sql = "
+				CREATE TABLE `events` (
+					`id` int(11) NOT NULL AUTO_INCREMENT,
+					`flavnum` int(1) NOT NULL,
+					`file_id` int(11) NOT NULL,
+					`time` int(10) NOT NULL,
+					`type` char(40) NOT NULL,
+					`data` text NOT NULL,
+					UNIQUE KEY `id` (`id`,`flavnum`) USING BTREE,
+					KEY `type` (`type`) USING BTREE,
+					KEY `time` (`time`)
+				) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+				PARTITION BY RANGE (`flavnum`) (
+					PARTITION `p_wtf` VALUES LESS THAN (1) ENGINE = InnoDB,
+					PARTITION `p_wow` VALUES LESS THAN (2) ENGINE = InnoDB,
+					PARTITION `p_wowclassic` VALUES LESS THAN (3) ENGINE = InnoDB,
+					PARTITION `p_wowclassictbc` VALUES LESS THAN (4) ENGINE = InnoDB
+				)
+			";
+			self::$db->query($schema_sql);
+			if (self::$db->error) 
+				throw new Exception("Failed to create table `events`: ".self::$db->error);
+		}
 	}
 
 	/**
