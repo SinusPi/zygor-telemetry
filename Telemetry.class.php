@@ -1189,7 +1189,6 @@ ENDLUA;
 	static function init() {
 		self::set_error_reporting();
 		self::self_tests();
-		self::create_db();
 	}
 
 	static function self_tests() {
@@ -1197,11 +1196,13 @@ ENDLUA;
 		self::test_datapoints();
 		try {
 			self::db_connect();
-			self::vlog("DB connection: PASS");
+			self::db_create();
+			self::test_status();
+			self::vlog("Database: connected and present.");
 		} catch (Exception $e) {
 			die("DB Connection to ".self::$CFG['DB']['host']." FAILED - ".$e->getMessage());
 		}
-		self::vlog("Self-tests: \x1b[48;5;70;30;1mPASS\x1b[0m");
+		self::vlog("Self-tests: \x1b[48;5;70;30mPASS\x1b[0m");
 	}
 
 	static function test_paths() {
@@ -1357,29 +1358,31 @@ ENDLUA;
 		};
 	}
 
-	static function create_db() {
-		self::db_connect();
-		$schema_sql = "
-			CREATE TABLE IF NOT EXISTS `sv_files` (
-			`id` int(11) NOT NULL AUTO_INCREMENT,
-			`file` char(50) NOT NULL,
-			`scrape_time` int(11) DEFAULT NULL,
-			`mtime` int(10) DEFAULT NULL,
-			`last_event_time` int(10) DEFAULT NULL,
-			UNIQUE KEY `file` (`file`),
-			UNIQUE KEY `id` (`id`)
-			)
-			ENGINE=InnoDB
-			DEFAULT CHARSET=latin1
-			COLLATE=latin1_swedish_ci
-			COMMENT='used to mark which SV files have been processed and when';
-		";
-		self::$db->query($schema_sql);
+	static function db_create() {
+		parent::db_create();
+
+		self::$db->query("SHOW CREATE TABLE sv_files;");
 		if (self::$db->error) {
-			throw new Exception("Failed to create DB schema: ".self::$db->error);
+			$schema_sql = "
+				CREATE TABLE `sv_files` (
+					`id` int(11) NOT NULL AUTO_INCREMENT,
+					`file` char(50) NOT NULL,
+					`scrape_time` int(11) DEFAULT NULL,
+					`mtime` int(10) DEFAULT NULL,
+					`last_event_time` int(10) DEFAULT NULL,
+					UNIQUE KEY `file` (`file`),
+					UNIQUE KEY `id` (`id`)
+				)
+				ENGINE=InnoDB
+				DEFAULT CHARSET=latin1
+				COLLATE=latin1_swedish_ci
+				COMMENT='used to mark which SV files have been processed and when';
+			";
+			self::$db->query($schema_sql);
+			if (self::$db->error) 
+				throw new Exception("Failed to create table `sv_files`: ".self::$db->error);
 		}
-		if (self::$db->affected_rows>=0) {
-			self::vlog("DB schema created.");
-		}
+
+		self::vlog("DB schema created.");
 	}
 }
