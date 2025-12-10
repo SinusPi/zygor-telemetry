@@ -608,6 +608,37 @@ class TelemetryScrapeSVs extends Telemetry {
 
 		$totals['inserted_datapoints'] = 0;
 
+
+		// PRE OPT!!
+		
+		/*
+
+		// process in chunks, for concurrency. Calculate last file in chunk.
+		$chunk_size = 3; // number of userfolders to process in parallel
+		$start_n = 0;
+		$chunks = [];
+		while ($start_n < count($freshfiles_to_process)) {
+			// grab $chunk_size base folders, however many files they have
+			$base_folder_count = 0;
+			$userfolder_last = basename(dirname($freshfiles_to_process[$start_n]));
+			$n = $start_n+1;
+			// proceed with $n, stop when userfolder changes $chunk_size times
+			// $n is now at the second file of the next chunk
+			while ($n < count($freshfiles_to_process)) {
+				$userfolder_cur = basename(dirname($freshfiles_to_process[$n]));
+				if ($userfolder_cur != $userfolder_last) {
+					$base_folder_count++;
+					$userfolder_last = $userfolder_cur;
+					if ($base_folder_count >= $chunk_size) break;
+				}
+				$n++;
+			}
+			$chunks[] = [$start_n, $n-1, basename(dirname($freshfiles_to_process[$start_n])), basename(dirname($freshfiles_to_process[$n-1]))]; // [first_file_index, last_file_index, first_file_fullpath, last_file_fullpath]
+			$start_n = $n;
+		}
+
+		*/
+
 		foreach ($freshfiles_to_process as $n=>$filename_full) {
 			self::stat(['file_last'=>$filename_full],true);
 			list (,$filename_slug) = self::split_filename($filename_full);
