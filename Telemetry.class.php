@@ -766,6 +766,12 @@ class TelemetryScrapeSVs extends Telemetry {
 				if (isset($fl)) { flock($fl, LOCK_UN); fclose($fl); }
 				self::$db->commit();
 			}
+
+			$processed_files = $n + 1;
+			if (isset(self::$CFG['limit']) && $processed_files >= self::$CFG['limit']) {
+				echo "Limit " . self::$CFG['limit'] . " hit, aborting.\n";
+				break;
+			}
 			
 		}
 		//self::write_intermediate_mtimes($flavour,$last_scrape_dates,true);
