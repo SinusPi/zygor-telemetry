@@ -627,6 +627,8 @@ class TelemetryScrapeSVs extends Telemetry {
 
 				self::$db->begin_transaction();
 
+				self::vlog(" - :. reading SV file...");
+
 				$flavourfile = $flavour."/".$filename_slug; // flavour/user/bnet
 				$sv_file_data = self::db_get_sv_file_data($flavourfile);
 				if (!$sv_file_data) {
@@ -639,6 +641,9 @@ class TelemetryScrapeSVs extends Telemetry {
 				// ===============================================================
 
 				$sv_raw = self::read_raw_sv($filename_full);
+
+				self::vlog(" - .: extracting datapoints...");
+
 				$extracted = self::extract_datapoints_with_lua($sv_raw,$flavour,$topics);
 
 				// ===============================================================
@@ -660,7 +665,8 @@ class TelemetryScrapeSVs extends Telemetry {
 				}
 
 				$counts = array_count_values(array_column($extracted['datapoints'], 'type'));
-				self::vlog("Datapoints extracted by type: " . join(", ", array_map(function ($item, $key) { return "\x1b[38;5;72m$key\x1b[0m:$item"; }, array_values($counts), array_keys($counts))));
+				$times = $extracted['times'];
+				self::vlog("Datapoints extracted by type: " . join(", ", array_map(function ($item, $key) use ($times) { return "\x1b[38;5;72m$key\x1b[0m:{$item} ({$times[$key]}s)"; }, array_values($counts), array_keys($counts))));
 
 				/*
 					// locale
@@ -1099,15 +1105,27 @@ class TelemetryScrapeSVs extends Telemetry {
 		$lua_head=<<<ENDLUA
 		   if not %ZGVS_VAR% then print('{"status":"err","err":"no_zgvs"}') return end
 		   $json_req
-		   print('{"status":"ok","datapoints":[')
+		   times={}
 		   count=0
+		   print('{"status":"ok","datapoints":[')
 ENDLUA;
 
 		$lua_extractors = "";
-		foreach($topic_defs as $name=>$def) $lua_extractors .= $def['extraction_lua'];
-		
+		foreach($topic_defs as $name=>$def)
+			$lua_extractors .= 
+				  "\nlocal time1=os.clock()\n"
+				. $def['extraction_lua'] . "\n"
+				. "times['$name']=os.clock()-time1\n";
+
 		$lua_foot = <<<ENDLUA
-		    print(']}')
+		    print('],"times":{')
+		    local first=true
+		    for k,v in pairs(times) do
+		        if not first then print(',') end
+		        print(string.format('"%s":%.3f',k,v))
+		        first=false
+		    end
+		    print('}}')
 ENDLUA;
 
 		$lua = $lua_head . $lua_extractors . $lua_foot;
@@ -1128,7 +1146,7 @@ ENDLUA;
 		$errcode = proc_close($process);
    
 		if ($errcode!=0) return ['status'=>"err",'err'=>"errcode_nonzero",'errcode'=>$errcode,'error'=>$stderr];
-		if ($stderr) return ['status'=>"err",'err'=>"stderr_output",'error'=>$stderr];
+		if ($stderr) return ['status'=>"err",'err'=>"stderr_output",'error'=>$stderr,'source_lua'=>$lua];
 		$arr = @json_decode($datapoints,true);
 		//if (!is_array($arr)) return ['']
 		if (!$arr) { return ['status'=>"err",'err'=>"bad_json_output",'json_err'=>json_last_error_msg(),'len'=>strlen($datapoints),'partial'=>substr($datapoints,0,6000)]; }
