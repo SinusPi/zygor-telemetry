@@ -1214,7 +1214,7 @@ ENDLUA;
 		if (!is_dir(self::$CFG['SV_STORAGE_DATA_PATH'])) die("Missing SV storage folder: ".self::$CFG['SV_STORAGE_DATA_PATH']."\n");
 		self::vlog(" - Specifically SV Sync config says: \x1b[33m".self::$CFG['SV_STORAGE_DATA_PATH']."\x1b[0m");
 
-		foreach (self::$CFG['WOW_FLAVOUR_DATA'] as $flav=>$data) {
+		foreach (self::$CFG['f'] as $flav) {
 			self::vlog("   - Flavour: \x1b[38;5;78m$flav\x1b[0m");
 
 			$svpath = self::cfgstr('SV_STORAGE_FLAVOUR_PATH',['FLAVOUR'=>$flav]);
