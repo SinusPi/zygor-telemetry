@@ -43,7 +43,7 @@ TelemetryScrapeSVs::init();
 
 // PHASE ONE: SCRAPE
 
-foreach ($FLAVOURS as $flav) TelemetryScrapeSVs::scrape_flavour($flav);
+foreach ($FLAVOURS as $flav) TelemetryScrapeSVs::scrape($flav);
 
 /*
 $status['status']="WRITING";
@@ -58,16 +58,3 @@ file_put_contents(TELEMETRY_FOLDER."/".date("telemetry--Y-m-d--H-i-s.json"),json
 //die(json_encode($result));
 
 end:
-
-TelemetryScrapeSVs::stat([
-	'status'=>"DONE",
-	'progress'=>[
-		'time_total'=>time()-Telemetry::$last_status['time_started'],
-		'progress_raw'=>null,
-		'progress_total'=>$total,
-		'progress_percent'=>100,
-		'speed_fps'=>null,
-		'time_remaining'=>null,
-		'time_total_est_hr'=>null,
-]
-]);

@@ -50,25 +50,3 @@ foreach ($FLAVOURS as $flav) TelemetryCrunch::crunch($flav);
 //die(json_encode($result));
 
 end:
-
-TelemetryCrunch::stat([
-	'status'=>"DONE",
-	'progress'=>[
-		'time_total'=>time()-Telemetry::get_status('time_started'),
-		'progress_raw'=>null,
-		'progress_total'=>$total,
-		'progress_percent'=>100,
-		'speed_fps'=>null,
-		'time_remaining'=>null,
-		'time_total_est_hr'=>null,
-]
-]);
-
-
-
-///////////////////////////////////////////////////////
-
-
-
-
-

@@ -564,15 +564,15 @@ class TelemetryScrapeSVs extends Telemetry {
 		}, $cfg))));
 	}
 	
+	static function filter_younger_files($files, $days_old) {
+		$time_limit = time() - ($days_old * DAY);
+		return array_values(array_filter($files, function($f) use ($time_limit) {
+			return filemtime($f) >= $time_limit;
+		}));
+	}
 	
-	static function find_files($path, $days_old=null, $filemask, $loud=false) {
+	static function find_files($path, $filemask, $loud=false) {
 		$files = self::rglob($path."/**/".$filemask, 10);
-		if ($days_old!==null) {
-			$time_limit = time() - ($days_old * DAY);
-			$files = array_filter($files, function($f) use ($time_limit) {
-				return filemtime($f) >= $time_limit;
-			});
-		}
 		return array_values($files);
 
 
@@ -599,7 +599,7 @@ class TelemetryScrapeSVs extends Telemetry {
 	 * Grab data from SVs, store into db
 	 * @param string $flavour
 	 */
-	static function scrape_flavour($flavour) {
+	static function scrape($flavour) {
 		if (!in_array($flavour,array_keys(self::$CFG['WOW_FLAVOUR_DATA']))) throw new Exception("Unsupported flavour '{$flavour}' (supported: ".join(", ",array_keys(self::$CFG['WOW_FLAVOUR_DATA'])).")");
 
 		self::$tag = "SCRAPE-".strtoupper(str_replace("-","_", $flavour));
@@ -620,9 +620,11 @@ class TelemetryScrapeSVs extends Telemetry {
 		self::log("Enumerating files $days_old days old matching ".self::$CFG['filemask']);
 
 		$t1 = microtime(true);
-		$files = self::find_files($sync_path, $days_old, self::$CFG['filemask'], true); // FINDING FILES. TAKES LONG.
+		$files = self::find_files($sync_path, self::$CFG['filemask'], true); // FINDING FILES. TAKES LONG.
+		$total_filecount = count($files);
+		$files = self::filter_younger_files($files, $days_old);
 		$t2 = microtime(true);
-		self::vlog("Found ".count($files)." files in ".round($t2-$t1,2)."s");
+		self::log("Out of $total_filecount files, ".count($files)." are new. (It took ".round(microtime(true)-$t2,2)."s.)");
 
 		while ($files[0]==="") array_shift($files);
 		//$files = str_replace($sync_path."/","",$files);
