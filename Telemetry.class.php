@@ -1452,27 +1452,36 @@ class TelemetryCrunch extends Telemetry {
 
 				// get starting point
 				$start = self::db_query_one(self::qesc("SELECT IFNULL(MAX(id),0) FROM {$table} WHERE flavnum={d}",$flavnum)) ?: 0;
-				self::vlog("Processing {$type} events, starting with index {$start}");
+				self::vlog("Processing {$type} events, starting with index {$start}...");
 
 				// get new events
 				$getquery = self::qesc("SELECT * FROM events WHERE flavnum={d} AND type={s} AND id>{d}",$flavnum,$type,$start);
 				$getrequest = self::$db->query($getquery);
-				self::vlog("Found ".strval($getrequest->num_rows)." records");
-				die();
-				$index = 0;
-				while ($line = $getrequest->fetch_assoc()) {
-					$index++;
-					self::vlog("Processing ".strval($index)."/".strval($getrequest->num_rows));
 
-					$values = $cruncher["function"]($line);
+				if ($getrequest->num_rows==0) {
+					self::vlog("No new {$name}-{$cname} events to process.");
+					continue;
+				}
+				self::vlog("Found ".strval($getrequest->num_rows)." records, processing...");
+				
+				$count = 0;
+				while ($event = $getrequest->fetch_assoc()) {
+					$count++;
+					//self::vlog("Processing ".strval($count)."/".strval($getrequest->num_rows));
+
+					$fields = $cruncher["function"]($event);
 
 					if ($cruncher['action']=="insert" && isset($cruncher['table'])) {
 						$table = $cruncher['table'];
-						$insertquery = self::qarrayesc("INSERT INTO {$table} ({keys}) VALUES ({values})",$values);
+						$insertquery = self::qarrayesc("INSERT INTO {$table} ({keys}) VALUES ({values})",$fields);
 						$insertrequest = self::$db->query($insertquery);
-						if (self::$db->affected_rows!=1) throw new Exception("Failed to insert cruncher data into {$table}.");
-						if (self::$db->error) throw new Exception("ERROR inserting into {$table}: ".self::$db->error);
+						if (self::$db->affected_rows!=1) throw new Exception("FAILED to insert event id {$event['id']} crunched into {$table}");
+						if (self::$db->error) throw new Exception("ERROR inserting event id {$event['id']} into {$table}: ".self::$db->error);
 					}
+				}
+
+				if ($cruncher['action']=="insert") {
+					self::vlog("Added ".strval($count)." new {$name}-{$cname} records.");
 				}
 			}
 		}
