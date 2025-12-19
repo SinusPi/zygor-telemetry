@@ -25,7 +25,19 @@ class Telemetry {
 
 	static function config($cfg) {
 		$configfile = (array)(require "config.inc.php");
-		self::$CFG = $configfile + $cfg + self::$CFG;
+		self::$CFG = $cfg + $configfile + self::$CFG;
+
+		// check if function _sub_config exists in child class
+		if (method_exists(get_called_class(), '_sub_config')) {
+			call_user_func([get_called_class(), '_sub_config']);			
+		}
+
+		if (!self::$CFG['DB']) {
+			throw new Exception("No DB configuration found in Telemetry config.");
+		}
+		if (self::$CFG['verbose']) {
+			self::dump_config();
+		}
 	}
 
 	static function init() {
@@ -524,6 +536,23 @@ class Telemetry {
 		}
 	}
 
+	static function dump_config() {
+		$cfg = self::$CFG;
+		if (!$cfg) return; // No config loaded
+		self::log(get_called_class()." config:");
+		if (isset($cfg['DB']['pass'])) $cfg['DB']['pass']="****"; // hide password
+		self::log(join("\n",array_map(function($k,$v) { /* key=value */
+			if (is_array($v)) $v="[".join(",",$v)."]";
+			elseif ($v===TRUE) $v="Y";
+			elseif ($v===FALSE) $v="N";
+			return "\x1b[32m{$k}\x1b[0m=\x1b[33m{$v}\x1b[0m";
+		},
+		array_keys($cfg),
+		array_map(function($s) { /* colorize <placeholders> */
+			return is_string($s) ? preg_replace("/(<.*?>)/","\x1b[35m$1\x1b[33m",$s) : $s;
+		}, $cfg))));
+	}
+	
 }
 
 class FileLockedException extends Exception {
@@ -544,36 +573,15 @@ class TelemetryScrapeSVs extends Telemetry {
 		self::self_tests();
 	}
 
-	static function config($cfg=[],$sync_cfg=[]) {
-		parent::config($cfg);
+	static function _sub_config() {
+		self::$CFG = (array)(@include "config-scrape.inc.php") + self::$CFG; // load defaults
 
-		self::$CFG = $cfg + (array)(@include "config-scrape.inc.php") + self::$CFG;
-
-		// load sync config
+		// load sync's config
 		@include self::$CFG['SV_STORAGE_ROOT']."/config.inc.php"; // defines SYNC_CFG
 		if (!$SYNC_CFG) throw new Exception("Failed to load sync config from ".self::$CFG['SV_STORAGE_ROOT']."/config.inc.php");
 		self::$CFG['SV_STORAGE_DATA_PATH'] = self::cfgstr('SV_STORAGE_DATA_PATH',['SYNC_FOLDER'=>$SYNC_CFG['folder']]);
-
-		if (self::$CFG['verbose']) self::dump_config();
 	}
 
-	static function dump_config() {
-		$cfg = self::$CFG;
-		if (!$cfg) return; // No config loaded
-		self::log(get_called_class()." config:");
-		if (isset($cfg['DB']['pass'])) $cfg['DB']['pass']="****"; // hide password
-		self::log(join("\n",array_map(function($k,$v) { /* key=value */
-			if (is_array($v)) $v="[".join(",",$v)."]";
-			elseif ($v===TRUE) $v="Y";
-			elseif ($v===FALSE) $v="N";
-			return "\x1b[32m{$k}\x1b[0m=\x1b[33m{$v}\x1b[0m";
-		},
-		array_keys($cfg),
-		array_map(function($s) { /* colorize <placeholders> */
-			return is_string($s) ? preg_replace("/(<.*?>)/","\x1b[35m$1\x1b[33m",$s) : $s;
-		}, $cfg))));
-	}
-	
 	static function filter_younger_files($files, $days_old) {
 		$time_limit = time() - ($days_old * DAY);
 		return array_values(array_filter($files, function($f) use ($time_limit) {
