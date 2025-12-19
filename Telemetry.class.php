@@ -23,6 +23,8 @@ class Telemetry {
 
 	static $db = null;
 
+	static $DBG = [];
+
 	static function config($cfg) {
 		$configfile = (array)(require "config.inc.php");
 		self::$CFG = $cfg + $configfile + self::$CFG;
@@ -67,8 +69,10 @@ class Telemetry {
 		
 		self::$CFG['SCRAPE_TOPICS'] = $topics;
 
-		$keys = array_keys($topics); foreach ($keys as $i=>$k) {
-			if ($topics[$k]['crunchers']) { $c=count($topics[$k]['crunchers']); $keys[$i] .= " (+ $c cruncher".($c==1 ? "" : "s").": ".implode(", ",array_keys($topics[$k]['crunchers'])).")"; }
+		$keys = array_keys($topics);
+		foreach ($keys as $i=>$k) {
+			$crunchers = $topics[$k]['crunchers'] ?: [];
+			if ($crunchers) { $c=count($crunchers); $keys[$i] .= " (+ $c cruncher".($c==1 ? "" : "s").": ".implode(", ",array_column($crunchers,'name')).")"; }
 		}
 		self::vlog("Loaded ".count($topics)." telemetry topics: ".implode(", ", $keys).".");
 	}
@@ -653,32 +657,31 @@ class TelemetryScrapeSVs extends Telemetry {
 
 		self::stat(['status'=>"ENUMERATING",'stage'=>1,'stageof'=>2,'flavour'=>$flavour,'progress'=>[],'time_started'=>time(),'time_started_hr'=>date("Y-m-d H:i:s")]);		
 
-		$days_old = intval(self::$CFG['TELEMETRY_FILE_AGE']/DAY)+1;
-		self::log("Enumerating files $days_old days old matching ".self::$CFG['filemask']);
-
+		self::log("Enumerating files matching ".self::$CFG['filemask']);
+		
 		$t1 = microtime(true);
 		$files = self::find_files($sync_path, self::$CFG['filemask'], true); // FINDING FILES. TAKES LONG.
 		$total_filecount = count($files);
-		$files = self::filter_younger_files($files, $days_old);
-		$t2 = microtime(true);
-		self::log("Out of $total_filecount files, ".count($files)." are new. (It took ".round(microtime(true)-$t2,2)."s.)");
+		self::vlog("Found $total_filecount files [".round(microtime(true)-$t1,2)."s]");
+
+		if (isset(self::$CFG['TELEMETRY_FILE_AGE'])) {
+			$days_old = intval(self::$CFG['TELEMETRY_FILE_AGE']/DAY)+1; // old way of detecting file age
+			$files = self::filter_younger_files($files, $days_old);
+			$t1 = microtime(true);
+			self::vlog("Filtered out files older than $days_old days: {$total_filecount} -> ".count($files)." files [".round(microtime(true)-$t1,2)."s]");
+		}
 
 		while ($files[0]==="") array_shift($files);
 		//$files = str_replace($sync_path."/","",$files);
 
 		self::stat(['files_total'=>count($files)],true);
-		self::log(count($files)." files found.");
-
+		self::log(count($files)." files to process.");
 
 		if (!count($files)) {
 			self::log("Nothing to do here.");
 			self::stat(['status'=>"IDLE"]);
 			return;
 		}
-
-		$metrics = [
-			'languages'=>[],
-		];
 
 		$freshfiles = $files; //array_values(array_filter($files,function($f) { return NOW-filemtime($f)<=TELEMETRY_INTERVAL; }));
 
@@ -697,19 +700,10 @@ class TelemetryScrapeSVs extends Telemetry {
 
 		//$telefolder = self::cfgstr('FLAVOUR_PATH',['FLAVOUR'=>$flavour]);
 		//$last_scrape_dates = (array)@json_decode(@file_get_contents($telefolder."/".self::$CFG['MTIMES_CACHE_FILENAME'])); // names relative to sync folder
-		$slice=100; $qs=0;
-		$last_mtimes = [];
 		$t1 = microtime(true);
-		for ($ffi=0;$ffi<count($freshfiles);$ffi+=$slice) {
-			$batch = array_slice($freshfiles,$ffi,$slice);
-			$batch = array_map(function($f) use ($flavour) { $f=self::split_filename($f)[1]; return $flavour."/".$f; }, $batch);  // flavour/user/bnet
-			$last_mtimes_batch = self::db_get_svfile_mtimes($batch);
-			$qs++;
-			if ($last_mtimes_batch) $last_mtimes += $last_mtimes_batch;
-		}
+		$last_mtimes = self::fetch_last_mtimes($flavour, $freshfiles);
 		$t2 = microtime(true);
-		self::vlog("Loaded ".count($last_mtimes)." last scrape dates from DB in $qs queries and ".round($t2-$t1,2)."s");
-
+		self::vlog("Loaded ".count($last_mtimes)." last scrape dates from DB in ".self::$DBG['mtime_queries']." queries [".round($t2-$t1,2)."s]");
 		
 		$totals=[];
 		$first_day_relevant = date("Ymd",time()-self::$CFG['TELEMETRY_DATA_AGE']);
@@ -932,6 +926,20 @@ class TelemetryScrapeSVs extends Telemetry {
 			self::log("Weird. Out of ".(count($freshfiles_to_process)-$totals['files_skipped'])." files read, ".count($totals['files_without_zgvs'])." had no ZGVs.");
 
 		self::stat(['status'=>"IDLE"]);
+	}
+
+	static function fetch_last_mtimes($flavour, $files) {
+		$slice=100; $qs=0;
+		$last_mtimes = [];
+		for ($ffi=0;$ffi<count($files);$ffi+=$slice) {
+			$batch = array_slice($files,$ffi,$slice);
+			$batch = array_map(function($f) use ($flavour) { $f=self::split_filename($f)[1]; return $flavour."/".$f; }, $batch);  // flavour/user/bnet
+			$last_mtimes_batch = self::db_get_svfile_mtimes($batch);
+			$qs++;
+			if ($last_mtimes_batch) $last_mtimes += $last_mtimes_batch;
+		}
+		self::$DBG['mtime_queries'] = $qs;
+		return $last_mtimes;
 	}
 
 	/**
@@ -1447,6 +1455,7 @@ class TelemetryCrunch extends Telemetry {
 	static function crunch_flavour($flavour) {
 		$topics = self::$CFG['SCRAPE_TOPICS'];
 
+		self::vlog("Running crunchers for flavour \x1b[38;5;78m{$flavour}\x1b[0m...");
 		foreach($topics as $name=>$topic) {
 			foreach($topic['crunchers'] as $cruncher) {
 				self::vlog("Running cruncher \x1b[38;5;148m{$name}\x1b[0m-\x1b[38;5;118m{$cruncher['name']}\x1b[0m...");
@@ -1476,6 +1485,7 @@ class TelemetryCrunch extends Telemetry {
 
 				// get new events
 				$getquery = self::qesc("SELECT * FROM events WHERE flavnum={d} AND type={s} AND id>{d}",$flavnum,$type,$start);
+				self::vlog("DEBUG: getquery: $getquery");
 				$getrequest = self::$db->query($getquery);
 
 				if ($getrequest->num_rows==0) {
@@ -1505,6 +1515,7 @@ class TelemetryCrunch extends Telemetry {
 				}
 			}
 		}
+		self::vlog("Crunchers for flavour \x1b[38;5;78m{$flavour}\x1b[0m complete.");
 	}
 
 }
