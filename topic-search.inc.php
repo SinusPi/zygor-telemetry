@@ -15,8 +15,5 @@ return [
 
 ENDLUA
 		,
-		'crunch_func'=>function($line,&$alldata,&$mydata) {
-			$mydata[$line['query']."=".$line['results']."/".substr($line['faction'],0,1)]++;
-		},
 		'output_mode'=>"day"
 ];

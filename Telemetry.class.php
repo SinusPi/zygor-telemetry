@@ -56,24 +56,43 @@ class Telemetry {
 
 	static function load_topics() {
 		$topics = [];
-		$files = glob("topic-*.inc.php");
-		foreach ($files as $file) {
-			$topic_name = preg_replace("/^.*topic-(.*)\\.inc\\.php$/","$1",$file);
-			if (preg_match("/[^a-z0-9_]/i",$topic_name)) continue; 
-			try {
-				$parse = token_get_all(file_get_contents($file));
-				$topic_data = include $file;
-				if (!$topic_data) continue;
-			} catch (Exception $e) {
-				throw new Exception("Failed to parse topic file $file: ".$e->getMessage()."\n");
-			}
+		foreach (glob("topic-*.inc.php") as $topic_file) {
+			$topic_name = preg_replace("/^.*topic-(.*)\\.inc\\.php$/","$1",$topic_file);
+			if (preg_match("/[^a-z0-9_]/i",$topic_name)) continue;
+			$topic_data = self::get_file($topic_file);
+			if (!$topic_data) continue;
+			if ($topic_data['crunchers_load']) $topic_data['crunchers'] = self::get_topic_crunchers($topic_name);
 			$topics[$topic_name] = $topic_data;
 		}
+		
 		self::$CFG['SCRAPE_TOPICS'] = $topics;
+
 		$keys = array_keys($topics); foreach ($keys as $i=>$k) {
 			if ($topics[$k]['crunchers']) { $c=count($topics[$k]['crunchers']); $keys[$i] .= " (+ $c cruncher".($c==1 ? "" : "s").": ".implode(", ",array_keys($topics[$k]['crunchers'])).")"; }
 		}
 		self::vlog("Loaded ".count($topics)." telemetry topics: ".implode(", ", $keys).".");
+	}
+
+	static function get_topic_crunchers($topic_name) {
+		$crunchers = [];
+		foreach (glob(__DIR__."/topic-{$topic_name}-*.inc.php") as $crunch_file) {
+			$crunch = self::get_file($crunch_file);
+			if (!is_array($crunch)) continue; // allow empty files
+			if (!$crunch['name']) $crunch['name'] = preg_replace("/.*topic-{$topic_name}-([^.]+)\.inc\.php$/","$1",$crunch_file);
+			$crunchers[] = $crunch;
+		}
+		return $crunchers;
+	}
+
+	static function get_file($filename) {
+		try {
+			$parse = token_get_all(file_get_contents($filename));
+			$file = include $filename;
+			if (!is_array($file)) return null;
+			return $file;
+		} catch (Exception $e) {
+			throw new Exception("Failed to parse file $filename: ".$e->getMessage()."\n");
+		}
 	}
 
 	static function set_error_reporting() {
@@ -1429,19 +1448,20 @@ class TelemetryCrunch extends Telemetry {
 		$topics = self::$CFG['SCRAPE_TOPICS'];
 
 		foreach($topics as $name=>$topic) {
-			foreach($topic['crunchers'] as $cname=>$cruncher) {
-				self::vlog("Running cruncher \x1b[38;5;148m{$name}\x1b[0m-\x1b[38;5;118m{$cname}\x1b[0m...");
+			foreach($topic['crunchers'] as $cruncher) {
+				self::vlog("Running cruncher \x1b[38;5;148m{$name}\x1b[0m-\x1b[38;5;118m{$cruncher['name']}\x1b[0m...");
 
 				// create if needed
 				if (isset($cruncher['table_schema'],$cruncher['table'])) {
 					$table = $cruncher['table'];
 					self::db_qesc("SHOW CREATE TABLE {$table}");
 					if (self::$db->error) {
-						self::vlog("Table '{$table}' for cruncher \x1b[38;5;118m{$cname}\x1b[0m does not exist (".self::$db->error."), creating...");
+						self::vlog("Table '{$table}' for cruncher '{$cruncher['name']}' does not exist (".self::$db->error."), creating...");
 						$schema_sql = $cruncher['table_schema'];
 						self::$db->query($schema_sql);
 						if (self::$db->error) 
 							throw new Exception("Failed to create table `{$table}`: ".self::$db->error);
+						self::vlog("Table '{$table}' created.");
 					}
 				}
 
@@ -1459,7 +1479,7 @@ class TelemetryCrunch extends Telemetry {
 				$getrequest = self::$db->query($getquery);
 
 				if ($getrequest->num_rows==0) {
-					self::vlog("No new {$name}-{$cname} events to process.");
+					self::vlog("No new {$name}-{$cruncher['name']} events to process.");
 					continue;
 				}
 				self::vlog("Found ".strval($getrequest->num_rows)." records, processing...");
@@ -1481,7 +1501,7 @@ class TelemetryCrunch extends Telemetry {
 				}
 
 				if ($cruncher['action']=="insert") {
-					self::vlog("Added ".strval($count)." new {$name}-{$cname} records.");
+					self::vlog("Added ".strval($count)." new {$name}-{$cruncher['name']} records.");
 				}
 			}
 		}

@@ -1,5 +1,5 @@
 <?php
-$UI = [
+return [
 		'extraction_lua'=><<<ENDLUA
 			if %ZGVS_VAR%.char then
 				for charname,chardata in pairs(%ZGVS_VAR%.char) do
@@ -30,23 +30,5 @@ $UI = [
 ENDLUA
 		,
 		'crunchers' => [],
-		'crunch_func'=>function($line,&$alldata,&$mydata,$userfn) {
-			unset($line['type']);
-			$mydata[$userfn][]=$line;
-		},
-		'output_mode'=>"day_user"
+		'crunchers_load' => true
 ];
-
-foreach (glob(__DIR__."/topic-ui-*.inc.php") as $cruncher) {
-	try {
-		$parse = token_get_all(file_get_contents($cruncher));
-		$fnconf = include $cruncher;
-		if (!is_array($fnconf)) continue; // allow empty files
-		$name = preg_replace("/.*topic-ui-([^.]+)\.inc\.php$/","$1",$cruncher);
-		$UI['crunchers'][$name] = $fnconf;
-	} catch (Exception $e) {
-		die("Error including $cruncher: ".$e->getMessage()."\n");
-	}
-}
-
-return $UI;
