@@ -1429,47 +1429,53 @@ class TelemetryCrunch extends Telemetry {
 		$topics = self::$CFG['SCRAPE_TOPICS'];
 
 		foreach($topics as $name=>$topic) {
-			foreach($topic["crunchers"] as $cname=>$cruncher) {
-				$table = $cruncher["table"];
+			foreach($topic['crunchers'] as $cname=>$cruncher) {
+				self::vlog("Running cruncher \x1b[38;5;148m{$name}\x1b[0m-\x1b[38;5;118m{$cname}\x1b[0m...");
 
 				// create if needed
-				self::db_qesc("SHOW CREATE TABLE {s}",$table);
-				if (self::$db->error) {
-					$schema_sql = $cruncher["table_schema"];
-					self::$db->query($schema_sql);
-					if (self::$db->error) 
-						throw new Exception("Failed to create table `{$table}`: ".self::$db->error);
+				if (isset($cruncher['table_schema'],$cruncher['table'])) {
+					$table = $cruncher['table'];
+					self::db_qesc("SHOW CREATE TABLE {$table}");
+					if (self::$db->error) {
+						self::vlog("Table '{$table}' for cruncher \x1b[38;5;118m{$cname}\x1b[0m does not exist (".self::$db->error."), creating...");
+						$schema_sql = $cruncher['table_schema'];
+						self::$db->query($schema_sql);
+						if (self::$db->error) 
+							throw new Exception("Failed to create table `{$table}`: ".self::$db->error);
+					}
 				}
-				die("boo");
+
+				// start fetching new events to process:
 
 				$flavnum = self::flavnum($flavour);
+				$type = $cruncher["eventtype"];
 
 				// get starting point
 				$start = self::db_query_one(self::qesc("SELECT IFNULL(MAX(id),0) FROM {$table} WHERE flavnum={d}",$flavnum)) ?: 0;
-				print("Processing {$cname} starting with index {$start}\n");
+				self::vlog("Processing {$type} events, starting with index {$start}");
 
 				// get new events
-				$getquery = self::qesc("SELECT * FROM events WHERE flavnum={d} AND type={s} AND id>{d}",$flavnum,$cname,$start);
+				$getquery = self::qesc("SELECT * FROM events WHERE flavnum={d} AND type={s} AND id>{d}",$flavnum,$type,$start);
 				$getrequest = self::$db->query($getquery);
-				print("Found ".strval($getrequest->num_rows)." records\n");
-
+				self::vlog("Found ".strval($getrequest->num_rows)." records");
+				die();
 				$index = 0;
 				while ($line = $getrequest->fetch_assoc()) {
 					$index++;
-					print("Processing ".strval($index)."/".strval($getrequest->num_rows)."\r");
+					self::vlog("Processing ".strval($index)."/".strval($getrequest->num_rows));
 
 					$values = $cruncher["function"]($line);
 
-					$insertquery = self::qarrayesc("INSERT INTO {$table} ({keys}) VALUES ({values})",$values);
-					$insertrequest = self::$db->query($insertquery);
-					if ($insertrequest!=1) {
-						print("\n");
-						print_r($insertrequest);
-						exit();
-					};						
-				};
-			};
-		};
+					if ($cruncher['action']=="insert" && isset($cruncher['table'])) {
+						$table = $cruncher['table'];
+						$insertquery = self::qarrayesc("INSERT INTO {$table} ({keys}) VALUES ({values})",$values);
+						$insertrequest = self::$db->query($insertquery);
+						if (self::$db->affected_rows!=1) throw new Exception("Failed to insert cruncher data into {$table}.");
+						if (self::$db->error) throw new Exception("ERROR inserting into {$table}: ".self::$db->error);
+					}
+				}
+			}
+		}
 	}
 
 }

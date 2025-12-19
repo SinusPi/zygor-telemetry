@@ -15,7 +15,6 @@ return [
 
 ENDLUA
 		,
-		'crunchers' => [],
 		'crunch_func'=>function($line,&$alldata,&$mydata) {
 			$mydata[$line['guide']]++;
 		},

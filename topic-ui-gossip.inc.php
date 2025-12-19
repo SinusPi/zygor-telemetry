@@ -1,8 +1,12 @@
 <?php
 /**
- * Cruncher for GOSSIP_MINED telemetry data.
+ * Simple cruncher for GOSSIP_MINED telemetry data.
+ * 
+ * Processes telemetry events of type 'eventtype' and extracts relevant fields.
+ * When run, returns associative arrays with the extracted values, to be put into the 'table'.
  */
 return [
+	"eventtype" => "ui_GOSSIP_MINED",
 	"function" => function($line) {
 		$unpacked = json_decode($line["data"], true);
 		foreach($unpacked as $field=>$value) {
@@ -30,6 +34,7 @@ return [
 
 		return $values;
 	},
+	"action" => "insert",
 	"table" => "gossips",
 	"table_schema" => "
 		CREATE TABLE `gossips` (
