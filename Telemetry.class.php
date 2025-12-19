@@ -14,7 +14,7 @@ class Telemetry {
 	static $CFG = [
 		'TELEMETRY_ROOT' => "telemetry",
 		'LOG_FILENAME' => "telemetry.log",
-		'MAX_RENDER_DAYS' => 30,
+		'MAX_DAYS' => 30,
 		'VERBOSE_FLAGS' => [],
 		'STATUS_INTERVAL' => 2,
 	];
@@ -30,6 +30,7 @@ class Telemetry {
 
 	static function init() {
 		self::set_error_reporting();
+		self::load_topics();
 		self::db_connect();
 	}
 
@@ -101,11 +102,15 @@ class Telemetry {
 		self::db_qesc("DELETE FROM status WHERE tag={s}", $testtag);
 	}
 	
+	static function stat($data,$keep=false) {
+		return self::status(self::$tag,$data,$keep);
+	}
 
 	/**
+	 * @deprecated
 	 * @return array [data_total,files,data_match]
 	 */
-	static function read_days($folder,$from=0,$to=9999999999) {
+	static function __read_days($folder,$from=0,$to=9999999999) {
 		$files = explode("\n",shell_exec("find $folder -name '*.json'"));
 		$files = str_replace("$folder/","",$files);
 	
@@ -118,7 +123,7 @@ class Telemetry {
 
 	// use glob to find all matching files, allowing ** to recurse into all folders
 	/** @deprecated */
-	static function rglob__old($pat) {
+	static function __rglob__old($pat) {
 		$p = strpos($pat, '**');
 		if ($p === false) {
 			//echo "$pat: just glob\n";
@@ -191,7 +196,7 @@ class Telemetry {
 	/** unused
 	 * @deprecated
 	 */
-	static function log_merged($s=null,$merge_tag=null) {
+	static function __log_merged($s=null,$merge_tag=null) {
 		static $i=0;
 		static $merges_last = [];
 		static $prev_merge_tag = null;
@@ -219,6 +224,7 @@ class Telemetry {
 	// utility functions
 
 	static function log($s,$tag=null) {
+		$tag = $tag ?: (self::$tag ?: "TELEMETRY");
 		file_put_contents(
 			self::$CFG['TELEMETRY_ROOT']."/".self::$CFG['LOG_FILENAME'],
 			date("Y-m-d H:i:s").".".sprintf("%03d",explode(" ", microtime())[0]*1000)." [$tag] ".$s."\n",
@@ -347,7 +353,7 @@ class Telemetry {
 	 * Save scraped data for a specific day and user/account.
 	 * @deprecated
 	 */
-	static function store_day_scrape($flavour,$day,$user,$acct, $daydata,$mtime, &$totals) {
+	static function __store_day_scrape($flavour,$day,$user,$acct, $daydata,$mtime, &$totals) {
 		if (!$daydata) 
 			return ++$totals['tmfiles_empty'];
 
@@ -539,14 +545,6 @@ class TelemetryScrapeSVs extends Telemetry {
 			}, self::$CFG))));
 		}
 	}
-
-	static function stat($data,$keep=false) {
-		return parent::status(self::$tag,$data,$keep);
-	}
-	static function log($s,$tag=null) {
-		return parent::log($s,self::$tag);
-	}
-
 	
 	
 	static function find_files($path, $days_old=null, $filemask, $loud=false) {
@@ -843,7 +841,7 @@ class TelemetryScrapeSVs extends Telemetry {
 				self::db_update_sv_file_times($sv_file_data['id'], filemtime($filename_full), NOW, $last_event_time);
 
 				// update progress
-				self::update_progress($n,count($freshfiles_to_process),['totals'=>$totals],self::$CFG['verbose']);
+				self::update_progress(self::$tag,$n,count($freshfiles_to_process),['totals'=>$totals],self::$CFG['verbose']);
 
 				// obey limit
 				if (isset(self::$CFG['limit']) && $n>=self::$CFG['limit']) {
@@ -885,7 +883,7 @@ class TelemetryScrapeSVs extends Telemetry {
 	 * Save scraped data for a specific day and user/account.
 	 * @deprecated
 	 */
-	static function save_day_scrape($flavour,$day,$user,$acct, $daydata, &$totals) {
+	static function __save_day_scrape($flavour,$day,$user,$acct, $daydata, &$totals) {
 		if (!$daydata) 
 			return ++$totals['tmfiles_empty'];
 		$scrape_folder = self::cfgstr('SCRAPES_PATH',['FLAVOUR'=>$flavour,'DAY'=>$day]);
@@ -907,7 +905,7 @@ class TelemetryScrapeSVs extends Telemetry {
 
 
 	/** @deprecated */
-	static function write_intermediate_mtimes($flavour,$last_scrape_dates,$force=false) {
+	static function __write_intermediate_mtimes($flavour,$last_scrape_dates,$force=false) {
 		static $time_last_mtimes=0;
 		if ($force || time()-$time_last_mtimes >= self::$CFG['MTIMES_WRITE_INTERVAL']) {
 			$mtimes_cache_filename = self::cfgstr('FLAVOUR_PATH',['FLAVOUR'=>$flavour])."/".self::$CFG['MTIMES_CACHE_FILENAME'];
@@ -1094,7 +1092,7 @@ ENDLUA;
 	/**
 	 * @deprecated
 	 */
-	static function split_data_by_types_days($datapoints) {
+	static function __split_data_by_types_days($datapoints) {
 		$today = date("Ymd",NOW);
 		$data_by_days = [];
 		foreach ((array)$datapoints as $line) {
@@ -1154,9 +1152,9 @@ ENDLUA;
 class TelemetryCrunch extends Telemetry {
 
 	/**
-	 * Combine each day's userfiles from telemetry/\<flavor\>/scraped/\<day\>/*.json into telemetry/\<flavor>\/\<metric\>/\<day\>.json
+	 * Combine each day's events from telemetry/\<flavor\>/scraped/\<day\>/*.json into telemetry/\<flavor>\/\<metric\>/\<day\>.json
 	 */
-	static function crunch_days($flavour) {
+	static function crunch($flavour) {
 		if (!in_array($flavour,array_keys(self::$CFG['WOW_FLAVOUR_DATA']))) throw new Exception("Unsupported flavour '{$flavour}' (supported: ".join(", ",array_keys(self::$CFG['WOW_FLAVOUR_DATA'])).")");
 
 		$status['progress']=[];
@@ -1197,11 +1195,13 @@ class TelemetryCrunch extends Telemetry {
 		//$files = array_values(array_filter($files,function($fn) use ($from,$to) { return $fn>=$from && $fn<=$to; }));
 		//$status['data_match']=count($files);
 
+		self::$tag = "CRUNCH-".strtoupper(str_replace("-","_", $flavour));
+
 		$totaldays=count($days);
 		$ndays=0;
 		$newfiles=0;
 		foreach ($days as $i=>$day) {
-			self::update_progress($i,$totaldays);
+			self::update_progress(self::$tag,$i,$totaldays);
 
 			$new = self::crunch_day($flavour,$day);
 			
@@ -1210,7 +1210,7 @@ class TelemetryCrunch extends Telemetry {
 				$ndays++;
 			}
 
-			self::update_progress($i,$totaldays);
+			self::update_progress(self::$tag,$i,$totaldays);
 
 			if ($ndays>=self::$CFG['MAX_CRUNCH_DAYS']) {
 				self::log("\x1b[41;37;1m STOP \x1b[0m : Reached max crunch days (".self::$CFG['MAX_CRUNCH_DAYS'].").");

@@ -2,9 +2,9 @@
 ini_set("max_execution_time",3600);
 
 /**
- * Extracts telemetry data from SV files using Lua scripts.
+ * Crunches telemetry data in DB
  * Usage:
- * php telemetry_scrape_svs.php -f <flavour> [--norender] [--maxrenderdays <days>] [--debug-lua] 
+ * php telemetry_crunch.php -f <flavour> [--norender] [--maxrenderdays <days>] [--debug-lua] 
  * [--ignore-mtimes] [--start-day <YYYYMMDD>] [--limit <number>] [--filemask <mask>] 
  * [--rendermask <mask>] [--debug] [--today-too] [--verbose]
  */
@@ -23,8 +23,7 @@ require_once "includes/zygor.class.inc.php";
 
 $OPTS = \Zygor\Shell::better_getopt([
 	['f:','flavour:',     ['wow','wow-classic','wow-classic-tbc']],
-	['', 'norender',      false],
-	['', 'maxrenderdays:',999999],
+	['', 'maxdays:',      999999],
 	['', 'debug',         false],
 	['', 'debug-lua',     false],
 	['', 'ignore-mtimes', false],
@@ -38,32 +37,12 @@ $OPTS = \Zygor\Shell::better_getopt([
 ]);
 $FLAVOURS = $OPTS['f'];
 if (substr($OPTS['start-day'],0,1)=="-") $OPTS['start-day']=date("Ymd",strtotime($OPTS['start-day']." days"));
-$OPTS["MAX_RENDER_DAYS"]=$OPTS['maxrenderdays'];
+$OPTS["MAX_DAYS"]=$OPTS['maxdays'];
 
-TelemetryScrapeSVs::config($OPTS);
-TelemetryScrapeSVs::load_topics();
-TelemetryScrapeSVs::init();
+TelemetryCrunch::config($OPTS);
+TelemetryCrunch::init();
 
-// PHASE ONE: SCRAPE
-
-foreach ($FLAVOURS as $flav) TelemetryScrapeSVs::scrape_flavour($flav);
-
-/*
-$status['status']="WRITING";
-status($status);
-file_put_contents(TELEMETRY_FOLDER."/".date("telemetry--Y-m-d--H-i-s.json"),json_encode($metrics));
-*/
-
-// AND NOW PHASE TWO
-
-die("NO RENDERING FOR NOW");
-
-if (!$OPTS['norender']) {
-	foreach ($FLAVOURS as $flav) TelemetryScrapeSVs::render_days($flav);
-} else {
-	Telemetry::log("'norender' requested, stopping.");
-	goto end;
-}
+foreach ($FLAVOURS as $flav) TelemetryCrunch::crunch($flav);
 
 
 
@@ -72,10 +51,10 @@ if (!$OPTS['norender']) {
 
 end:
 
-TelemetryScrapeSVs::stat([
+TelemetryCrunch::stat([
 	'status'=>"DONE",
 	'progress'=>[
-		'time_total'=>time()-Telemetry::$last_status['time_started'],
+		'time_total'=>time()-Telemetry::get_status('time_started'),
 		'progress_raw'=>null,
 		'progress_total'=>$total,
 		'progress_percent'=>100,

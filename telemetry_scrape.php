@@ -23,7 +23,7 @@ require_once "includes/zygor.class.inc.php";
 
 $OPTS = \Zygor\Shell::better_getopt([
 	['f:','flavour:',     ['wow','wow-classic','wow-classic-tbc']],
-	['', 'maxrenderdays:',999999],
+	['', 'maxdays:',      999999],
 	['', 'debug',         false],
 	['', 'debug-lua',     false],
 	['', 'ignore-mtimes', false],
@@ -36,10 +36,9 @@ $OPTS = \Zygor\Shell::better_getopt([
 ]);
 $FLAVOURS = $OPTS['f'];
 if (substr($OPTS['start-day'],0,1)=="-") $OPTS['start-day']=date("Ymd",strtotime($OPTS['start-day']." days"));
-$OPTS["MAX_RENDER_DAYS"]=$OPTS['maxrenderdays'];
+$OPTS["MAX_DAYS"]=$OPTS['maxdays'];
 
 TelemetryScrapeSVs::config($OPTS);
-TelemetryScrapeSVs::load_topics();
 TelemetryScrapeSVs::init();
 
 // PHASE ONE: SCRAPE
