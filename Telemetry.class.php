@@ -44,14 +44,24 @@ class Telemetry {
 
 	static function load_topics() {
 		$topics = [];
-		$files = glob(__DIR__."/topic-*.inc.php");
+		$files = glob("topic-*.inc.php");
 		foreach ($files as $file) {
-			$topic_name = substr(basename($file),6,-8); // strip topic- and .inc.php
-			$topic_data = include $file;
-			if (!$topic_data) throw new Exception("Failed to parse topic file $file");
+			$topic_name = preg_replace("/^.*topic-(.*)\\.inc\\.php$/","$1",$file);
+			if (preg_match("/[^a-z0-9_]/i",$topic_name)) continue; 
+			try {
+				$parse = token_get_all(file_get_contents($file));
+				$topic_data = include $file;
+				if (!$topic_data) continue;
+			} catch (Exception $e) {
+				throw new Exception("Failed to parse topic file $file: ".$e->getMessage()."\n");
+			}
 			$topics[$topic_name] = $topic_data;
 		}
 		self::$CFG['SCRAPE_TOPICS'] = $topics;
+		$keys = array_keys($topics); foreach ($keys as $i=>$k) {
+			if ($topics[$k]['crunchers']) { $c=count($topics[$k]['crunchers']); $keys[$i] .= " (+ $c cruncher".($c==1 ? "" : "s").": ".implode(", ",array_keys($topics[$k]['crunchers'])).")"; }
+		}
+		self::vlog("Loaded ".count($topics)." telemetry topics: ".implode(", ", $keys).".");
 	}
 
 	static function set_error_reporting() {
@@ -1174,6 +1184,8 @@ class TelemetryCrunch extends Telemetry {
 	static function crunch($flavour) {
 		if (!in_array($flavour,array_keys(self::$CFG['WOW_FLAVOUR_DATA']))) throw new Exception("Unsupported flavour '{$flavour}' (supported: ".join(", ",array_keys(self::$CFG['WOW_FLAVOUR_DATA'])).")");
 
+		self::$tag = "CRUNCH-".strtoupper(str_replace("-","_", $flavour));
+
 		$status['progress']=[];
 		$status['totals']=[];
 		self::stat([
@@ -1181,7 +1193,6 @@ class TelemetryCrunch extends Telemetry {
 			'stage'=>2,
 			'stageof'=>2,
 		]);
-
 
 		/*
 		$scrape_path_root = dirname(self::cfgstr('SCRAPES_PATH',['FLAVOUR'=>$flavour,'DAY'=>'0']));
@@ -1211,8 +1222,6 @@ class TelemetryCrunch extends Telemetry {
 		//$status['data_total']=count($files);
 		//$files = array_values(array_filter($files,function($fn) use ($from,$to) { return $fn>=$from && $fn<=$to; }));
 		//$status['data_match']=count($files);
-
-		self::$tag = "CRUNCH-".strtoupper(str_replace("-","_", $flavour));
 
 		$totaldays=count($days);
 		$ndays=0;
@@ -1408,29 +1417,35 @@ class TelemetryCrunch extends Telemetry {
 		}
 	}
 
-	static function crunch_all($flavour) {
+	static function crunch_flavour($flavour) {
 		$topics = self::$CFG['SCRAPE_TOPICS'];
 
 		foreach($topics as $name=>$topic) {
 			foreach($topic["crunchers"] as $cname=>$cruncher) {
 				$table = $cruncher["table"];
-				$keys = $cruncher["keys"];
-				// get starting point
-				$countquery = self::qesc("SELECT max(id) as max FROM {$table}");
-				$countrequest = self::$db->query($countquery);
-				$countresult = $countrequest->fetch_array();
 
-				$start = $countresult["max"];
+				// create if needed
+				self::db_qesc("SHOW CREATE TABLE {s}",$table);
+				if (self::$db->error) {
+					$schema_sql = $cruncher["table_schema"];
+					self::$db->query($schema_sql);
+					if (self::$db->error) 
+						throw new Exception("Failed to create table `{$table}`: ".self::$db->error);
+				}
+				die("boo");
+
+				$flavnum = self::flavnum($flavour);
+
+				// get starting point
+				$start = self::db_query_one(self::qesc("SELECT IFNULL(MAX(id),0) FROM {$table} WHERE flavnum={d}",$flavnum)) ?: 0;
 				print("Processing {$cname} starting with index {$start}\n");
 
 				// get new events
-				$getquery = self::qesc("SELECT * FROM events where type={s} and id>{d}",$cname,$start);
+				$getquery = self::qesc("SELECT * FROM events WHERE flavnum={d} AND type={s} AND id>{d}",$flavnum,$cname,$start);
 				$getrequest = self::$db->query($getquery);
-
 				print("Found ".strval($getrequest->num_rows)." records\n");
 
-
-				$indedx = 0;
+				$index = 0;
 				while ($line = $getrequest->fetch_assoc()) {
 					$index++;
 					print("Processing ".strval($index)."/".strval($getrequest->num_rows)."\r");

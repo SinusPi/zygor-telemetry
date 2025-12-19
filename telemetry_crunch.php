@@ -42,7 +42,7 @@ $OPTS["MAX_DAYS"]=$OPTS['maxdays'];
 TelemetryCrunch::config($OPTS);
 TelemetryCrunch::init();
 
-foreach ($FLAVOURS as $flav) TelemetryCrunch::crunch($flav);
+foreach ($FLAVOURS as $flav) TelemetryCrunch::crunch_flavour($flav);
 
 
 

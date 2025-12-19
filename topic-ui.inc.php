@@ -1,5 +1,5 @@
 <?php
-return [
+$UI = [
 		'extraction_lua'=><<<ENDLUA
 			if %ZGVS_VAR%.char then
 				for charname,chardata in pairs(%ZGVS_VAR%.char) do
@@ -29,41 +29,24 @@ return [
 
 ENDLUA
 		,
-		'crunchers' => [
-			"ui_GOSSIP_MINED" => [
-				"function" => function($line) {
-					$unpacked = json_decode($line["data"], true);
-					foreach($unpacked as $field=>$value) {
-						$line[$field] = $value;
-					};
-					unset($line['data']);
-					unset($line['type']);
-					unset($line['file_id']);
-					$line["gossip"] = str_replace("||","|",$line["gossip"]);
-					$line["file"] = str_replace("\n","",$line["file"]);
-
-					$values = [
-						"gossip" => $line["gossip"],
-						"file" => $line["file"],
-						"gossip" => $line["gossip"],
-						"gossipIcon" => $line["gossipIcon"],
-						"guide" => $line["guide"],
-						"raceclass" => $line["raceclass"],
-						"step" => $line["step"],
-						"stepgoals" => $line["stepgoals"],
-						"ver" => $line["ver"],
-						"id" => $line["id"],
-						"flavnum" => $line["flavnum"]
-						];
-
-					return $values;
-				},
-				"table" => "gossips",
-			],
-		],
+		'crunchers' => [],
 		'crunch_func'=>function($line,&$alldata,&$mydata,$userfn) {
 			unset($line['type']);
 			$mydata[$userfn][]=$line;
 		},
 		'output_mode'=>"day_user"
 ];
+
+foreach (glob(__DIR__."/topic-ui-*.inc.php") as $cruncher) {
+	try {
+		$parse = token_get_all(file_get_contents($cruncher));
+		$fnconf = include $cruncher;
+		if (!is_array($fnconf)) continue; // allow empty files
+		$name = preg_replace("/.*topic-ui-([^.]+)\.inc\.php$/","$1",$cruncher);
+		$UI['crunchers'][$name] = $fnconf;
+	} catch (Exception $e) {
+		die("Error including $cruncher: ".$e->getMessage()."\n");
+	}
+}
+
+return $UI;
