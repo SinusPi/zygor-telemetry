@@ -544,19 +544,24 @@ class TelemetryScrapeSVs extends Telemetry {
 		if (!$SYNC_CFG) throw new Exception("Failed to load sync config from ".self::$CFG['SV_STORAGE_ROOT']."/config.inc.php");
 		self::$CFG['SV_STORAGE_DATA_PATH'] = self::cfgstr('SV_STORAGE_DATA_PATH',['SYNC_FOLDER'=>$SYNC_CFG['folder']]);
 
-		if (self::$CFG['verbose']) {
-			self::log(get_called_class()." config:");
-			self::log(join("\n",array_map(function($k,$v) { /* key=value */
-				if (is_array($v)) $v="[".join(",",$v)."]";
-				elseif ($v===TRUE) $v="Y";
-				elseif ($v===FALSE) $v="N";
-				return "\x1b[32m{$k}\x1b[0m=\x1b[33m{$v}\x1b[0m";
-			},
-			array_keys(self::$CFG),
-			array_map(function($s) { /* colorize <placeholders> */
-				return is_string($s) ? preg_replace("/(<.*?>)/","\x1b[35m$1\x1b[33m",$s) : $s;
-			}, self::$CFG))));
-		}
+		if (self::$CFG['verbose']) self::dump_config();
+	}
+
+	static function dump_config() {
+		$cfg = self::$CFG;
+		if (!$cfg) return; // No config loaded
+		self::log(get_called_class()." config:");
+		if (isset($cfg['DB']['pass'])) $cfg['DB']['pass']="****"; // hide password
+		self::log(join("\n",array_map(function($k,$v) { /* key=value */
+			if (is_array($v)) $v="[".join(",",$v)."]";
+			elseif ($v===TRUE) $v="Y";
+			elseif ($v===FALSE) $v="N";
+			return "\x1b[32m{$k}\x1b[0m=\x1b[33m{$v}\x1b[0m";
+		},
+		array_keys($cfg),
+		array_map(function($s) { /* colorize <placeholders> */
+			return is_string($s) ? preg_replace("/(<.*?>)/","\x1b[35m$1\x1b[33m",$s) : $s;
+		}, $cfg))));
 	}
 	
 	
