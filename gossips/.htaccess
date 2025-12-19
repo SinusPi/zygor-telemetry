@@ -1,0 +1,4 @@
+AuthType Basic
+AuthName "Password Protected Area"
+AuthUserFile /home/zygordata/.htpasswds/.htpasswd
+Require user tutorial zygor sinus asturgeon ptinsley calamity mmccormick
