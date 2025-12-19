@@ -30,8 +30,16 @@ class Telemetry {
 
 	static function init() {
 		self::set_error_reporting();
-		self::load_topics();
-		self::db_connect();
+		try {
+			self::load_topics();
+		} catch (Exception $e) {
+			die("Failed to load topics: ".$e->getMessage()."\n");
+		}
+		try {
+			self::db_connect();
+		} catch (Exception $e) {
+			die("Failed to connect to database '".self::$CFG['DB']['db']."' on '".self::$CFG['DB']['host']."': ".$e->getMessage()."\n");
+		}
 	}
 
 	static function load_topics() {
@@ -82,6 +90,7 @@ class Telemetry {
 		return self::$last_statuses[$tag];
 	}
 	static function status($tag,$data,$keep=false) {
+		if (!self::$db) return; // DB not connected, no status
 		$last_status = $keep ? self::get_status($tag) : [];
 		$last_status = array_replace_recursive($last_status,$data);
 
@@ -225,11 +234,14 @@ class Telemetry {
 
 	static function log($s,$tag=null) {
 		$tag = $tag ?: (self::$tag ?: "TELEMETRY");
-		file_put_contents(
-			self::$CFG['TELEMETRY_ROOT']."/".self::$CFG['LOG_FILENAME'],
-			date("Y-m-d H:i:s").".".sprintf("%03d",explode(" ", microtime())[0]*1000)." [$tag] ".$s."\n",
-			FILE_APPEND|LOCK_EX
-		);
+		if (self::$CFG['LOG_FILENAME']) {
+			// log to file
+			file_put_contents(
+				self::$CFG['TELEMETRY_ROOT']."/".self::$CFG['LOG_FILENAME'],
+				date("Y-m-d H:i:s").".".sprintf("%03d",explode(" ", microtime())[0]*1000)." [$tag] ".$s."\n",
+				FILE_APPEND|LOCK_EX
+			);
+		}
 		if (function_exists('posix_isatty') ? posix_isatty(STDIN) : (php_sapi_name() === 'cli')) echo $s."\n";
 	}
 
@@ -519,6 +531,7 @@ class FileLockedException extends Exception {
 class TelemetryScrapeSVs extends Telemetry {
 	static function init() {
 		parent::init();
+		self::self_tests();
 	}
 
 	static function config($cfg=[],$sync_cfg=[]) {
@@ -583,8 +596,6 @@ class TelemetryScrapeSVs extends Telemetry {
 	 */
 	static function scrape_flavour($flavour) {
 		if (!in_array($flavour,array_keys(self::$CFG['WOW_FLAVOUR_DATA']))) throw new Exception("Unsupported flavour '{$flavour}' (supported: ".join(", ",array_keys(self::$CFG['WOW_FLAVOUR_DATA'])).")");
-
-		self::db_connect();
 
 		self::$tag = "SCRAPE-".strtoupper(str_replace("-","_", $flavour));
 		$status = self::get_status(self::$tag, true);
@@ -1046,7 +1057,6 @@ ENDLUA;
 		self::test_paths();
 		self::test_datapoints();
 		try {
-			self::db_connect();
 			self::db_create();
 			self::test_status();
 			self::vlog("Database: connected and present.");
@@ -1393,8 +1403,6 @@ class TelemetryCrunch extends Telemetry {
 
 	static function crunch_all($flavour) {
 		$topics = self::$CFG['SCRAPE_TOPICS'];
-
-		self::db_connect();
 
 		foreach($topics as $name=>$topic) {
 			foreach($topic["crunchers"] as $cname=>$cruncher) {
