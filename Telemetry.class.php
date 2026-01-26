@@ -575,7 +575,22 @@ class Telemetry {
 			return is_string($s) ? preg_replace("/(<.*?>)/","\x1b[35m$1\x1b[33m",$s) : $s;
 		}, $cfg))));
 	}
-	
+
+	static function db_lock($lock) {
+		$lock = "'scrape/".self::$db->real_escape_string($lock)."'";
+		self::vlog(microtime(true)." DB lock '$lock' attempting...");
+		$result = self::db_query_one("SELECT GET_LOCK($lock, 1);");
+		self::vlog(microtime(true)." DB lock '$lock' result: ".$result);
+		return $result;
+	}
+
+	static function db_unlock($lock) {
+		$lock = "'scrape/".self::$db->real_escape_string($lock)."'";
+		self::vlog(microtime(true)." DB lock '$lock' releasing...");
+		$result = self::db_query_one("SELECT RELEASE_LOCK($lock);");
+		self::vlog(microtime(true)." DB lock '$lock' released: ".$result);
+		return $result;
+	}
 }
 
 class FileLockedException extends Exception {
@@ -785,19 +800,31 @@ class TelemetryScrapeSVs extends Telemetry {
 		foreach ($freshfiles_to_process as $n=>$filename_full) {
 			self::stat(['file_last'=>$filename_full],true);
 			list (,$filename_slug) = self::split_filename($filename_full);
-			$user = basename($filename_slug);
-			$bnet = basename(dirname($filename_slug));
+			$bnet = basename($filename_slug);
+			$user = basename(dirname($filename_slug));
 			$userfolder = dirname($filename_full);
 
 			self::vlog("Scraping SV: \x1b[38;5;110m$user\x1b[0m/\x1b[38;5;116m$bnet\x1b[0m\x1b[30;1m--SavedVariables...\x1b[0m");
 
+			$is_windows = (strpos(PHP_OS, 'WIN') === 0); $is_linux = !$is_windows;
+			$lock_code = $flavour."/".$filename_slug;
+			$got_db_lock = false;
+
 			try { // flock block
-				if (strpos(PHP_OS, 'WIN') !== 0) {
+				if ($is_linux) {
 					$fl = fopen($userfolder, 'rb');
 					if (!$fl) throw new FileLockedException("Cannot open input folder for locking: $userfolder");
 					if (!flock($fl, LOCK_EX | LOCK_NB)) {
 						fclose($fl);
 						throw new FileLockedException("Input folder locked: $userfolder");
+					}
+				} else {
+					// Windows: use DB locks
+					$got_db_lock = self::db_lock($lock_code);
+					if (!$got_db_lock) {
+						throw new FileLockedException("Input folder locked (DB): $lock_code");
+					} else {
+						self::vlog(microtime(true)." DB lock acquired for $lock_code");
 					}
 				}
 
@@ -808,7 +835,7 @@ class TelemetryScrapeSVs extends Telemetry {
 				$flavourfile = $flavour."/".$filename_slug; // flavour/user/bnet
 				$sv_file_data = self::db_get_sv_file_data($flavourfile);
 				if (!$sv_file_data) {
-					self::log("Cannot get sv_file_data for $filename_full. Locked?");					
+					self::log("Cannot get sv_file_data for $filename_full. Locked?");
 					throw new FileLockedException("DB locked for $flavourfile");
 				}
 
@@ -897,17 +924,22 @@ class TelemetryScrapeSVs extends Telemetry {
 					echo "Limit ".self::$CFG['limit']." hit, aborting.\n";
 					break;
 				}
+				self::$db->commit();
+
 			} catch (FileLockedException $e) {
-				self::vlog("Input file locked, skipping: $filename_full");
+				self::vlog($e->getMessage()." - $filename_full");
 				self::$db->rollback();
 				continue;
 			} catch (Exception $e) {
-				self::log("ERROR processing $filename_full: " . $e->getMessage());
+				self::log(microtime(true)." ERROR processing $filename_full: " . $e->getMessage());
 				throw $e;
 			} finally {
 				// unlock
 				if (isset($fl)) { flock($fl, LOCK_UN); fclose($fl); }
-				self::$db->commit();
+				if ($got_db_lock) {
+					$unl = self::db_unlock($lock_code);
+					self::vlog(microtime(true)." DB lock released for $lock_code: ".($unl ? "ok" : "failed"));
+				}
 			}
 
 			$processed_files = $n + 1;
@@ -1465,7 +1497,7 @@ class TelemetryCrunch extends Telemetry {
 					$table = $cruncher['table'];
 					self::db_qesc("SHOW CREATE TABLE {$table}");
 					if (self::$db->error) {
-						self::vlog("Table '{$table}' for cruncher '{$cruncher['name']}' does not exist (".self::$db->error."), creating...");
+						self::vlog("\x1b[31;1mTable '{$table}' for cruncher '{$cruncher['name']}' does not exist, creating...\x1b[0m");
 						$schema_sql = $cruncher['table_schema'];
 						self::$db->query($schema_sql);
 						if (self::$db->error) 
