@@ -12,6 +12,7 @@ class TelemetryScrapeSVs extends Telemetry {
 
 	static function _sub_config() {
 		self::$CFG = (array)(@include "config-scrape.inc.php") + self::$CFG; // load defaults
+		if (!self::$CFG['SV_STORAGE_ROOT']) throw new Exception("SV_STORAGE_ROOT not defined in config, config.inc.php not loaded?");
 
 		// load sync's config
 		@include self::$CFG['SV_STORAGE_ROOT']."/config.inc.php"; // defines SYNC_CFG
@@ -223,7 +224,7 @@ class TelemetryScrapeSVs extends Telemetry {
 					if (!$got_db_lock) {
 						throw new FileLockedException("Input folder locked (DB): $lock_code");
 					} else {
-						self::vlog(microtime(true)." DB lock acquired for $lock_code");
+						//self::vlog(microtime(true)." DB lock acquired for $lock_code");
 					}
 				}
 
@@ -337,7 +338,7 @@ class TelemetryScrapeSVs extends Telemetry {
 				if (isset($fl)) { flock($fl, LOCK_UN); fclose($fl); }
 				if ($got_db_lock) {
 					$unl = self::db_unlock($lock_code);
-					self::vlog(microtime(true)." DB lock released for $lock_code: ".($unl ? "ok" : "failed"));
+					//self::vlog(microtime(true)." DB lock released for $lock_code: ".($unl ? "ok" : "failed"));
 				}
 			}
 
@@ -430,13 +431,6 @@ class TelemetryScrapeSVs extends Telemetry {
 	* @return array ['status'=>"ok",'datapoints'=>[...], 'times'=>[...] ] or ['status'=>"err", 'err'=>...]
 	*/
 	static function extract_datapoints_with_lua($sv_raw,$flavour,$topic_defs) {
-		$descriptorspec = [
-			0 => ["pipe", "r"],  // stdin is a pipe that the child will read from
-			1 => ["pipe", "w"],  // stdout is a pipe that the child will write to
-			2 => ["pipe", "w"]  // NOPE:pipe // stderr is a file to write to
-		];
-		$process = proc_open(self::$CFG['LUA_PATH'], $descriptorspec, $pipes, __DIR__, []);
-	
 		$json_req = self::$CFG['LUA_JSON_MODULE_REQUIRE'];
 		$lua_head=<<<ENDLUA
 		   if not %ZGVS_VAR% then print('{"status":"err","err":"no_zgvs"}') return end
@@ -468,7 +462,14 @@ ENDLUA;
 		$lua = preg_replace_callback("/%([A-Z_]+)%/",function($s) use ($flavour) { return self::$CFG['WOW_FLAVOUR_DATA'][$flavour][$s[1]]; },$lua);
 		if (self::$CFG['debug_lua']) echo $lua;
 		unset(self::$CFG['debug_lua']);
+
 	
+		$descriptorspec = [
+			0 => ["pipe", "r"],  // stdin is a pipe that the child will read from
+			1 => ["pipe", "w"],  // stdout is a pipe that the child will write to
+			2 => ["pipe", "w"]  // NOPE:pipe // stderr is a file to write to
+		];
+		$process = proc_open(self::$CFG['LUA_PATH'], $descriptorspec, $pipes, null, []);
 		
 		fwrite($pipes[0],$sv_raw); // ZGVSV
 		fwrite($pipes[0],$lua);
@@ -482,7 +483,7 @@ ENDLUA;
 		$errcode = proc_close($process);
    
 		if ($errcode!=0) return ['status'=>"err",'err'=>"errcode_nonzero",'errcode'=>$errcode,'error'=>$stderr];
-		if ($stderr) return ['status'=>"err",'err'=>"stderr_output",'error'=>$stderr,'source_lua'=>$lua];
+		if ($stderr) return ['status'=>"err",'err'=>"stderr_output",'error'=>$stderr,'source_lua'=>$lua,'cwd'=>getcwd(),'luapath'=>self::$CFG['LUA_PATH']];
 		$arr = @json_decode($datapoints,true);
 		//if (!is_array($arr)) return ['']
 		if (!$arr) { return ['status'=>"err",'err'=>"bad_json_output",'json_err'=>json_last_error_msg(),'len'=>strlen($datapoints),'partial'=>substr($datapoints,0,6000)]; }

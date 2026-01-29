@@ -1,6 +1,4 @@
 <?php
-require_once "includes/zygor.class.inc.php";
-
 if (!defined('DAY')) define('DAY', 24 * 60 * 60);
 if (!defined('NOW')) define('NOW', time());
 
@@ -576,17 +574,17 @@ class Telemetry {
 
 	static function db_lock($lock) {
 		$lock = "'scrape/".self::$db->real_escape_string($lock)."'";
-		self::vlog(microtime(true)." DB lock '$lock' attempting...");
+		//self::vlog(microtime(true)." DB lock '$lock' attempting...");
 		$result = self::db_query_one("SELECT GET_LOCK($lock, 1);");
-		self::vlog(microtime(true)." DB lock '$lock' result: ".$result);
+		//self::vlog(microtime(true)." DB lock '$lock' result: ".$result);
 		return $result;
 	}
 
 	static function db_unlock($lock) {
 		$lock = "'scrape/".self::$db->real_escape_string($lock)."'";
-		self::vlog(microtime(true)." DB lock '$lock' releasing...");
+		//self::vlog(microtime(true)." DB lock '$lock' releasing...");
 		$result = self::db_query_one("SELECT RELEASE_LOCK($lock);");
-		self::vlog(microtime(true)." DB lock '$lock' released: ".$result);
+		//self::vlog(microtime(true)." DB lock '$lock' released: ".$result);
 		return $result;
 	}
 }
@@ -595,5 +593,5 @@ class FileLockedException extends Exception {
 	// Custom exception for file locking issues
 }
 
-require_once "TelemetryScrapeSVs.class.php";
-require_once "TelemetryCrunch.class.php";
+require_once __DIR__."/TelemetryScrapeSVs.class.php";
+require_once __DIR__."/TelemetryCrunch.class.php";

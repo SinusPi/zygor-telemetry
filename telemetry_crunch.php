@@ -11,7 +11,7 @@ ini_set("max_execution_time",3600);
 
 define("DAY",86400);
  
-require_once "Telemetry.class.php";
+require_once "classes/Telemetry.class.php";
 
 require_once "includes/VerboseException.class.php";
 require_once "includes/shell.class.php";
@@ -22,7 +22,7 @@ require_once "includes/zygor.class.inc.php";
 //pcntl_signal(SIGINT,function() { write_error_to_status(E_ERROR,"Terminated",__FILE__,__LINE__); die(); return true; });
 
 $OPTS = \Zygor\Shell::better_getopt([
-	['f:','flavour:',     ['wow','wow-classic','wow-classic-tbc']],
+	['f:','flavour:',     ['wow','wow-classic','wow-classic-tbc','wow-classic-tbc-anniv']],
 	['', 'maxdays:',      999999],
 	['', 'debug',         false],
 	['', 'debug-lua',     false],

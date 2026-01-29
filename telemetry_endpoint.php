@@ -9,7 +9,7 @@ header("Content-type: application/json");
 
 define("STORAGE_FOLDER","storage");
 define("TELEMETRY_FOLDER","telemetry");
-define("WOW_FLAVOURS","wow,wow-classic,wow-classic-tbc");
+define("WOW_FLAVOURS","wow,wow-classic,wow-classic-tbc",'wow-classic-tbc-anniv');
 
 $from = $_REQUEST['from'];
 $to = $_REQUEST['to'];
