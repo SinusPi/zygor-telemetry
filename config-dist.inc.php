@@ -7,7 +7,7 @@ return [
 	"TELEMETRY_FILE_AGE" => 7 * DAY,
 	"TELEMETRY_DATA_AGE" => 30 * DAY,
 
-	"WOW_FLAVOURS" => [ 'wow','wow-classic','wow-classic-tbc' ],
+	"WOW_FLAVOURS" => [ 'wow','wow-classic','wow-classic-tbc','wow-classic-tbc-anniv' ],
 
 	"DB" => [
 		'host' => 'localhost',

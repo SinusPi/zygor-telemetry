@@ -16,6 +16,7 @@ return [
 	"WOW_FLAVOUR_DATA" => [
 		'wow' => ['ZGVS_VAR' => "ZygorGuidesViewerSettings"],
 		'wow-classic' => ['ZGVS_VAR' => "ZygorGuidesViewerClassicSettings"],
-		'wow-classic-tbc' => ['ZGVS_VAR' => "ZygorGuidesViewerClassicSettings"]
+		'wow-classic-tbc' => ['ZGVS_VAR' => "ZygorGuidesViewerClassicSettings"],
+		'wow-classic-tbc-anniv' => ['ZGVS_VAR' => "ZygorGuidesViewerClassicSettings"]
 	],
 ];
