@@ -312,8 +312,7 @@ class Telemetry {
 	}
 
 	static function flavnum($flavour) {
-		$flavs = ['wow'=>1,'wow-classic'=>2,'wow-classic-tbc'=>3];
-		$flavnum = $flavs[$flavour] ?: 0;
+		$flavnum = self::$CFG['WOW_FLAVOUR_DATA'][$flavour]['num'] ?: 0;
 		if ($flavnum===0) throw new Exception("Unknown flavour '$flavour'");
 		return $flavnum;
 	}
@@ -393,9 +392,10 @@ class Telemetry {
 					PARTITION `p_wtf` VALUES LESS THAN (1) ENGINE = InnoDB,
 					PARTITION `p_wow` VALUES LESS THAN (2) ENGINE = InnoDB,
 					PARTITION `p_wowclassic` VALUES LESS THAN (3) ENGINE = InnoDB,
-					PARTITION `p_wowclassictbc` VALUES LESS THAN (4) ENGINE = InnoDB
+					PARTITION `p_wowclassictbc` VALUES LESS THAN (4) ENGINE = InnoDB,
+					PARTITION `p_wowclassictbcanniv` VALUES LESS THAN (5) ENGINE = InnoDB
 				)
-			";
+			"; // will need manual adjustment for more flavours
 			self::$db->query($schema_sql);
 			if (self::$db->error) 
 				throw new Exception("Failed to create table `events`: ".self::$db->error);

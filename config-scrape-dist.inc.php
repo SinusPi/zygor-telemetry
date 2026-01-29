@@ -14,9 +14,9 @@ return [
 	// Windows? "LUA_JSON_MODULE_REQUIRE" => "json = require 'lib/json'  if (not json) then error('Cannot load json module') end   local exjsonencode=json.encode  json.encode=function(_,...) return exjsonencode(...) end  -- wrapper to call as :",
 	
 	"WOW_FLAVOUR_DATA" => [
-		'wow' => ['ZGVS_VAR' => "ZygorGuidesViewerSettings"],
-		'wow-classic' => ['ZGVS_VAR' => "ZygorGuidesViewerClassicSettings"],
-		'wow-classic-tbc' => ['ZGVS_VAR' => "ZygorGuidesViewerClassicSettings"],
-		'wow-classic-tbc-anniv' => ['ZGVS_VAR' => "ZygorGuidesViewerClassicSettings"]
+		'wow' => ['ZGVS_VAR' => "ZygorGuidesViewerSettings",'num'=>0],
+		'wow-classic' => ['ZGVS_VAR' => "ZygorGuidesViewerClassicSettings",'num'=>1],
+		'wow-classic-tbc' => ['ZGVS_VAR' => "ZygorGuidesViewerClassicSettings",'num'=>2],
+		'wow-classic-tbc-anniv' => ['ZGVS_VAR' => "ZygorGuidesViewerClassicSettings",'num'=>3]
 	],
 ];
