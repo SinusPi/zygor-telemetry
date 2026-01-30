@@ -59,7 +59,7 @@ class Telemetry {
 			if (preg_match("/[^a-z0-9_]/i",$topic_name)) continue;
 			$topic_data = self::get_file($topic_file);
 			if (!$topic_data) continue;
-			if ($topic_data['crunchers_load']) $topic_data['crunchers'] = self::get_topic_crunchers($topic_name);
+			if ($topic_data['crunchers_load']) $topic_data['crunchers'] = self::get_topic_crunchers($topic_name); // if a topic has many crunchers for its subtypes
 			$topics[$topic_name] = $topic_data;
 		}
 		
@@ -75,7 +75,7 @@ class Telemetry {
 
 	static function get_topic_crunchers($topic_name) {
 		$crunchers = [];
-		foreach (glob(__DIR__."/topic-{$topic_name}-*.inc.php") as $crunch_file) {
+		foreach (glob("topic-{$topic_name}-*.inc.php") as $crunch_file) {
 			$crunch = self::get_file($crunch_file);
 			if (!is_array($crunch)) continue; // allow empty files
 			if (!$crunch['name']) $crunch['name'] = preg_replace("/.*topic-{$topic_name}-([^.]+)\.inc\.php$/","$1",$crunch_file);
@@ -313,7 +313,7 @@ class Telemetry {
 
 	static function flavnum($flavour) {
 		$flavnum = self::$CFG['WOW_FLAVOUR_DATA'][$flavour]['num'] ?: 0;
-		if ($flavnum===0) throw new Exception("Unknown flavour '$flavour'");
+		if ($flavnum===0) throw new Exception("Unknown flavour '$flavour', known are: ".implode(", ", array_keys(self::$CFG['WOW_FLAVOUR_DATA'])).".");
 		return $flavnum;
 	}
 
