@@ -23,14 +23,14 @@ require_once "includes/zygor.class.inc.php";
 
 $OPTS = \Zygor\Shell::better_getopt([
 	['f:','flavour:',     ['wow','wow-classic','wow-classic-tbc','wow-classic-tbc-anniv']],
-	['', 'maxdays:',      999999], // use to limit how far back to crunch, for debugging only
-	['', 'start-day:',    null], // similar to maxdays, but explicit date
-	['', 'today-too',     false],
-	['', 'limit:',        null], // stop after N events
-	['', 'debug',         false],
-	['', 'debug-lua',     false],
-	['', 'verbose',       false],
-	['', 'verboseflags:', []],
+	['',  'maxdays:',      999999], // use to limit how far back to crunch, for debugging only
+	['',  'start-day:',    null], // similar to maxdays, but explicit date
+	['',  'today-too',     false],
+	['',  'limit:',        null], // stop after N events
+	['',  'debug',         false],
+	['',  'debug-lua',     false],
+	['v', 'verbose',       false],
+	['',  'verboseflags:', []],
 ]);
 $FLAVOURS = $OPTS['f'];
 if (substr($OPTS['start-day'],0,1)=="-") $OPTS['start-day']=date("Ymd",strtotime($OPTS['start-day']." days"));

@@ -23,16 +23,16 @@ require_once "includes/zygor.class.inc.php";
 
 $OPTS = \Zygor\Shell::better_getopt([
 	['f:','flavour:',     ['wow','wow-classic','wow-classic-tbc','wow-classic-tbc-anniv']],
-	['', 'maxdays:',      999999], // use to limit how far back to scrape, for debugging only
-	['', 'ignore-mtimes', false], // that is: limit by maxdays... or even not at all
-	['', 'start-day:',    null], // similar to maxdays, but explicit date
-	['', 'limit:',        null], // stop after N files
-	['', 'debug',         false],
-	['', 'debug-lua',     false],
-	['', 'filemask:',     "*.lua*"], // use to maybe process very specific files only
-	['', 'today-too',     false],
+	['',  'maxdays:',      999999], // use to limit how far back to scrape, for debugging only
+	['',  'ignore-mtimes', false], // that is: limit by maxdays... or even not at all
+	['',  'start-day:',    null], // similar to maxdays, but explicit date
+	['',  'limit:',        null], // stop after N files
+	['',  'debug',         false],
+	['',  'debug-lua',     false],
+	['',  'filemask:',     "*.lua*"], // use to maybe process very specific files only
+	['',  'today-too',     false],
 	['v', 'verbose',       false],
-	['', 'verboseflags:', []],
+	['',  'verboseflags:', []],
 ]);
 $FLAVOURS = $OPTS['f'];
 if (substr($OPTS['start-day'],0,1)=="-") $OPTS['start-day']=date("Ymd",strtotime($OPTS['start-day']." days"));
