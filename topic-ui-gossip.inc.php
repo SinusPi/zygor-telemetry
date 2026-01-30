@@ -28,7 +28,7 @@ return [
 			"step" => $line["step"],
 			"stepgoals" => $line["stepgoals"],
 			"ver" => $line["ver"],
-			"id" => $line["id"],
+			"event_id" => $line["id"],
 			"flavnum" => $line["flavnum"]
 		];
 
@@ -38,7 +38,7 @@ return [
 	"table" => "gossips",
 	"table_schema" => "
 		CREATE TABLE `gossips` (
-			`id` int(11) NOT NULL,
+			`event_id` int(11) NOT NULL,
 			`flavnum` int(1) NOT NULL,
 			`time` int(11) NOT NULL,
 			`guide` text NOT NULL,
@@ -49,7 +49,7 @@ return [
 			`file` text NOT NULL,
 			`ver` tinytext NOT NULL,
 			`raceclass` text NOT NULL,
-			PRIMARY KEY (`id`)
+			PRIMARY KEY (`event_id`)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci
 		"
 ];
