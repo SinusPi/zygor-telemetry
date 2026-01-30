@@ -23,13 +23,13 @@ require_once "includes/zygor.class.inc.php";
 
 $OPTS = \Zygor\Shell::better_getopt([
 	['f:','flavour:',     ['wow','wow-classic','wow-classic-tbc','wow-classic-tbc-anniv']],
-	['', 'maxdays:',      999999],
+	['', 'maxdays:',      999999], // use to limit how far back to scrape, for debugging only
+	['', 'ignore-mtimes', false], // that is: limit by maxdays... or even not at all
+	['', 'start-day:',    null], // similar to maxdays, but explicit date
+	['', 'limit:',        null], // stop after N files
 	['', 'debug',         false],
 	['', 'debug-lua',     false],
-	['', 'ignore-mtimes', false],
-	['', 'start-day:',    null],
-	['', 'limit:',        null],
-	['', 'filemask:',     "*.lua*"],
+	['', 'filemask:',     "*.lua*"], // use to maybe process very specific files only
 	['', 'today-too',     false],
 	['v', 'verbose',       false],
 	['', 'verboseflags:', []],

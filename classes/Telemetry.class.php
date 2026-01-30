@@ -395,7 +395,7 @@ class Telemetry {
 					PARTITION `p_wowclassictbc` VALUES LESS THAN (4) ENGINE = InnoDB,
 					PARTITION `p_wowclassictbcanniv` VALUES LESS THAN (5) ENGINE = InnoDB
 				)
-			"; // will need manual adjustment for more flavours
+			"; // will need manual adjustment for more flavours :(
 			self::$db->query($schema_sql);
 			if (self::$db->error) 
 				throw new Exception("Failed to create table `events`: ".self::$db->error);

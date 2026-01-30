@@ -23,15 +23,12 @@ require_once "includes/zygor.class.inc.php";
 
 $OPTS = \Zygor\Shell::better_getopt([
 	['f:','flavour:',     ['wow','wow-classic','wow-classic-tbc','wow-classic-tbc-anniv']],
-	['', 'maxdays:',      999999],
+	['', 'maxdays:',      999999], // use to limit how far back to crunch, for debugging only
+	['', 'start-day:',    null], // similar to maxdays, but explicit date
+	['', 'today-too',     false],
+	['', 'limit:',        null], // stop after N events
 	['', 'debug',         false],
 	['', 'debug-lua',     false],
-	['', 'ignore-mtimes', false],
-	['', 'start-day:',    null],
-	['', 'limit:',        null],
-	['', 'filemask:',     "*.lua*"],
-	['', 'rendermask:',   null],
-	['', 'today-too',     false],
 	['', 'verbose',       false],
 	['', 'verboseflags:', []],
 ]);
