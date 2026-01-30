@@ -273,11 +273,11 @@ class TelemetryCrunch extends Telemetry {
 				$type = $cruncher["eventtype"];
 
 				// get starting point
-				$start = self::db_query_one(self::qesc("SELECT IFNULL(MAX(id),0) FROM {$table} WHERE flavnum={d}",$flavnum)) ?: 0;
-				self::vlog("Processing {$type} events, starting with index {$start}...");
+				$max_id = self::db_query_one(self::qesc("SELECT IFNULL(MAX(event_id),0) FROM {$table} WHERE flavnum={d}",$flavnum)) ?: 0;
+				self::vlog("Processing {$type} events, starting with index {$max_id}...");
 
 				// get new events
-				$getquery = self::qesc("SELECT * FROM events WHERE flavnum={d} AND type={s} AND id>{d}",$flavnum,$type,$start);
+				$getquery = self::qesc("SELECT * FROM events WHERE flavnum={d} AND type={s} AND id>{d}",$flavnum,$type,$max_id);
 				self::vlog("DEBUG: getquery: $getquery");
 				$getrequest = self::$db->query($getquery);
 

@@ -14,7 +14,8 @@ class TelemetryScrapeSVs extends Telemetry {
 	}
 
 	static function _sub_config() {
-		self::$CFG = (array)(@include "config-scrape.inc.php") + self::$CFG; // load defaults
+		$configfile = (array)(@include "config-scrape.inc.php"); // load defaults
+		self::$CFG = self::merge_configs(self::$CFG, $configfile);
 		if (!self::$CFG['SV_STORAGE_ROOT']) throw new Exception("SV_STORAGE_ROOT not defined in config, config.inc.php not loaded?");
 
 		// load sync's config
@@ -466,7 +467,6 @@ ENDLUA;
 		if (self::$CFG['debug_lua']) echo $lua;
 		unset(self::$CFG['debug_lua']);
 
-	
 		$descriptorspec = [
 			0 => ["pipe", "r"],  // stdin is a pipe that the child will read from
 			1 => ["pipe", "w"],  // stdout is a pipe that the child will write to

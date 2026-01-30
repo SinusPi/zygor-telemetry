@@ -10,7 +10,7 @@ class Telemetry {
 	static $CFG = [
 		'TELEMETRY_ROOT' => "telemetry",
 		'LOG_FILENAME' => "telemetry.log",
-		'MAX_DAYS' => 30,
+		'MAX_DAYS' => false,
 		'VERBOSE_FLAGS' => [],
 		'STATUS_INTERVAL' => 2,
 	];
@@ -21,9 +21,9 @@ class Telemetry {
 
 	static $DBG = [];
 
-	static function config($cfg) {
+	static function config($cfg=[]) {
 		$configfile = (array)(require "config.inc.php");
-		self::$CFG = $cfg + $configfile + self::$CFG;
+		self::$CFG = self::merge_configs(self::$CFG, $configfile, $cfg);
 
 		// check if function _sub_config exists in child class
 		if (method_exists(get_called_class(), '_sub_config')) {
@@ -41,7 +41,7 @@ class Telemetry {
 	static function init() {
 		self::set_error_reporting();
 		try {
-			self::load_topics();
+			self::$CFG['SCRAPE_TOPICS'] = self::load_topics();
 		} catch (Exception $e) {
 			die("Failed to load topics: ".$e->getMessage()."\n");
 		}
@@ -59,21 +59,27 @@ class Telemetry {
 			if (preg_match("/[^a-z0-9_]/i",$topic_name)) continue;
 			$topic_data = self::get_file($topic_file);
 			if (!$topic_data) continue;
-			if ($topic_data['crunchers_load']) $topic_data['crunchers'] = self::get_topic_crunchers($topic_name); // if a topic has many crunchers for its subtypes
+			if ($topic_data['crunchers_load']) $topic_data['crunchers'] = self::load_topic_crunchers($topic_name); // if a topic has many crunchers for its subtypes
 			$topics[$topic_name] = $topic_data;
 		}
-		
-		self::$CFG['SCRAPE_TOPICS'] = $topics;
 
-		$keys = array_keys($topics);
-		foreach ($keys as $i=>$k) {
-			$crunchers = $topics[$k]['crunchers'] ?: [];
-			if ($crunchers) { $c=count($crunchers); $keys[$i] .= " (+ $c cruncher".($c==1 ? "" : "s").": ".implode(", ",array_column($crunchers,'name')).")"; }
+		if (!count($topics)) {
+			throw new Exception("No telemetry topics found in topic-*.inc.php files!");
 		}
-		self::vlog("Loaded ".count($topics)." telemetry topics: ".implode(", ", $keys).".");
+
+		if (self::$CFG['verbose']) {
+			$keys = array_keys($topics);
+			foreach ($keys as $i=>$k) {
+				$crunchers = $topics[$k]['crunchers'] ?: [];
+				if ($crunchers) { $c=count($crunchers); $keys[$i] .= " (+ $c cruncher".($c==1 ? "" : "s").": ".implode(", ",array_column($crunchers,'name')).")"; }
+			}
+			self::vlog("Loaded ".count($topics)." telemetry topics: ".implode(", ", $keys).".");
+		}
+
+		return $topics;
 	}
 
-	static function get_topic_crunchers($topic_name) {
+	static function load_topic_crunchers($topic_name) {
 		$crunchers = [];
 		foreach (glob("topic-{$topic_name}-*.inc.php") as $crunch_file) {
 			$crunch = self::get_file($crunch_file);
@@ -368,7 +374,7 @@ class Telemetry {
 				ENGINE=InnoDB
 				DEFAULT CHARSET=latin1
 				COLLATE=latin1_swedish_ci
-				COMMENT='used to mark which SV files have been processed and when';
+				COMMENT='current status of telemetry processing jobs';
 			";
 			self::$db->query($schema_sql);
 			if (self::$db->error) 
@@ -586,6 +592,19 @@ class Telemetry {
 		$result = self::db_query_one("SELECT RELEASE_LOCK($lock);");
 		//self::vlog(microtime(true)." DB lock '$lock' released: ".$result);
 		return $result;
+	}
+
+	static function merge_configs($base,...$overrides) {
+		foreach ($overrides as $override) {
+			foreach ($override as $k=>$v) {
+				if (is_array($v) && isset($base[$k]) && is_array($base[$k])) {
+					$base[$k] = self::merge_configs($base[$k], $v);
+				} else {
+					$base[$k] = $v;
+				}
+			}
+		}
+		return $base;
 	}
 }
 

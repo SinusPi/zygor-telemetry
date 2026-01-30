@@ -21,8 +21,10 @@ require_once "includes/zygor.class.inc.php";
 
 //pcntl_signal(SIGINT,function() { write_error_to_status(E_ERROR,"Terminated",__FILE__,__LINE__); die(); return true; });
 
+Telemetry::config();
+
 $OPTS = \Zygor\Shell::better_getopt([
-	['f:','flavour:',     ['wow','wow-classic','wow-classic-tbc','wow-classic-tbc-anniv']],
+	['f:','flavour:',      array_keys(Telemetry::$CFG['WOW_FLAVOUR_DATA'])],
 	['',  'maxdays:',      999999], // use to limit how far back to crunch, for debugging only
 	['',  'start-day:',    null], // similar to maxdays, but explicit date
 	['',  'today-too',     false],
