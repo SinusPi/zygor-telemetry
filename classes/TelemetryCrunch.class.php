@@ -7,6 +7,7 @@ class TelemetryCrunch extends Telemetry {
 
 	/**
 	 * Combine each day's events from telemetry/\<flavor\>/scraped/\<day\>/*.json into telemetry/\<flavor>\/\<metric\>/\<day\>.json
+	 * @deprecated Use TelemetryCrunch::crunch_flavour() instead.
 	 */
 	static function crunch($flavour) {
 		if (!in_array($flavour,array_keys(self::$CFG['WOW_FLAVOUR_DATA']))) throw new Exception("Unsupported flavour '{$flavour}' (supported: ".join(", ",array_keys(self::$CFG['WOW_FLAVOUR_DATA'])).")");
