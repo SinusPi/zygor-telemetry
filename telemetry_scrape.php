@@ -34,18 +34,21 @@ $OPTS = \Zygor\Shell::better_getopt([
 	['',  'filemask:',     "*.lua*"], // use to maybe process very specific files only
 	['',  'today-too',     false],
 	['v', 'verbose',       false],
+	['i:','input:',        $valid_inputs=["sv"]],
 	['',  'verboseflags:', []],
 ]);
 $FLAVOURS = $OPTS['f'];
 if (substr($OPTS['start-day'],0,1)=="-") $OPTS['start-day']=date("Ymd",strtotime($OPTS['start-day']." days"));
 $OPTS["MAX_DAYS"]=$OPTS['maxdays'];
 
-TelemetryScrapeSVs::config($OPTS);
-TelemetryScrapeSVs::init();
-
-// PHASE ONE: SCRAPE
-
-foreach ($FLAVOURS as $flav) TelemetryScrapeSVs::scrape($flav);
+if (count(array_intersect($valid_inputs,$OPTS['input']))!=count($OPTS['input'])) {
+	throw new Exception("Invalid input type specified. Valid types are: ".implode(", ",$valid_inputs));
+}
+if (in_array("sv",$OPTS['input'])) {
+	TelemetryScrapeSVs::config($OPTS);
+	TelemetryScrapeSVs::init();
+	foreach ($FLAVOURS as $flav) TelemetryScrapeSVs::scrape($flav);
+}
 
 /*
 $status['status']="WRITING";
