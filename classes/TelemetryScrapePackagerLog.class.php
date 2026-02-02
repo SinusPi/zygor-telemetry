@@ -581,26 +581,23 @@ ENDLUA;
 	static function db_create() {
 		parent::db_create();
 
-		self::$db->query("SHOW CREATE TABLE sv_files;");
+		self::$db->query("SHOW CREATE TABLE packagerlog_files;");
 		if (self::$db->error) {
 			$schema_sql = "
-				CREATE TABLE `sv_files` (
+				CREATE TABLE `packagerlog_files` (
 					`id` int(11) NOT NULL AUTO_INCREMENT,
 					`file` char(50) NOT NULL,
-					`scrape_time` int(11) DEFAULT NULL,
-					`mtime` int(10) DEFAULT NULL,
-					`last_event_time` int(10) DEFAULT NULL,
 					UNIQUE KEY `file` (`file`),
 					UNIQUE KEY `id` (`id`)
 				)
 				ENGINE=InnoDB
 				DEFAULT CHARSET=latin1
 				COLLATE=latin1_swedish_ci
-				COMMENT='used to mark which SV files have been processed and when';
+				COMMENT='used to mark which log files have been processed and when';
 			";
 			self::$db->query($schema_sql);
 			if (self::$db->error) 
-				throw new Exception("Failed to create table `sv_files`: ".self::$db->error);
+				throw new Exception("Failed to create table `packagerlog_files`: ".self::$db->error);
 		}
 
 		self::vlog("DB schema created.");
