@@ -247,6 +247,7 @@ class Zygor {
 				$values[] = sprintf('"%s"',$db->real_escape_string($value));
 			}
 		}
+		$keys = array_map(function($k) { return "`".$k."`"; }, $keys); //safeguard keys
 
 		$query = str_replace("{keys}",implode(', ', $keys),$query);
 		$query = str_replace("{values}",implode(', ', $values),$query);
