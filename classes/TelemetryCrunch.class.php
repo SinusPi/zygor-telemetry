@@ -278,7 +278,7 @@ class TelemetryCrunch extends Telemetry {
 
 				// get new events
 				$getquery = self::qesc("SELECT * FROM events WHERE flavnum={d} AND type={s} AND id>{d}",$flavnum,$type,$max_id);
-				self::vlog("DEBUG: getquery: $getquery");
+				//self::vlog("DEBUG: getquery: $getquery");
 				$getrequest = self::$db->query($getquery);
 
 				if ($getrequest->num_rows==0) {
