@@ -33,6 +33,8 @@ class TelemetryScrapePackagerLog extends Telemetry {
 			return;
 		}
 
+		// TODO : go through log-<Y>-<M>-<D> files, bzipped or not, extract flavour update lines, treat them similarly to "ui-VERSION" type events (but store them separately!). Remember which logs were parsed.
+
 		return;
 
 		$topics = self::$CFG['SCRAPE_TOPICS'];
