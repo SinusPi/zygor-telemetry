@@ -612,5 +612,8 @@ class FileLockedException extends Exception {
 	// Custom exception for file locking issues
 }
 
-require_once __DIR__."/TelemetryScrapeSVs.class.php";
-require_once __DIR__."/TelemetryCrunch.class.php";
+// load dependent classes
+foreach (glob(__DIR__."/*.class.php") as $classfile) {
+	if (basename($classfile)=="Telemetry.class.php") continue;
+	require_once $classfile;
+}

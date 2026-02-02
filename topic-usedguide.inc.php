@@ -1,5 +1,6 @@
 <?php
 return [
+		'input'=>"sv",
 		'extraction_lua'=><<<ENDLUA
 			if %ZGVS_VAR%.char then
 				for char,d in pairs(%ZGVS_VAR%.char) do
@@ -18,5 +19,4 @@ ENDLUA
 		'crunch_func'=>function($line,&$alldata,&$mydata) {
 			$mydata[$line['guide']]++;
 		},
-		'output_mode'=>"day"
 ];
