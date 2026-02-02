@@ -70,6 +70,7 @@ class TelemetryScrapeSVs extends Telemetry {
 		}
 
 		$topics = self::$CFG['SCRAPE_TOPICS'];
+		$topics = array_filter($topics, function($t) { return $t['input']?:"" == "sv"; });
 		$sync_path = self::cfgstr('SV_STORAGE_FLAVOUR_PATH',["FLAVOUR"=>$flavour]);
 
 		self::log("Starting scrape of flavour '\x1b[38;5;78m{$flavour}\x1b[0m' in \x1b[33;1m{$sync_path}\x1b[0m.");

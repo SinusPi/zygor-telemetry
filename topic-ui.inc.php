@@ -1,5 +1,6 @@
 <?php
 return [
+		'input'=>"sv",
 		'extraction_lua'=><<<ENDLUA
 			if %ZGVS_VAR%.char then
 				for charname,chardata in pairs(%ZGVS_VAR%.char) do

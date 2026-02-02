@@ -1,5 +1,6 @@
 <?php
 return [
+		'input'=>"sv",
 		'extraction_lua'=><<<ENDLUA
 			if %ZGVS_VAR%.char then
 				for char,ch in pairs(%ZGVS_VAR%.char) do
@@ -15,5 +16,4 @@ return [
 
 ENDLUA
 		,
-		'output_mode'=>"day"
 ];
