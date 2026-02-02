@@ -1,3 +1,6 @@
+<?php
+$CFG = include(__DIR__."/config-view.inc.php");
+?>
 <html>
 	<head>
 		<link rel="stylesheet" href="/includes/jquery-ui-1.13.2.custom/jquery-ui.min.css">
@@ -148,7 +151,7 @@
 			return date;
 		}
 
-		var ENDPOINT = "/telemetry/telemetry_endpoint.php";
+		var ENDPOINT = "telemetry_endpoint.php";
 	</script>
 	<body>
 		<div id="main">
