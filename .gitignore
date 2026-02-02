@@ -1,4 +1,5 @@
 /config.inc.php
 /config-scrape.inc.php
+/config-scrape-packagerlog.inc.php
 *.log
 *.status.json
