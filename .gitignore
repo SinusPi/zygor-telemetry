@@ -2,3 +2,4 @@
 /config-scrape.inc.php
 *.log
 *.status.json
+/includes/jquery-ui-1.13.2.custom/*
