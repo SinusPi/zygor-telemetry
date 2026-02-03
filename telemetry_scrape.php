@@ -34,7 +34,7 @@ $OPTS = \Zygor\Shell::better_getopt([
 	['',  'filemask:',     "*.lua*"], // use to maybe process very specific files only
 	['',  'today-too',     false],
 	['v', 'verbose',       false],
-	['i:','input:',        $valid_inputs=["sv"]],
+	['i:','input:',        $valid_inputs=["sv","packagerlog"]],
 	['',  'verboseflags:', []],
 ]);
 $FLAVOURS = $OPTS['f'];
@@ -48,6 +48,11 @@ if (in_array("sv",$OPTS['input'])) {
 	TelemetryScrapeSVs::config($OPTS);
 	TelemetryScrapeSVs::init();
 	foreach ($FLAVOURS as $flav) TelemetryScrapeSVs::scrape($flav);
+}
+if (in_array("packagerlog",$OPTS['input'])) {
+	TelemetryScrapePackagerLog::config($OPTS);
+	TelemetryScrapePackagerLog::init();
+	TelemetryScrapePackagerLog::scrape();
 }
 
 /*

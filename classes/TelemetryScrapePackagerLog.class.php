@@ -16,7 +16,6 @@ class TelemetryScrapePackagerLog extends Telemetry {
 	static function _sub_config() {
 		$configfile = (array)(@include "config-scrape-packagerlog.inc.php"); // load defaults
 		self::$CFG = self::merge_configs(self::$CFG, $configfile);
-		if (!self::$CFG['SV_STORAGE_ROOT']) throw new Exception("SV_STORAGE_ROOT not defined in config, config.inc.php not loaded?");
 	}
 
 	/**
@@ -24,9 +23,7 @@ class TelemetryScrapePackagerLog extends Telemetry {
 	 * @param string $flavour
 	 */
 	static function scrape() {
-		if (!in_array($flavour,array_keys(self::$CFG['WOW_FLAVOUR_DATA']))) throw new Exception("Unsupported flavour '{$flavour}' (supported: ".join(", ",array_keys(self::$CFG['WOW_FLAVOUR_DATA'])).")");
-
-		self::$tag = "SCRAPEPACKLOG");
+		self::$tag = "SCRAPEPACKLOG";
 		$status = self::get_status(self::$tag, true);
 		if ($status['status']=="SCRAPING") {
 			self::log("Another scrape of packager log is already in progress, aborting.");
@@ -35,11 +32,12 @@ class TelemetryScrapePackagerLog extends Telemetry {
 
 		// TODO : go through log-<Y>-<M>-<D> files, bzipped or not, extract flavour update lines, treat them similarly to "ui-VERSION" type events (but store them separately!). Remember which logs were parsed.
 
-		return;
-
 		$topics = self::$CFG['SCRAPE_TOPICS'];
+		$topics = array_filter($topics, function($t) { return ($t['input']?:"") == "packagerlog"; });
 
-		self::log("Starting scrape of flavour '\x1b[38;5;78m{$flavour}\x1b[0m' in \x1b[33;1m{$sync_path}\x1b[0m.");
+		self::log("Starting scrape of topics: '\x1b[38;5;78m".implode(", ",array_keys($topics))."\x1b[0m' in packager logs.");
+
+		return;
 
 		self::stat(['status'=>"ENUMERATING",'stage'=>1,'stageof'=>2,'flavour'=>$flavour,'progress'=>[],'time_started'=>time(),'time_started_hr'=>date("Y-m-d H:i:s")]);		
 
@@ -509,7 +507,7 @@ ENDLUA;
 
 	static function self_tests() {
 		self::test_paths();
-		self::test_datapoints();
+		//self::test_datapoints();
 		try {
 			self::db_create();
 			self::test_status();
@@ -522,29 +520,15 @@ ENDLUA;
 
 	static function test_paths() {
 		self::vlog("Testing paths:");
-		
-		if (!is_dir(self::$CFG['SV_STORAGE_ROOT'])) die("Missing SV storage root: ".self::$CFG['SV_STORAGE_ROOT']."\n");
-		self::vlog(" - Will read SVs in root of: \x1b[33m".self::$CFG['SV_STORAGE_ROOT']."\x1b[0m");
 
-		if (!is_dir(self::$CFG['SV_STORAGE_DATA_PATH'])) die("Missing SV storage folder: ".self::$CFG['SV_STORAGE_DATA_PATH']."\n");
-		self::vlog(" - Specifically SV Sync config says: \x1b[33m".self::$CFG['SV_STORAGE_DATA_PATH']."\x1b[0m");
+		if (!is_dir(self::$CFG['PACKAGERLOG_PATH'])) die("Missing Packager Log path: ".self::$CFG['PACKAGERLOG_PATH']."\n");
+		self::vlog(" - Will read Packager Logs from: \x1b[33m".self::$CFG['PACKAGERLOG_PATH']."\x1b[0m");
 
-		foreach (self::$CFG['f'] as $flav) {
-			self::vlog("   - Flavour: \x1b[38;5;78m$flav\x1b[0m");
+		$mask = str_replace(["<Y>","<M>","<D>"],["*","*","*"],self::$CFG['PACKAGERLOG_MASK']);
+		$g = glob(self::$CFG['PACKAGERLOG_PATH']."/".$mask,GLOB_NOSORT);
+		if (!$g || !count($g)) die("No Packager Log files found matching mask: ".$mask."\n");
+		self::vlog(" - Found ".count($g)." Packager Log files matching mask '".$mask."', we're good.");
 
-			$svpath = self::cfgstr('SV_STORAGE_FLAVOUR_PATH',['FLAVOUR'=>$flav]);
-			if (!is_dir($svpath)) die("Missing SV storage flavour folder: ".$svpath."\n");
-			self::vlog("     - Reading SVs from: \x1b[33m$svpath\x1b[0m");
-
-			/*
-			$scrapepath = self::cfgstr('SCRAPES_PATH',['FLAVOUR'=>$flav,'DAY'=>"YYYYMMDD"]);
-			self::vlog("     - Temporary scrape folder: \x1b[33m$scrapepath\x1b[0m");
-
-			$telepath = self::cfgstr('FLAVOUR_PATH',['FLAVOUR'=>$flav]);
-			if (!is_dir($telepath)) die("Missing Telemetry output flavour folder: ".$telepath."\n");
-			self::vlog("     - Saving telemetry data into: \x1b[33m$telepath\x1b[0m");
-			*/
-		}
 		return true;
 	}
 
@@ -598,8 +582,8 @@ ENDLUA;
 			self::$db->query($schema_sql);
 			if (self::$db->error) 
 				throw new Exception("Failed to create table `packagerlog_files`: ".self::$db->error);
+			self::vlog("DB schema created.");
 		}
 
-		self::vlog("DB schema created.");
 	}
 }
