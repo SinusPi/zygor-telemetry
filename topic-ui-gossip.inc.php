@@ -2,10 +2,12 @@
 /**
  * Simple cruncher for GOSSIP_MINED telemetry data.
  * 
- * Processes telemetry events of type 'eventtype' and extracts relevant fields.
- * When run, returns associative arrays with the extracted values, to be put into the 'table'.
+ * Processes telemetry events of type 'ui-GOSSIP_MINED' and extracts relevant fields.
+ * When run, returns associative arrays with the extracted values, to be put into the 'gossips' table.
  */
 return [
+	//'input'=>"event",
+	//'event'=>"ui", // these defaults are taken from file names, unless overridden
 	"eventtype" => "ui_GOSSIP_MINED",
 	"function" => function($line) {
 		$unpacked = json_decode($line["data"], true);

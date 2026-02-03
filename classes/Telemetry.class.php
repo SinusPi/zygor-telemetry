@@ -60,7 +60,12 @@ class Telemetry {
 			$topic_data = self::get_file($topic_file);
 			if (!$topic_data) continue;
 			if ($topic_data['crunchers_load']) $topic_data['crunchers'] = self::load_topic_crunchers($topic_name); // if a topic has many crunchers for its subtypes
+			$topic_data = array_merge([
+				'name' => $topic_name,
+				'event' => $topic_name, // default event name is the same as topic name, can be overridden in topic-*.inc.php
+			], $topic_data);
 			$topics[$topic_name] = $topic_data;
+
 		}
 
 		if (!count($topics)) {
@@ -68,12 +73,18 @@ class Telemetry {
 		}
 
 		if (self::$CFG['verbose']) {
-			$keys = array_keys($topics);
-			foreach ($keys as $i=>$k) {
-				$crunchers = $topics[$k]['crunchers'] ?: [];
-				if ($crunchers) { $c=count($crunchers); $keys[$i] .= " (+ $c cruncher".($c==1 ? "" : "s").": ".implode(", ",array_column($crunchers,'name')).")"; }
-			}
-			self::vlog("Loaded ".count($topics)." telemetry topics: ".implode(", ", $keys).".");
+			$dot = function($reset=false) { static $s=0; if ($reset) $s=-1; return $s++ ? ", ":" - "; };
+			self::vlog("Loaded ".count($topics)." telemetry topics:\n".implode("\n",array_map(function($t) use ($dot) {
+				$cc = count($t['crunchers']);
+				$r = "* ";
+				$r .= C_MTHD.$t['name'].C_R;
+				$dot(true);
+				if ($t['scraper']) $r .= $dot()."scraping: ".($t['scraper']['input'] ?: "???");
+				if ($cc==0) $r .= $dot()."not crunched";
+				elseif ($cc==1) $r .= $dot()."crunched";
+				else $r .= $dot()."$cc crunchers: ".($c=count($t['crunchers']))." (".implode(", ",array_column($t['crunchers'],'name')).")";
+				return $r;
+			}, $topics)));
 		}
 
 		return $topics;
@@ -85,6 +96,11 @@ class Telemetry {
 			$crunch = self::get_file($crunch_file);
 			if (!is_array($crunch)) continue; // allow empty files
 			if (!$crunch['name']) $crunch['name'] = preg_replace("/.*topic-{$topic_name}-([^.]+)\.inc\.php$/","$1",$crunch_file);
+			$crunch = array_merge([
+				'name' => $crunch['name'] ?: "unknown",
+				'input' => "event",
+				'eventtype' => $topic_name,
+			], $crunch);
 			$crunchers[] = $crunch;
 		}
 		return $crunchers;

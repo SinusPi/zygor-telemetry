@@ -292,7 +292,9 @@ class TelemetryCrunch extends Telemetry {
 					$count++;
 					//self::vlog("Processing ".strval($count)."/".strval($getrequest->num_rows));
 
-					$fields = $cruncher["function"]($event);
+					$func = $cruncher['crunch_function'] ?: $cruncher['function'];
+
+					$fields = $func($event);
 
 					if ($cruncher['action']=="insert" && isset($cruncher['table'])) {
 						$table = $cruncher['table'];

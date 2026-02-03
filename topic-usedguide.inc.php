@@ -1,5 +1,6 @@
 <?php
 return [
+	'scraper'=>[
 		'input'=>"sv",
 		'extraction_lua'=><<<ENDLUA
 			if %ZGVS_VAR%.char then
@@ -13,10 +14,16 @@ return [
 					end
 				end
 			end
-
 ENDLUA
 		,
-		'crunch_func'=>function($line,&$alldata,&$mydata) {
-			$mydata[$line['guide']]++;
-		},
+		//'output'=>"events" // everything goes into events, this is just a visual reminder
+	],
+	'crunchers'=>[
+		[
+			'function'=>function($line,&$alldata,&$mydata) {
+				$mydata[$line['guide']]++;
+			},
+			// without 'action' and maybe 'table' this cruncher just collects data in $mydata which isn't used anyway
+		]
+	]
 ];

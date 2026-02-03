@@ -70,7 +70,7 @@ class TelemetryScrapeSVs extends Telemetry {
 		}
 
 		$topics = self::$CFG['SCRAPE_TOPICS'];
-		$topics = array_filter($topics, function($t) { return ($t['input']?:"") == "sv"; });
+		$topics = array_filter($topics, function($t) { return ($t['scraper']['input']?:"") == "sv"; });
 		$sync_path = self::cfgstr('SV_STORAGE_FLAVOUR_PATH',["FLAVOUR"=>$flavour]);
 
 		self::log("Starting scrape of flavour '\x1b[38;5;78m{$flavour}\x1b[0m' in \x1b[33;1m{$sync_path}\x1b[0m.");
@@ -446,11 +446,13 @@ class TelemetryScrapeSVs extends Telemetry {
 ENDLUA;
 
 		$lua_extractors = "";
-		foreach($topic_defs as $name=>$def)
+		foreach($topic_defs as $name=>$def) {
+			$scraper = $def['scraper'];
 			$lua_extractors .= 
 				  "\nlocal time1=os.clock()\n"
-				. $def['extraction_lua'] . "\n"
+				. $scraper['extraction_lua'] . "\n"
 				. "times['$name']=os.clock()-time1\n";
+		}
 
 		$lua_foot = <<<ENDLUA
 		    print('],"times":{')

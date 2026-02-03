@@ -1,5 +1,6 @@
 <?php
 return [
+	'scraper'=>[
 		'input'=>"sv",
 		'extraction_lua'=><<<ENDLUA
 			if %ZGVS_VAR%.char then
@@ -27,9 +28,8 @@ return [
 					end
 				end
 			end
-
 ENDLUA
-		,
-		'crunchers' => [],
-		'crunchers_load' => true
+	],
+	'crunchers' => [],
+	'crunchers_load' => true
 ];
