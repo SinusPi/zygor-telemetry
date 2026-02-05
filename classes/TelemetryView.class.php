@@ -13,16 +13,16 @@ class TelemetryView extends Telemetry {
 
 	static function renderMetrics() {
 		foreach (self::$CFG['TOPICS'] as $topicname => &$topicdata) {
-			if (is_callable($topicdata['view']['printer'])) {
-				?><div id="topic-<?=$topicname?>" class="telemetry-topic telemetry-topic-<?=$topicname?>"><?php
-				?><h2 class="telemetry-topic-title"><?=$topicdata['view']['title']?></h2><?php
-				$topicdata['view']['printer']();
+			$view = &$topicdata['view'] ?: null;
+			if (is_callable($view['printer'])) {
+				?><div id="topic-<?=$topicname?>" class="telemetry-topic telemetry-topic-<?=$topicname?> <?=($view['class'] ?: '')?>"><?php
+				?><h2 class="telemetry-topic-title"><?=$view['title']?></h2><?php
+					$printout = $view['printer']();
+					echo $printout;
 				?></div><?php
 			}
 		}
 	}
-
-	// Tests, DB schemas
 
 	static function self_tests() {
 		return;
