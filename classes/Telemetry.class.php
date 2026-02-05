@@ -347,7 +347,7 @@ class Telemetry {
 		try {
 			self::$db = self::_connect_db($cfg['host'], $cfg['user'], $cfg['pass'], $cfg['db']);
 		} catch (Exception $e) {
-			die("Failed to connect to database '".$cfg['db']."' on '".$cfg['host']."': ".$e->getMessage()."\n");
+			throw new Exception("Failed to connect to database '".$cfg['db']."' on '".$cfg['host']."': ".$e->getMessage()."\n");
 		}
 	}
 
