@@ -249,8 +249,11 @@ class TelemetryCrunch extends Telemetry {
 
 		self::vlog("Running crunchers for flavour \x1b[38;5;78m{$flavour}\x1b[0m...");
 		foreach($topics as $name=>$topic) {
-			foreach($topic['crunchers'] as $cruncher) {
-				self::vlog("Running cruncher \x1b[38;5;148m{$name}\x1b[0m-\x1b[38;5;118m{$cruncher['name']}\x1b[0m...");
+			foreach($topic['crunchers'] as $num=>$cruncher) {
+				$colorname = "\x1b[38;5;148m{$name}\x1b[0m";
+				$colordashsubname = "-\x1b[38;5;118m".($cruncher['name'] ?: $num)."\x1b[0m";
+				$dashsubname = "-".($cruncher['name'] ?: "#".($num+1));
+				self::vlog("Running cruncher {$colorname}{$colordashsubname}...");
 
 				// create if needed
 				if (isset($cruncher['table_schema'],$cruncher['table'])) {
@@ -270,7 +273,7 @@ class TelemetryCrunch extends Telemetry {
 				// start fetching new events to process:
 
 				$flavnum = self::flavnum($flavour);
-				$type = $cruncher["eventtype"];
+				$type = $cruncher["eventtype"]?:$name;
 
 				// get starting point
 				$max_id = self::db_query_one(self::qesc("SELECT IFNULL(MAX(event_id),0) FROM {$table} WHERE flavnum={d}",$flavnum)) ?: 0;
@@ -282,7 +285,7 @@ class TelemetryCrunch extends Telemetry {
 				$getrequest = self::$db->query($getquery);
 
 				if ($getrequest->num_rows==0) {
-					self::vlog("No new {$name}-{$cruncher['name']} events to process.");
+					self::vlog("No new {$name}{$dashsubname} events to process.");
 					continue;
 				}
 				self::vlog("Found ".strval($getrequest->num_rows)." records, processing...");
@@ -306,7 +309,7 @@ class TelemetryCrunch extends Telemetry {
 				}
 
 				if ($cruncher['action']=="insert") {
-					self::vlog("Added ".strval($count)." new {$name}-{$cruncher['name']} records.");
+					self::vlog("Added ".strval($count)." new {$name}{$dashsubname} records.");
 				}
 			}
 		}
