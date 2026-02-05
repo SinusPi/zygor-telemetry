@@ -25,11 +25,6 @@ class Telemetry {
 		$configfile = (array)(require "config.inc.php");
 		self::$CFG = self::merge_configs(self::$CFG, $configfile, $cfg);
 
-		// check if function _sub_config exists in child class
-		if (method_exists(get_called_class(), '_sub_config')) {
-			call_user_func([get_called_class(), '_sub_config']);			
-		}
-
 		if (!self::$CFG['DB']) {
 			throw new Exception("No DB configuration found in Telemetry config.");
 		}
@@ -40,16 +35,22 @@ class Telemetry {
 
 	static function init() {
 		self::set_error_reporting();
+	}
+
+	/** Init, config, connect... */
+	static function startup($cfg=[]) {
+		static::init(); // overridable
+		static::config($cfg); // overridable
 		try {
-			self::$CFG['SCRAPE_TOPICS'] = self::load_topics();
+			self::$CFG['TOPICS'] = self::load_topics();
 		} catch (Exception $e) {
 			die("Failed to load topics: ".$e->getMessage()."\n");
 		}
-		try {
-			self::db_connect();
-		} catch (Exception $e) {
-			die("Failed to connect to database '".self::$CFG['DB']['db']."' on '".self::$CFG['DB']['host']."': ".$e->getMessage()."\n");
-		}
+		self::db_connect();
+		static::self_tests(); // overridable
+	}
+
+	static function self_tests() {
 	}
 
 	static function load_topics() {
@@ -233,7 +234,7 @@ class Telemetry {
 	}
 
 	static function get_counts($flavour,$topic) {
-		$def = self::$CFG['SCRAPE_TOPICS'][$topic] ?: null;
+		$def = self::$CFG['TOPICS'][$topic] ?: null;
 		if (!$def) return ['total'=>0,'matching'=>0];
 		if ($def['output_mode']=="day") {
 			$file_glob = self::cfgstr('DATA_PATH_DPMODE_DAY',['FLAVOUR'=>$flavour,'TOPIC'=>$topic,'DAY'=>"*"]);
@@ -343,7 +344,11 @@ class Telemetry {
 
 	static function db_connect() {
 		$cfg = self::$CFG['DB'];
-		self::$db = self::_connect_db($cfg['host'], $cfg['user'], $cfg['pass'], $cfg['db']);
+		try {
+			self::$db = self::_connect_db($cfg['host'], $cfg['user'], $cfg['pass'], $cfg['db']);
+		} catch (Exception $e) {
+			die("Failed to connect to database '".$cfg['db']."' on '".$cfg['host']."': ".$e->getMessage()."\n");
+		}
 	}
 
 	static function _connect_db($host,$user,$pass,$db) {
@@ -517,7 +522,7 @@ class Telemetry {
 
 	static function call_hooks($hook,$args) {
 		//self::vlog("Hook: $hook calls starting.");
-		foreach (self::$CFG['SCRAPE_TOPICS'] as $dp_name=>$dp_def)
+		foreach (self::$CFG['TOPICS'] as $dp_name=>$dp_def)
 			if ($dp_def[$hook] && $dp_def['skip']!==false) { self::vlog(" - Calling $hook for $dp_name"); call_user_func_array($dp_def[$hook], $args); }
 		//self::vlog("Hook: $hook calls complete.");
 	}

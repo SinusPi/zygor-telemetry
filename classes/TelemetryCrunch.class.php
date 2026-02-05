@@ -1,7 +1,6 @@
 <?php
 
 /**
- * TODO: make it work again, this is just a jumble of code extracted from ScrapeSVs.
  */
 class TelemetryCrunch extends Telemetry {
 
@@ -114,7 +113,7 @@ class TelemetryCrunch extends Telemetry {
 			$userfile_mtimes = array_map("filemtime", $userfiles);
 			$newest_userfile_date = max($userfile_mtimes);
 
-			$DEFS = self::$CFG['SCRAPE_TOPICS'];
+			$DEFS = self::$CFG['TOPICS'];
 
 			self::vlog("+ Newest input file mtime: ".date("Y-m-d H:i:s",$newest_userfile_date));
 			self::vlog(".- Verifying output file mtimes for freshness...");
@@ -246,7 +245,7 @@ class TelemetryCrunch extends Telemetry {
 	}
 
 	static function crunch_flavour($flavour) {
-		$topics = self::$CFG['SCRAPE_TOPICS'];
+		$topics = self::$CFG['TOPICS'];
 
 		self::vlog("Running crunchers for flavour \x1b[38;5;78m{$flavour}\x1b[0m...");
 		foreach($topics as $name=>$topic) {

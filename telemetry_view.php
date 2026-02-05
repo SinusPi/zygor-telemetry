@@ -1,14 +1,17 @@
 <?php
-$CFG = include(__DIR__."/config-view.inc.php");
+require_once "classes/Telemetry.class.php";
+TelemetryView::startup(['verbose'=>1]);
+
+define("CLASSIC_EXP","MoP");
 ?>
 <html>
 	<head>
-		<link rel="stylesheet" href="/includes/jquery-ui-1.13.2.custom/jquery-ui.min.css">
-		<script src="/includes/jquery-ui-1.13.2.custom/external/jquery/jquery.js"></script>
-		<script src="/includes/jquery-ui-1.13.2.custom/jquery-ui.min.js"></script>
+		<link rel="stylesheet" href="<?= TelemetryView::$CFG['jquery_dir'] ?>/jquery-ui.min.css">
+		<script src="<?= TelemetryView::$CFG['jquery_dir'] ?>/external/jquery/jquery.js"></script>
+		<script src="<?= TelemetryView::$CFG['jquery_dir'] ?>/jquery-ui.min.js"></script>
+		<script src="<?= TelemetryView::$CFG['jquery_dir'] ?>/jquery-ui.min.js"></script>
 		<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 		<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
-		<script src="/includes/jquery-ui-1.13.2.custom/jquery-ui.min.js"></script>
 		<style>
 			body { font-family:"Tahoma"; }
 			#main { display:flex; gap:0.5em; }
@@ -138,8 +141,7 @@ $CFG = include(__DIR__."/config-view.inc.php");
 		//var INITING=true
 		//$( "[data-datedir]" ).datepicker() //.change(e=>{$t=$(e.target);setDate($t.data("datedir"),$t.val())})
 		//$( "[data-field]" ).change(e=>{$t=$(e.target);setField($t.data("field"),$t.val())})
-		window.metrics = []
-
+		
 		function getDatev( element ) {
 			return $(element).datepicker("getDate")
 			var date;
@@ -151,18 +153,95 @@ $CFG = include(__DIR__."/config-view.inc.php");
 			return date;
 		}
 
+		window.metrics = []
+
 		var ENDPOINT = "telemetry_endpoint.php";
 	</script>
 	<body>
 		<div id="main">
 			<div id="left">
-				From:
-				<div data-picker id="date_from"></div>
+				From:<br>
+				<input type="text" data-datedir="from"/>
+				<!-- <div data-picker id="date_from"></div> -->
 				<br>
-				To:
-				<div data-picker id="date_to"></div>
-				<input type="hidden" data-datedir="from"/>
-				<input type="hidden" data-datedir="to"/>
+				To:<br>
+				<input type="text" data-datedir="to"/>
+				<!-- <div data-picker id="date_to"></div> -->
+				
+				
+				<br>
+				Predefined:<br>
+				<!-- use $CFG from config-view.php -->
+				<!-- present as dropdown -->
+				<button id="dropdownButton">Select Date Range</button>
+				<div id="dropdownMenu" style="display: none; border: 1px solid #ccc; max-height: 200px; overflow-y: auto; position: absolute; background: white; z-index: 1000;">
+					<table id="date_range_table" border="1" style="width: 100%; border-collapse: collapse;">
+						<tr>
+							<th>Name</th>
+							<th>From</th>
+							<th>To</th>	
+						</tr>
+						<?php foreach ($CFG['dateranges'] as &$date): ?>
+							<tr class="dropdown-item" data-from="<?= date('Y-m-d', strtotime($date['from'])) ?>" data-to="<?= date('Y-m-d', strtotime($date['to'])) ?>">
+								<td><?= $date['name'] ?></td>
+								<td><?= date('Y-m-d', strtotime($date['from'])) ?></td>
+								<td><?= date('Y-m-d', strtotime($date['to'])) ?></td>
+							</tr>
+						<?php endforeach; ?>
+					</table>
+				</div>
+				<style>
+					#dropdownMenu .dropdown-item:hover {
+						background-color: #f0f0f0;
+						cursor: pointer;
+					}
+				</style>
+
+				<script>
+					$(function() {
+						$("#dropdownButton").on("click", function() {
+							$("#dropdownMenu").toggle();
+						});
+
+						$("#dropdownMenu .dropdown-item").on("click", function() {
+							$(`[data-datedir=from]`).val($(this).data("from")).trigger("change");
+							$(`[data-datedir=to]`).val($(this).data("to")).trigger("change");
+							$("#dropdownMenu").hide();
+						});
+
+						$(document).on("click", function(event) {
+							if (!$(event.target).closest("#dropdownButton, #dropdownMenu").length) {
+								$("#dropdownMenu").hide();
+							}
+						});
+
+						$("#date_range").change(function() {
+							let val = $(this).val()
+							if (!val) return
+							let [from,to] = val.split("-")
+							$(`[data-datedir=from]`).val(from).trigger("change")
+							$(`[data-datedir=to]`).val(to).trigger("change")
+						})
+
+						$( "[data-datedir]").change(() => runAll()).datepicker({
+							dateFormat:"yy-mm-dd",
+							changeYear:true,
+							maxDate:"0",
+						})
+						
+						/*
+						$("#date_from").datepicker({altField:"[data-datedir=from]",altFormat:"yymmdd", dateFormat:"yy-mm-dd", changeYear:true, maxDate:"0",defaultDate:"-7"})
+							.on( "change", function() {   $("#date_to").datepicker( "option", "minDate", getDatev( this ) ); runAll() }),
+						$("#date_to")  .datepicker({altField:"[data-datedir=to]"  ,altFormat:"yymmdd", dateFormat:"yy-mm-dd", changeYear:true, minDate:"-7",maxDate:"0",defaultDate:"0"})
+							.on( "change", function() { $("#date_from").datepicker( "option", "maxDate", getDatev( this ) ); runAll() })
+						*/
+							
+
+					})
+				</script>
+				<br>
+
+
 			</div>
 
 			<div id="charts">
@@ -273,83 +352,6 @@ $CFG = include(__DIR__."/config-view.inc.php");
 					<div class="desc"></div>
 					<canvas id="chart_flavorsinstalled"></canvas>
 
-					<script>
-						let CHART1
-						function runUsedGuide() {
-							if (CHART1) CHART1.destroy()
-							$.get(ENDPOINT+"?"+new URLSearchParams({
-								metric:"usedguide",
-								from:getDate("from"),
-								to:getDate("to"),
-								limit:50,
-								flavour:$("#usedguide input[name=flavour]:checked").val(),
-								grouptypes:$("#usedguide [data-field=grouptypes]").val(),
-								type:$("#usedguide [data-field=type]").val(),
-								find:$("#usedguide [data-field=find]").val(),
-								...$("#usedguide [data-field=meta]").data("meta")
-							}))
-								.then(d=>showUsedGuide(d))
-								.fail(d=>console.error(d))
-						}
-						function showUsedGuide(data) {
-							console.log(data)
-							if (data.metric!="usedguide") return console.error("Wrong metric in showUsedGuide:",data.metric)
-							if (CHART1) CHART1.destroy()
-							const ctx = document.getElementById('chart_usedguide');
-							CHART1 = new Chart(ctx, {
-								type: 'pie',
-								data: {
-									labels: Object.keys(data.usedguides).map(s=>`${s}: ${data.usedguides[s]}`),
-									datasets: [{
-										label: '#',
-										data: Object.values(data.usedguides),
-										borderWidth: 1
-									}]
-								},
-								options: {
-								}
-							})
-						}
-						window.metrics.push({run:runUsedGuide,show:showUsedGuide})
-						$(()=>{
-							$( "#usedguide :input" ).change(runUsedGuide)
-						})
-					</script>
-
-				</div>
-
-
-
-
-
-
-
-
-
-
-				<div id="usedguide" class="overviewbox">
-					<h2>Used guides:</h2>
-					<form>
-					Flavor:
-					<?php $i=0; $name="flavour"; foreach (['wow'=>"Retail",'wow-classic'=>"Classic",'wow-classic-tbc'=>CLASSIC_EXP] as $v=>$l): $i++; ?>
-					<input type="radio" data-cbr name="<?=$name?>" id="cbug-<?=$name?>-<?=$i?>" value="<?=$v?>" <?=$i==1?"checked":""?>><label data-flavor="<?=$v?>" for="cbug-<?=$name?>-<?=$i?>"><?=$l?></label>
-					<?php endforeach; ?>
-					<br>
-					Group types: <select data-field="grouptypes">
-						<option value="" selected>No</option>
-						<option value="1">Yes</option>
-					</select><br>
-					Type: <select data-field="type">
-						<option value="" selected>Any</option>
-						<option value="LEVELING">Leveling</option>
-						<option value="DAILIES">Dailies</option>
-						<option value="ACHIEVEMENTS">Achievements</option>
-						<option value="TITLES">Titles</option>
-						<option value="REPUTATION">Reputation</option>
-					</select><br>
-					Find: <input type="text" data-field="find" data-formetric="usedguide">
-					</form>
-					<canvas id="chart_usedguide"></canvas>
 					<script>
 						let CHART2
 						let dmf
@@ -540,6 +542,85 @@ $CFG = include(__DIR__."/config-view.inc.php");
 
 
 
+
+
+				<div id="usedguide" class="overviewbox">
+					<h2>Used guides:</h2>
+					<form>
+					Flavor:
+					<?php $i=0; $name="flavour"; foreach (['wow'=>"Retail",'wow-classic'=>"Classic",'wow-classic-tbc'=>CLASSIC_EXP] as $v=>$l): $i++; ?>
+					<input type="radio" data-cbr name="<?=$name?>" id="cbug-<?=$name?>-<?=$i?>" value="<?=$v?>" <?=$i==1?"checked":""?>><label data-flavor="<?=$v?>" for="cbug-<?=$name?>-<?=$i?>"><?=$l?></label>
+					<?php endforeach; ?>
+					<br>
+					Group types: <select data-field="grouptypes">
+						<option value="" selected>No</option>
+						<option value="1">Yes</option>
+					</select><br>
+					Type: <select data-field="type">
+						<option value="" selected>Any</option>
+						<option value="LEVELING">Leveling</option>
+						<option value="DAILIES">Dailies</option>
+						<option value="ACHIEVEMENTS">Achievements</option>
+						<option value="TITLES">Titles</option>
+						<option value="REPUTATION">Reputation</option>
+					</select><br>
+					Find: <input type="text" data-field="find" data-formetric="usedguide">
+					</form>
+					<canvas id="chart_usedguide"></canvas>
+
+					<script>
+						let CHART1
+						function runUsedGuide() {
+							if (CHART1) CHART1.destroy()
+							$.get(ENDPOINT+"?"+new URLSearchParams({
+								metric:"usedguide",
+								from:getDate("from"),
+								to:getDate("to"),
+								limit:50,
+								flavour:$("#usedguide input[name=flavour]:checked").val(),
+								grouptypes:$("#usedguide [data-field=grouptypes]").val(),
+								type:$("#usedguide [data-field=type]").val(),
+								find:$("#usedguide [data-field=find]").val(),
+								...$("#usedguide [data-field=meta]").data("meta")
+							}))
+								.then(d=>showUsedGuide(d))
+								.fail(d=>console.error(d))
+						}
+						function showUsedGuide(data) {
+							console.log(data)
+							if (data.metric!="usedguide") return console.error("Wrong metric in showUsedGuide:",data.metric)
+							if (CHART1) CHART1.destroy()
+							const ctx = document.getElementById('chart_usedguide');
+							CHART1 = new Chart(ctx, {
+								type: 'pie',
+								data: {
+									labels: Object.keys(data.usedguides).map(s=>`${s}: ${data.usedguides[s]}`),
+									datasets: [{
+										label: '#',
+										data: Object.values(data.usedguides),
+										borderWidth: 1
+									}]
+								},
+								options: {
+								}
+							})
+						}
+						window.metrics.push({run:runUsedGuide,show:showUsedGuide})
+						$(()=>{
+							$("#usedguide :input").change(runUsedGuide)
+						})
+					</script>
+
+
+				</div>
+
+
+
+
+
+
+
+
 				<div id="searches" class="overviewbox">
 					<h2>Search keywords:</h2>
 					<form>
@@ -720,6 +801,10 @@ $CFG = include(__DIR__."/config-view.inc.php");
 					</script>
 				</div>
 
+				<?php
+				TelemetryView::renderMetrics();
+				?>
+
 
 			</div>
 		</div>
@@ -732,18 +817,15 @@ $CFG = include(__DIR__."/config-view.inc.php");
 			function runAll() {
 				window.metrics.map(m=>m.run())
 			}
+			
 			$(()=>{
 				$("input[type=radio][data-cbr]").checkboxradio()
 
 				Chart.register(ChartDataLabels)
-				$( "[data-datedir]" ).datepicker() //.change(e=>{$t=$(e.target);setDate($t.data("datedir"),$t.val())})
-				$( "[data-datedir=from]" ).datepicker("setDate","-7")
-				$( "[data-datedir=to]" ).datepicker("setDate","now")
-				$( "[data-datedir]").change(runAll)
-				let
-					from = $("#date_from").datepicker({altField:"[data-datedir=from]",altFormat:"yymmdd", changeYear:true, maxDate:"0",defaultDate:"-7"}).on( "change", function() {   to.datepicker( "option", "minDate", getDatev( this ) ); runAll() }),
-					to   = $("#date_to")  .datepicker({altField:"[data-datedir=to]"  ,altFormat:"yymmdd", changeYear:true, minDate:"-7",maxDate:"0",defaultDate:"0"}).on( "change", function() { from.datepicker( "option", "maxDate", getDatev( this ) ); runAll() })
-
+				//$( "[data-datedir]" ).datepicker() //.change(e=>{$t=$(e.target);setDate($t.data("datedir"),$t.val())})
+				//$( "[data-datedir=from]" ).datepicker("setDate","-7")
+				//$( "[data-datedir=to]" ).datepicker("setDate","now")
+				
 				runAll()
 			})
 			

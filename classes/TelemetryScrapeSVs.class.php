@@ -10,10 +10,12 @@
 class TelemetryScrapeSVs extends Telemetry {
 	static function init() {
 		parent::init();
-		self::self_tests();
+		// any local inits?
 	}
 
-	static function _sub_config() {
+	static function config($cfg=[]) {
+		parent::config($cfg);
+
 		$configfile = (array)(@include "config-scrape.inc.php"); // load defaults
 		self::$CFG = self::merge_configs(self::$CFG, $configfile);
 		if (!self::$CFG['SV_STORAGE_ROOT']) throw new Exception("SV_STORAGE_ROOT not defined in config, config.inc.php not loaded?");
@@ -23,6 +25,7 @@ class TelemetryScrapeSVs extends Telemetry {
 		if (!$SYNC_CFG) throw new Exception("Failed to load sync config from ".self::$CFG['SV_STORAGE_ROOT']."/config.inc.php");
 		self::$CFG['SV_STORAGE_DATA_PATH'] = self::cfgstr('SV_STORAGE_DATA_PATH',['SYNC_FOLDER'=>$SYNC_CFG['folder']]);
 	}
+
 
 	static function filter_younger_files($files, $days_old) {
 		$time_limit = time() - ($days_old * DAY);
@@ -69,7 +72,7 @@ class TelemetryScrapeSVs extends Telemetry {
 			return;
 		}
 
-		$topics = self::$CFG['SCRAPE_TOPICS'];
+		$topics = self::$CFG['TOPICS'];
 		$topics = array_filter($topics, function($t) { return ($t['scraper']['input']?:"") == "sv"; });
 		$sync_path = self::cfgstr('SV_STORAGE_FLAVOUR_PATH',["FLAVOUR"=>$flavour]);
 
@@ -544,6 +547,8 @@ ENDLUA;
 	// Tests, DB schemas
 
 	static function self_tests() {
+		parent::self_tests();
+		
 		self::test_paths();
 		self::test_datapoints();
 		try {
@@ -585,7 +590,7 @@ ENDLUA;
 	}
 
 	static function test_datapoints() {
-		$test_dataps = self::extract_datapoints_with_lua("ZygorGuidesViewerSettings={char={bar={guidestephistory={foo={lasttime=12345}}}}}","wow",self::$CFG['SCRAPE_TOPICS']);
+		$test_dataps = self::extract_datapoints_with_lua("ZygorGuidesViewerSettings={char={bar={guidestephistory={foo={lasttime=12345}}}}}","wow",self::$CFG['TOPICS']);
 		if (!($test_dataps['status']=="ok" && $test_dataps['datapoints'][0]['type']=="usedguide" && $test_dataps['datapoints'][0]['time']==12345)) die("FAILED testing datapoint defs:\n".print_r($test_dataps,1)."\n");
 	}
 

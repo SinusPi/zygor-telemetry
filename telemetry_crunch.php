@@ -38,8 +38,7 @@ $FLAVOURS = $OPTS['f'];
 if (substr($OPTS['start-day'],0,1)=="-") $OPTS['start-day']=date("Ymd",strtotime($OPTS['start-day']." days"));
 $OPTS["MAX_DAYS"]=$OPTS['maxdays'];
 
-TelemetryCrunch::config($OPTS);
-TelemetryCrunch::init();
+TelemetryCrunch::startup($OPTS);
 
 foreach ($FLAVOURS as $flav) TelemetryCrunch::crunch_flavour($flav);
 

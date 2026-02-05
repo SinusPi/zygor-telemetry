@@ -45,8 +45,7 @@ if (count(array_intersect($valid_inputs,$OPTS['input']))!=count($OPTS['input']))
 	throw new Exception("Invalid input type specified. Valid types are: ".implode(", ",$valid_inputs));
 }
 if (in_array("sv",$OPTS['input'])) {
-	TelemetryScrapeSVs::config($OPTS);
-	TelemetryScrapeSVs::init();
+	TelemetryScrapeSVs::startup($OPTS);
 	foreach ($FLAVOURS as $flav) TelemetryScrapeSVs::scrape($flav);
 }
 
