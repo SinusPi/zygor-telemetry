@@ -39,7 +39,7 @@ return [
 	"action" => "insert",
 	"table" => "gossips",
 	"table_schema" => "
-		CREATE TABLE `gossips` (
+		CREATE TABLE `<TABLE>` (
 			`event_id` int(11) NOT NULL,
 			`flavnum` int(1) NOT NULL,
 			`time` int(11) NOT NULL,

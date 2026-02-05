@@ -31,7 +31,7 @@ return [
 	"action" => "insert",
 	"table" => "version",
 	"table_schema" => "
-		CREATE TABLE `version` (
+		CREATE TABLE `<TABLE>` (
 			`event_id` int(11) NOT NULL,
 			`flavnum` int(1) NOT NULL,
 			`time` int(11) NOT NULL,

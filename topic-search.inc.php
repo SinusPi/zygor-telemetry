@@ -22,7 +22,7 @@ ENDLUA
 	'crunchers'=>[
 		[
 			//'input'=>"event",
-			//'event'=>"search",
+			//'eventtype'=>"search",
 			'function' => function($line) {
 				$unpacked = json_decode($line["data"], true);
 				$line = $unpacked + $line;
@@ -46,7 +46,7 @@ ENDLUA
 			'action' => "insert",
 			'table' => "search",
 			'table_schema' => "
-				CREATE TABLE `search` (
+				CREATE TABLE `<TABLE>` (
 					`event_id` int(11) NOT NULL,
 					`flavnum` int(1) NOT NULL,
 					`time` int(11) NOT NULL,

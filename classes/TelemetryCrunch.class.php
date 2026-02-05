@@ -259,6 +259,7 @@ class TelemetryCrunch extends Telemetry {
 					if (self::$db->error) {
 						self::vlog("\x1b[31;1mTable '{$table}' for cruncher '{$cruncher['name']}' does not exist, creating...\x1b[0m");
 						$schema_sql = $cruncher['table_schema'];
+						$schema_sql = str_replace("<TABLE>",$table,$schema_sql);
 						self::$db->query($schema_sql);
 						if (self::$db->error) 
 							throw new Exception("Failed to create table `{$table}`: ".self::$db->error);
