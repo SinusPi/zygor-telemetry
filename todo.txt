@@ -1,0 +1,1 @@
+Now, each Cruncher def can have subdefs, but that doesn't create a proper "topic" for View and Endpoint. Need to treat sub-crunchers as Topics.
