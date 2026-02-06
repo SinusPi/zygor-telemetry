@@ -6,10 +6,10 @@ define("CLASSIC_EXP","MoP");
 ?>
 <html>
 	<head>
-		<link rel="stylesheet" href="<?= TelemetryView::$CFG['jquery_dir'] ?>/jquery-ui.min.css">
-		<script src="<?= TelemetryView::$CFG['jquery_dir'] ?>/external/jquery/jquery.js"></script>
-		<script src="<?= TelemetryView::$CFG['jquery_dir'] ?>/jquery-ui.min.js"></script>
-		<script src="<?= TelemetryView::$CFG['jquery_dir'] ?>/jquery-ui.min.js"></script>
+		<link rel="stylesheet" href="<?= TelemetryView::$CFG['JQUERY_DIR'] ?>/jquery-ui.min.css">
+		<script src="<?= TelemetryView::$CFG['JQUERY_DIR'] ?>/external/jquery/jquery.js"></script>
+		<script src="<?= TelemetryView::$CFG['JQUERY_DIR'] ?>/jquery-ui.min.js"></script>
+		<script src="<?= TelemetryView::$CFG['JQUERY_DIR'] ?>/jquery-ui.min.js"></script>
 		<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 		<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 		<style>
@@ -181,7 +181,7 @@ define("CLASSIC_EXP","MoP");
 							<th>From</th>
 							<th>To</th>	
 						</tr>
-						<?php foreach ($CFG['dateranges'] as &$date): ?>
+						<?php foreach (TelemetryView::$CFG['DATE_RANGES'] as &$date): ?>
 							<tr class="dropdown-item" data-from="<?= date('Y-m-d', strtotime($date['from'])) ?>" data-to="<?= date('Y-m-d', strtotime($date['to'])) ?>">
 								<td><?= $date['name'] ?></td>
 								<td><?= date('Y-m-d', strtotime($date['from'])) ?></td>
@@ -544,6 +544,7 @@ define("CLASSIC_EXP","MoP");
 
 
 
+				<?php /* ?>
 				<div id="usedguide" class="overviewbox">
 					<h2>Used guides:</h2>
 					<form>
@@ -613,7 +614,7 @@ define("CLASSIC_EXP","MoP");
 
 
 				</div>
-
+				<?php */ ?>
 
 
 
