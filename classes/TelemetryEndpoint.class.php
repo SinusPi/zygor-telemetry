@@ -13,23 +13,24 @@ class TelemetryEndpoint extends Telemetry {
 
 	static function serveRequest() {
 		$flavour = $_REQUEST['flavour'] ?: "";
-		if (!in_array($flavour,array_keys(self::$CFG['WOW_FLAVOUR_DATA']))) self::response(["success"=>false,"error"=>"Invalid flavour specified","errcode"=>"BAD_FLAVOUR"]);
+		$flavnum = self::$CFG['WOW_FLAVOUR_DATA'][$flavour]['num'] ?: 0;
+		if (!$flavnum) self::response(["success"=>false,"error"=>"Invalid flavour specified","errcode"=>"BAD_FLAVOUR"]);
 
 		try {
-			$from = strtotime($_REQUEST['from']);
-			$to = strtotime($_REQUEST['to']);
+			$from = intval($_REQUEST['from']);
+			$to = intval($_REQUEST['to']);
 		} catch (Exception $e) {
 			self::response([
 				"success"=>false,
 				"code"=>400,
-				"error"=>"Invalid date format in from/to parameters: ".$e->getMessage(),
+				"error"=>"Invalid date in from/to parameters: ".$e->getMessage(),
 				"errcode"=>"BAD_DATE",
 			]);
 		}
 
 		$topic = $_REQUEST['topic'] ?: null;
 		$topicendpoint = self::$CFG['TOPICS'][$topic]['endpoint'] ?: null;
-		if (!$topic || !$topicendpoint || !is_callable($topicendpoint)) {
+		if (!$topic || !$topicendpoint || !is_callable($topicendpoint['queryfunc'])) {
 			self::response([
 				"success"=>false,
 				"code"=>400,
@@ -51,7 +52,7 @@ class TelemetryEndpoint extends Telemetry {
 		}
 
 		try {
-			$data = $topicendpoint($from,$to,$flavour);
+			$data = $topicendpoint['queryfunc']($from,$to,$flavnum);
 			self::response([
 				"success"=>true,
 				"code"=>200,
@@ -73,8 +74,9 @@ class TelemetryEndpoint extends Telemetry {
 	}
 
 	static function query($from,$to,$flavour,$table,$select,$groupby="",$order="",$limit="") {
-		$q = self::db_qesc($select." FROM `%d` WHERE `flavnum`=%d AND `time`>=%d AND `time`<=%d $groupby $order", $table, $flavour, $from, $to);
-		return $results = self::$db->fetch_all($q);
+		$q = self::db_qesc($select." FROM `$table` WHERE `flavnum`={d} AND `time`>={d} AND `time`<={d} $groupby $order", $flavour, $from, $to);
+		var_dump(self::$LAST_QUERY);
+		return $results = $q->fetch_all();
 	}
 
 	// Tests, DB schemas
