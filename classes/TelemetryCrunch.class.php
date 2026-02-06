@@ -250,9 +250,9 @@ class TelemetryCrunch extends Telemetry {
 		self::vlog("Running crunchers for flavour \x1b[38;5;78m{$flavour}\x1b[0m...");
 		foreach($topics as $name=>$topic) {
 			foreach($topic['crunchers'] as $num=>$cruncher) {
+				$subname = ($cruncher['name'] ?: "#".($num+1));
 				$colorname = "\x1b[38;5;148m{$name}\x1b[0m";
-				$colordashsubname = "-\x1b[38;5;118m".($cruncher['name'] ?: $num)."\x1b[0m";
-				$dashsubname = "-".($cruncher['name'] ?: "#".($num+1));
+				$colordashsubname = "-\x1b[38;5;118m".$subname."\x1b[0m";
 				self::vlog("Running cruncher {$colorname}{$colordashsubname}...");
 
 				// create if needed
@@ -260,7 +260,7 @@ class TelemetryCrunch extends Telemetry {
 					$table = $cruncher['table'];
 					self::db_qesc("SHOW CREATE TABLE {$table}");
 					if (self::$db->error) {
-						self::vlog("\x1b[31;1mTable '{$table}' for cruncher '{$cruncher['name']}' does not exist, creating...\x1b[0m");
+						self::vlog("\x1b[31;1mTable '{$table}' for cruncher '{$subname}' does not exist, creating...\x1b[0m");
 						$schema_sql = $cruncher['table_schema'];
 						$schema_sql = str_replace("<TABLE>",$table,$schema_sql);
 						self::$db->query($schema_sql);
@@ -285,7 +285,7 @@ class TelemetryCrunch extends Telemetry {
 				$getrequest = self::$db->query($getquery);
 
 				if ($getrequest->num_rows==0) {
-					self::vlog("No new {$name}{$dashsubname} events to process.");
+					self::vlog("No new {$name}-{$subname} events to process.");
 					continue;
 				}
 				self::vlog("Found ".strval($getrequest->num_rows)." records, processing...");
@@ -303,13 +303,13 @@ class TelemetryCrunch extends Telemetry {
 						$table = $cruncher['table'];
 						$insertquery = self::qarrayesc("INSERT INTO {$table} ({keys}) VALUES ({values})",$fields);
 						$insertrequest = self::$db->query($insertquery);
-						if (self::$db->affected_rows!=1) throw new Exception("FAILED to insert event id {$event['id']} crunched into {$table}");
+						if (self::$db->affected_rows!=1) throw new Exception("FAILED to insert crunched event id {$event['id']} into {$table}");
 						if (self::$db->error) throw new Exception("ERROR inserting event id {$event['id']} into {$table}: ".self::$db->error);
 					}
 				}
 
 				if ($cruncher['action']=="insert") {
-					self::vlog("Added ".strval($count)." new {$name}{$dashsubname} records.");
+					self::vlog("Added ".strval($count)." new {$name}-{$subname} records.");
 				}
 			}
 		}
