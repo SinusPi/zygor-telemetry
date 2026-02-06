@@ -20,6 +20,7 @@ class Telemetry {
 	static $db = null;
 
 	static $DBG = [];
+	static $LAST_QUERY = null;
 
 	static function config($cfg=[]) {
 		$configfile = (array)(require "config.inc.php");
@@ -374,6 +375,7 @@ class Telemetry {
 
 	static function db_qesc($query,...$args) {
 		$query = self::qesc($query, ...$args);
+		self::$LAST_QUERY = $query;
 		return self::$db->query($query);
 	}
 
