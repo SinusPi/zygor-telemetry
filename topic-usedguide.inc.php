@@ -20,17 +20,54 @@ ENDLUA
 	],
 	'crunchers'=>[
 		[
-			'function'=>function($line,&$alldata,&$mydata) {
-				$mydata[$line['guide']]++;
+			'function' => function($line) {
+				$unpacked = json_decode($line["data"], true);
+				$line = $unpacked + $line;
+
+				$values = [
+					"event_id" => $line["id"],
+					"flavnum" => $line["flavnum"],
+					"time" => $line["time"],
+
+					"guide" => $line["guide"],
+					"type" => substr($line["guide"],0,strpos($line["guide"],"/")),
+				];
+
+				return $values;
 			},
+			'action' => "insert",
+			'table' => "usedguide",
+			'table_schema' => "
+				CREATE TABLE `<TABLE>` (
+					`event_id` int(11) NOT NULL,
+					`flavnum` int(1) NOT NULL,
+					`time` int(11) NOT NULL,
+					`guide` varchar(30) NOT NULL,
+					`type` varchar(10) NOT NULL,
+					PRIMARY KEY (`event_id`)
+				) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci
+				"
 			// without 'action' and maybe 'table' this cruncher just collects data in $mydata which isn't used anyway
 		]
 	],
 	'endpoint'=>[
+		'queryfunc'=>function($from,$to,$flavour) {
+			$results = TelemetryEndpoint::query($from,$to,$flavour,'usedguide',"SELECT COUNT(*) as count, guide","GROUP BY guide","ORDER BY count DESC",1000);
 
+			return $results;
+
+			if ($_REQUEST['type']) $usedguides = array_filter($usedguides,function($val,$key) { return strpos($key,$_REQUEST['type'])===0; },ARRAY_FILTER_USE_BOTH);
+			if ($_REQUEST['find']) $usedguides = array_filter($usedguides,function($val,$key) { return strpos($key,$_REQUEST['find'])!==FALSE; },ARRAY_FILTER_USE_BOTH);
+			if ($_REQUEST['sort']=="name") ksort($usedguides); else arsort($usedguides);
+			if ($_REQUEST['limit']) $usedguides = array_slice($usedguides,0,intval($_REQUEST['limit']));
+			$result['usedguides']=&$usedguides;
+
+			return $result;
+		}
 	],
 	'view'=>[
 		'title'=>"Used Guides",
+		'class'=>"overviewbox",
 		'printer'=>function() {
 			ob_start();
 			?>

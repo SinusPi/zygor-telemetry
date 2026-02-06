@@ -1,20 +1,12 @@
 <?php
 if (!defined('WEBHOME')) define("WEBHOME","/home/zygordata/www");
 
-require_once($_SERVER['DOCUMENT_ROOT']?:"~/www")."/includes/Telemetry.class.php";
-require_once($_SERVER['DOCUMENT_ROOT']."/includes/config.inc.php");
-require_once(__DIR__."/config.inc.php");
+require_once("classes/Telemetry.class.php");
+require_once("includes/Zygor.class.inc.php");
+
+TelemetryEndpoint::startup();
 
 header("Content-type: application/json");
-
-define("STORAGE_FOLDER","storage");
-define("TELEMETRY_FOLDER","telemetry");
-define("WOW_FLAVOURS","wow,wow-classic,wow-classic-tbc",'wow-classic-tbc-anniv');
-
-$from = $_REQUEST['from'];
-$to = $_REQUEST['to'];
-$flavour = $_REQUEST['flavour'] ?: $_REQUEST['flavor'];
-if (!in_array($flavour,explode(",",WOW_FLAVOURS))) $flavour=next(explode(",",WOW_FLAVOURS));
 
 $metric = $_REQUEST['metric'];
 
@@ -22,37 +14,23 @@ $result['metric']=$metric;
 
 // Parts still use old format, parts will connect to db...
 
+if (isset($_REQUEST['list'])) {
+	$topics = Telemetry::$CFG['TOPICS'];
+	$list = array_map(function($t) {
+		$r=[];
+		$r['endpoint'] = !!$t['endpoint'];
+		$r['view'] = !!$t['view'];
+	
+		return $r;
+	}, $topics);
+	die(json_encode(['topics'=>$list],JSON_UNESCAPED_SLASHES|JSON_PRETTY_PRINT));
+}
+
+TelemetryEndpoint::serveRequest();
+die();
+
 try {
 	if ($metric=="usedguide") {
-		$from = Telemetry::date_strip_dashes($from);
-		$to = Telemetry::date_strip_dashes($to);
-		
-		$folder = STORAGE_FOLDER."/".TELEMETRY_FOLDER."/".$flavour."/usedguide";
-		$days = Telemetry::read_days($folder,$from,$to);
-		$files = $days['files'];
-		$result['flavour']=$flavour;
-		$result['data_total']=$days['data_total'];
-		$result['data_match']=$days['data_match'];
-
-		$usedguides = [];
-		foreach ($files as $fn) {
-			$guides = @json_decode(@file_get_contents($folder."/".$fn));
-			if (!$guides) continue;
-			foreach ($guides as $guide=>$count) {
-				if ($_REQUEST['grouptypes']) {
-					$folders = explode("/",$guide);
-					$usedguides[$folders[0]]+=$count;
-				} else 
-					$usedguides[$guide]+=$count;
-			}
-		}
-		if ($_REQUEST['type']) $usedguides = array_filter($usedguides,function($val,$key) { return strpos($key,$_REQUEST['type'])===0; },ARRAY_FILTER_USE_BOTH);
-		if ($_REQUEST['find']) $usedguides = array_filter($usedguides,function($val,$key) { return strpos($key,$_REQUEST['find'])!==FALSE; },ARRAY_FILTER_USE_BOTH);
-		if ($_REQUEST['sort']=="name") ksort($usedguides); else arsort($usedguides);
-		if ($_REQUEST['limit']) $usedguides = array_slice($usedguides,0,intval($_REQUEST['limit']));
-		$result['usedguides']=&$usedguides;
-
-		die(json_encode($result,JSON_UNESCAPED_SLASHES|JSON_PRETTY_PRINT));
 	}
 
 	elseif ($metric=="flavorsinstalled") {
