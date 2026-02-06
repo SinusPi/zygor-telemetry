@@ -3,3 +3,5 @@
 *.log
 *.status.json
 /includes/jquery-ui-1.13.2.custom/*
+config-view.inc.php
+config-scrape-packagerlog.inc.php
