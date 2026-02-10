@@ -246,6 +246,10 @@ define("CLASSIC_EXP","MoP");
 
 			<div id="charts">
 
+				<?php
+				TelemetryView::renderMetrics();
+				?>
+
 				<div id="simples" class="overviewbox">
 					<h2>User counts:</h2>
 					<div id="ecb">Total Potential Users <sup title='users seen in 3 years before "to" date'>?</sup>: <span data-value=ecb></span></div>
@@ -802,9 +806,6 @@ define("CLASSIC_EXP","MoP");
 					</script>
 				</div>
 
-				<?php
-				TelemetryView::renderMetrics();
-				?>
 
 
 			</div>
