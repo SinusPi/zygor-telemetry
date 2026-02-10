@@ -17,7 +17,7 @@ class Telemetry {
 	static $tag = "";
 	static $last_statuses = [];
 
-	static $db = null;
+	static ?mysqli $db = null;
 
 	static $DBG = [];
 	static $LAST_QUERY = null;
@@ -266,6 +266,19 @@ class Telemetry {
 		if (preg_match("/^\\d{8}$/",$d)) return $d;
 		throw new Exception("Date format invalid: $d");
 	}
+	static function parse_date($datestr) {
+		// try to parse as YYYYMMDD or YYYY-MM-DD
+		if (preg_match("/^(\d{4})(-?)(\d{2})(-?)(\d{2})$/", $datestr, $m)) {
+			return strtotime("{$m[1]}-{$m[3]}-{$m[5]}");
+		}
+		// try to parse as timestamp
+		if (is_numeric($datestr)) {
+			return intval($datestr);
+		}
+		throw new Exception("Invalid date format: $datestr");
+	}
+
+
 
 	/** unused
 	 * @deprecated
