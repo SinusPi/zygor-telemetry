@@ -17,8 +17,8 @@ class TelemetryEndpoint extends Telemetry {
 		if (!$flavnum) self::response(["success"=>false,"error"=>"Invalid flavour specified","errcode"=>"BAD_FLAVOUR"]);
 
 		try {
-			$from = intval($_REQUEST['from']);
-			$to = intval($_REQUEST['to']);
+			$from = parent::parse_date($_REQUEST['from']);
+			$to = parent::parse_date($_REQUEST['to']);
 		} catch (Exception $e) {
 			self::response([
 				"success"=>false,
@@ -52,12 +52,13 @@ class TelemetryEndpoint extends Telemetry {
 		}
 
 		try {
-			$data = $topicendpoint['queryfunc']($from,$to,$flavnum);
+			$data = $topicendpoint['queryfunc']($from,$to,$flavnum); // any other parameters should be handled by the queryfunc itself, not here
 			self::response([
 				"success"=>true,
 				"code"=>200,
 				"id"=>intval($_REQUEST['id']?:0),
 				"data"=>$data,
+				"query"=>self::$LAST_QUERY
 			]);
 		} catch (Exception $e) {
 			self::response([
@@ -73,11 +74,20 @@ class TelemetryEndpoint extends Telemetry {
 		die(json_encode($details));
 	}
 
-	static function query($from,$to,$flavour,$table,$select,$groupby="",$order="",$limit="") {
-		$q = self::db_qesc($select." FROM `$table` WHERE `flavnum`={d} AND `time`>={d} AND `time`<={d} $groupby $order", $flavour, $from, $to);
-		var_dump(self::$LAST_QUERY);
+	static function get_where_from_to_flavour($from,$to,$flavour) {
+		return [
+			"`flavnum`=".intval($flavour),
+			"`time`>=".intval($from),
+			"`time`<".intval($to),
+		];
+	}
+
+	/*
+	static function query($select,$table,$from,$to,$flavour,$where=[1],$groupby="",$order="",$limit="") {
+		$q = self::db_qesc($select." FROM `$table` WHERE `flavnum`={d} AND `time`>={d} AND `time`<={d} AND ".join(" AND ",$where)." $groupby $order", $flavour, $from, $to);
 		return $results = $q->fetch_all();
 	}
+	*/
 
 	// Tests, DB schemas
 
