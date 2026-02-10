@@ -52,17 +52,17 @@ ENDLUA
 	],
 	'endpoint'=>[
 		'queryfunc'=>function($from,$to,$flavour) {
-			$results = TelemetryEndpoint::query($from,$to,$flavour,'usedguide',"SELECT COUNT(*) as count, guide","GROUP BY guide","ORDER BY count DESC",1000);
+			
+			$where = TelemetryEndpoint::get_where_from_to_flavour($from,$to,$flavour);
+			if ($_REQUEST['type']) $where[] = "type='".Telemetry::$db->real_escape_string($_REQUEST['type'])."'";
+			if ($_REQUEST['find']) $where[] = "guide LIKE '%".Telemetry::$db->real_escape_string($_REQUEST['find'])."%'";
+			$order = ($_REQUEST['sort']=="name") ? "guide ASC" : "count DESC";
+			$limit = ($_REQUEST['limit']) ? intval($_REQUEST['limit']) : 100000;
 
-			return $results;
+			$query = TelemetryEndpoint::db_qesc("SELECT COUNT(*) AS count, guide FROM usedguide WHERE ".join(" AND ",$where)." GROUP BY guide  ORDER BY $order  LIMIT $limit");
+			$result = $query->fetch_all(MYSQLI_ASSOC);
 
-			if ($_REQUEST['type']) $usedguides = array_filter($usedguides,function($val,$key) { return strpos($key,$_REQUEST['type'])===0; },ARRAY_FILTER_USE_BOTH);
-			if ($_REQUEST['find']) $usedguides = array_filter($usedguides,function($val,$key) { return strpos($key,$_REQUEST['find'])!==FALSE; },ARRAY_FILTER_USE_BOTH);
-			if ($_REQUEST['sort']=="name") ksort($usedguides); else arsort($usedguides);
-			if ($_REQUEST['limit']) $usedguides = array_slice($usedguides,0,intval($_REQUEST['limit']));
-			$result['usedguides']=&$usedguides;
-
-			return $result;
+			return array_combine(array_column($result, 'guide'), array_column($result, 'count'));
 		}
 	],
 	'view'=>[
@@ -70,11 +70,12 @@ ENDLUA
 		'class'=>"overviewbox",
 		'printer'=>function() {
 			ob_start();
+			$name = "usedguide";
 			?>
 				<form>
 				Flavor:
-				<?php $i=0; $name="flavour"; foreach (['wow'=>"Retail",'wow-classic'=>"Classic",'wow-classic-tbc'=>"MoP"] as $v=>$l): $i++; ?>
-				<input type="radio" data-cbr name="<?=$name?>" id="cbug-<?=$name?>-<?=$i?>" value="<?=$v?>" <?=$i==1?"checked":""?>><label data-flavor="<?=$v?>" for="cbug-<?=$name?>-<?=$i?>"><?=$l?></label>
+				<?php $i=0; $label="flavour"; foreach (['wow'=>"Retail",'wow-classic'=>"Classic",'wow-classic-tbc'=>"MoP"] as $v=>$l): $i++; ?>
+				<input type="radio" data-cbr name="<?=$label?>" id="cbug-<?=$label?>-<?=$i?>" value="<?=$v?>" <?=$i==1?"checked":""?>><label data-flavor="<?=$v?>" for="cbug-<?=$label?>-<?=$i?>"><?=$l?></label>
 				<?php endforeach; ?>
 				<br>
 				Group types: <select data-field="grouptypes">
@@ -95,34 +96,34 @@ ENDLUA
 
 				<script>
 					let CHART1
+					let DIV_ID = "#topic-<?= $name ?>"
 					function runUsedGuide() {
 						if (CHART1) CHART1.destroy()
 						$.get(ENDPOINT+"?"+new URLSearchParams({
-							metric:"usedguide",
+							topic:"usedguide",
 							from:getDate("from"),
 							to:getDate("to"),
 							limit:50,
-							flavour:$("#usedguide input[name=flavour]:checked").val(),
-							grouptypes:$("#usedguide [data-field=grouptypes]").val(),
-							type:$("#usedguide [data-field=type]").val(),
-							find:$("#usedguide [data-field=find]").val(),
-							...$("#usedguide [data-field=meta]").data("meta")
+							flavour:$(`${DIV_ID} input[name=flavour]:checked`).val(),
+							grouptypes:$(`${DIV_ID} [data-field=grouptypes]`).val(),
+							type:$(`${DIV_ID} [data-field=type]`).val(),
+							find:$(`${DIV_ID} [data-field=find]`).val(),
+							...$(`${DIV_ID} [data-field=meta]`).data("meta")
 						}))
 							.then(d=>showUsedGuide(d))
 							.fail(d=>console.error(d))
 					}
 					function showUsedGuide(data) {
 						console.log(data)
-						if (data.metric!="usedguide") return console.error("Wrong metric in showUsedGuide:",data.metric)
 						if (CHART1) CHART1.destroy()
 						const ctx = document.getElementById('chart_usedguide');
 						CHART1 = new Chart(ctx, {
 							type: 'pie',
 							data: {
-								labels: Object.keys(data.usedguides).map(s=>`${s}: ${data.usedguides[s]}`),
+								labels: Object.keys(data.data).map(s=>`${s}: ${data.data[s]}`),
 								datasets: [{
 									label: '#',
-									data: Object.values(data.usedguides),
+									data: Object.values(data.data),
 									borderWidth: 1
 								}]
 							},
