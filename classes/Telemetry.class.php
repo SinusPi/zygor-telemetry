@@ -422,7 +422,7 @@ class Telemetry {
 				CREATE TABLE `events` (
 					`id` int(11) NOT NULL AUTO_INCREMENT,
 					`flavnum` int(1) NOT NULL,
-					`file_id` int(11) NOT NULL,
+					`svfile_id` int(11),
 					`time` int(10) NOT NULL,
 					`type` char(40) NOT NULL,
 					`data` text NOT NULL,
@@ -471,7 +471,7 @@ class Telemetry {
 		$totals['tmfiles_written']++;
 	}
 
-	static function db_store_datapoints($flavour,$sv_file_id,$datapoints) {
+	static function db_store_datapoints($flavour,$sv_file_id=null,$datapoints) {
 		if (!count($datapoints)) return;
 		$chunk_size = 100;
 		$values = [];
@@ -485,7 +485,7 @@ class Telemetry {
 		$chunks = array_chunk($values, $chunk_size);
 		$inserted = 0;
 		foreach ($chunks as $chunk) {
-			$q = "INSERT INTO events (flavnum,file_id,time,type,data) VALUES ".join(",",$chunk);
+			$q = "INSERT INTO events (flavnum,svfile_id,time,type,data) VALUES ".join(",",$chunk);
 			$r = self::$db->query($q);
 			if (!$r) throw new Exception("DB error: ".self::$db->error);
 			$inserted += self::$db->affected_rows;
