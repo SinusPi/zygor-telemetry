@@ -205,158 +205,22 @@ class TelemetryScrapeSVs extends Telemetry {
 
 		*/
 
-		foreach ($freshfiles_to_process as $n=>$filename_full) {
-			self::stat(['file_last'=>$filename_full],true);
-			list (,$filename_slug) = self::split_filename($filename_full);
-			$bnet = basename($filename_slug);
-			$user = basename(dirname($filename_slug));
-			$userfolder = dirname($filename_full);
+		foreach ($freshfiles_to_process as $n => $filename_full) {
+			$should_break = self::process_single_sv_file($flavour, $filename_full, $n, $topics, $totals, count($freshfiles_to_process));
+			if ($should_break) break;
 
-			self::vlog("Scraping SV: \x1b[38;5;110m$user\x1b[0m/\x1b[38;5;116m$bnet\x1b[0m\x1b[30;1m--SavedVariables...\x1b[0m");
-
-			$is_windows = (strpos(PHP_OS, 'WIN') === 0); $is_linux = !$is_windows;
-			$lock_code = $flavour."/".$filename_slug;
-			$got_db_lock = false;
-
-			try { // flock block
-				if ($is_linux) {
-					$fl = fopen($userfolder, 'rb');
-					if (!$fl) throw new FileLockedException("Cannot open input folder for locking: $userfolder");
-					if (!flock($fl, LOCK_EX | LOCK_NB)) {
-						fclose($fl);
-						throw new FileLockedException("Input folder locked: $userfolder");
-					}
-				} else {
-					// Windows: use DB locks
-					$got_db_lock = self::db_lock($lock_code);
-					if (!$got_db_lock) {
-						throw new FileLockedException("Input folder locked (DB): $lock_code");
-					} else {
-						//self::vlog(microtime(true)." DB lock acquired for $lock_code");
-					}
-				}
-
-				self::$db->begin_transaction();
-
-				self::vlog(" - :. reading SV file...");
-
-				$flavourfile = $flavour."/".$filename_slug; // flavour/user/bnet
-				$sv_file_data = self::db_get_sv_file_data($flavourfile);
-				if (!$sv_file_data) {
-					self::log("Cannot get sv_file_data for $filename_full. Locked?");
-					throw new FileLockedException("DB locked for $flavourfile");
-				}
-
-				$last_event_stored = $sv_file_data['last_event_time'] ?: 0;
-
-				// ===============================================================
-
-				$sv_raw = self::read_raw_sv($filename_full);
-
-				self::vlog(" - .: extracting datapoints...");
-
-				$extracted = self::extract_datapoints_with_lua($sv_raw,$flavour,$topics);
-
-				// ===============================================================
-
-				// handle errors
-				if ($extracted['status'] != "ok") {
-					if ($extracted['err'] == "stderr_output") {
-						$totals['broken_lua']++;
-						echo $filename_full . ": ERROR: " . $extracted['error'];
-						continue; // SV+Lua broken, it could mean our extraction failed, or the file was broken in the first place.
-					} elseif ($extracted['err'] == "no_zgvs") {
-						$size = filesize($filename_full);
-						if ($size > 500) $totals['files_without_zgvs'][] = $filename_userfile; // just log it
-						$totals['broken_lua']++;
-						continue;
-					} elseif (!isset($extracted['datapoints'])) {
-						trigger_error("ERROR: no datapoints at all (did Lua even run?), reading $filename_full " . print_r($extracted, 1));
-					}
-				}
-
-				$counts = array_count_values(array_column($extracted['datapoints'], 'type'));
-				$times = $extracted['times'];
-				self::vlog("Datapoints extracted by type: " . join(", ", array_map(function ($item, $key) use ($times) { return "\x1b[38;5;72m$key\x1b[0m:{$item} ({$times[$key]}s)"; }, array_values($counts), array_keys($counts))));
-
-				/*
-					// locale
-					$lang_match = preg_match("#translation\"\]=\{\[\"(....)\"#",$file,$lang_m);
-						if ($lang_match) {
-							$metrics['languages'][$lang_m[1]]++;
-							$metrics['files_withlang']++;
-						}
-				*/
-
-				$extracted['datapoints'] = array_values(array_filter($extracted['datapoints'], function ($dp) use ($last_event_stored) {  return $dp['time'] > $last_event_stored;  })); // only new events
-				self::vlog("Datapoints after filtering out old (<= ".($last_event_stored ? date("Y-m-d H:i:s",$last_event_stored) : "never")."): ".count($extracted['datapoints']));
-
-				$inserted = self::db_store_datapoints($flavour,$sv_file_data['id'],$extracted['datapoints']);
-				self::vlog("Datapoints inserted into DB: $inserted");
-
-				$totals['inserted_datapoints'] += $inserted;
-
-				/*
-				$datapoints_by_days = self::split_data_by_types_days($extracted['datapoints']);
-				ksort($datapoints_by_days);
-
-				//self::vlog("Days present: ".implode(",",self::group_ranges(array_keys($datapoints_by_days))));
-				$all_days = array_keys($datapoints_by_days);
-				foreach ($datapoints_by_days as $day=>&$data) 
-					if ($day<$first_day_relevant) unset($datapoints_by_days[$day]);
-
-				self::vlog(sprintf("Days present: \x1b[38;5;118m%s\x1b[0m-\x1b[38;5;118m%s\x1b[0m", current($all_days), end($all_days)));
-				self::vlog("Days relevant: ".implode(",",array_map(function($s) { return "\x1b[38;5;118m$s\x1b[0m"; }, self::group_ranges(array_keys($datapoints_by_days)))));
-				
-				foreach ($datapoints_by_days as $day=>&$daydata) {
-					self::vlog("Day $day: ".count($daydata)." events (".join(", ", array_unique(array_map(function ($item) { return $item['type']; }, $daydata))).")");
-					self::store_day_scrape($flavour,$day,$user,$bnet, $daydata, filemtime($filename_full), $totals);
-				} unset ($daydata);
-				//self::write_intermediate_mtimes($flavour,$last_scrape_dates);
-				*/
-
-
-
-				$last_event_time = max(array_column($extracted['datapoints'],'time')) ?: 0;
-				// $last_event_data = array_filter($extracted['datapoints'], function($dp) use ($last_event_time) { return $dp['time'] == $last_event_time; });
-				// print_r($last_event_data);
-				// die("LAST EVENT TIME: $last_event_time");
-
-				self::db_update_sv_file_times($sv_file_data['id'], filemtime($filename_full), NOW, $last_event_time);
-
-				// update progress
-				self::update_progress(self::$tag,$n,count($freshfiles_to_process),['totals'=>$totals],self::$CFG['verbose']);
-
-				// obey limit
-				if (isset(self::$CFG['limit']) && $n>=self::$CFG['limit']) {
-					echo "Limit ".self::$CFG['limit']." hit, aborting.\n";
-					break;
-				}
+			// obey limit
+			if (isset(self::$CFG['limit']) && $n>=self::$CFG['limit']) {
+				echo "Limit ".self::$CFG['limit']." hit, aborting.\n";
 				self::$db->commit();
-
-			} catch (FileLockedException $e) {
-				self::vlog($e->getMessage()." - $filename_full");
-				self::$db->rollback();
-				continue;
-			} catch (Exception $e) {
-				self::log(microtime(true)." ERROR processing $filename_full: " . $e->getMessage());
-				throw $e;
-			} finally {
-				// unlock
-				if (isset($fl)) { flock($fl, LOCK_UN); fclose($fl); }
-				if ($got_db_lock) {
-					$unl = self::db_unlock($lock_code);
-					//self::vlog(microtime(true)." DB lock released for $lock_code: ".($unl ? "ok" : "failed"));
-				}
-			}
-
-			$processed_files = $n + 1;
-			if (isset(self::$CFG['limit']) && $processed_files >= self::$CFG['limit']) {
-				echo "Limit " . self::$CFG['limit'] . " hit, aborting.\n";
 				break;
 			}
-			
+
+			// update progress
+			self::update_progress(self::$tag,$n,count($freshfiles_to_process),['totals'=>$totals],self::$CFG['verbose']);
+
 		}
+
 		//self::write_intermediate_mtimes($flavour,$last_scrape_dates,true);
 		$tot1 = array_filter($totals,function($v) { return is_numeric($v); });
 		$tots = array_map(function($k,$v) { return "$k=$v"; }, array_keys($tot1), array_values($tot1));
@@ -366,6 +230,130 @@ class TelemetryScrapeSVs extends Telemetry {
 			self::log("Weird. Out of ".(count($freshfiles_to_process)-$totals['files_skipped'])." files read, ".count($totals['files_without_zgvs'])." had no ZGVs.");
 
 		self::stat(['status'=>"IDLE"]);
+	}
+
+	/** Run all SV-sourced topic scrapers on a single file */
+	static function process_single_sv_file($flavour, $filename_full, $topics, &$totals) {
+		self::stat(['file_last'=>$filename_full],true);
+		list ($filename_userfile, $filename_slug) = self::split_filename($filename_full);
+		$bnet = basename($filename_slug);
+		$user = basename(dirname($filename_slug));
+		$userfolder = dirname($filename_full);
+
+		self::vlog("Scraping SV: \x1b[38;5;110m$user\x1b[0m/\x1b[38;5;116m$bnet\x1b[0m\x1b[30;1m--SavedVariables...\x1b[0m");
+
+		$is_windows = (strpos(PHP_OS, 'WIN') === 0); $is_linux = !$is_windows;
+		$lock_code = $flavour."/".$filename_slug;
+		$got_db_lock = false;
+
+		try { // flock block
+			if ($is_linux) {
+				$fl = fopen($userfolder, 'rb');
+				if (!$fl) throw new FileLockedException("Cannot open input folder for locking: $userfolder");
+				if (!flock($fl, LOCK_EX | LOCK_NB)) {
+					fclose($fl);
+					throw new FileLockedException("Input folder locked: $userfolder");
+				}
+			} else {
+				// Windows: use DB locks
+				$got_db_lock = self::db_lock($lock_code);
+				if (!$got_db_lock) {
+					throw new FileLockedException("Input folder locked (DB): $lock_code");
+				} else {
+					//self::vlog(microtime(true)." DB lock acquired for $lock_code");
+				}
+			}
+
+			self::vlog(" - :. reading SV file...");
+
+			$flavourfile = $flavour."/".$filename_slug; // flavour/user/bnet
+			$sv_file_data = self::db_get_sv_file_data($flavourfile);
+			if (!$sv_file_data) {
+				self::log("Cannot get sv_file_data for $filename_full. Locked?");
+				throw new FileLockedException("DB locked for $flavourfile");
+			}
+
+			$last_event_stored = $sv_file_data['last_event_time'] ?: 0;
+
+			// ===============================================================
+
+			$sv_raw = self::read_raw_sv($filename_full);
+
+			self::vlog(" - .: extracting datapoints...");
+
+			$extracted = self::extract_datapoints_with_lua($sv_raw,$flavour,$topics);
+
+			// ===============================================================
+
+			// handle errors
+			if ($extracted['status'] != "ok") {
+				if ($extracted['err'] == "stderr_output") {
+					$totals['broken_lua']++;
+					echo $filename_full . ": ERROR: " . $extracted['error'];
+					// SV+Lua broken, it could mean our extraction failed, or the file was broken in the first place.
+					return false; // continue outer loop
+				} elseif ($extracted['err'] == "no_zgvs") {
+					$size = filesize($filename_full);
+					if ($size > 500) $totals['files_without_zgvs'][] = $filename_userfile; // just log it
+					$totals['broken_lua']++;
+					return false;
+				} elseif (!isset($extracted['datapoints'])) {
+					trigger_error("ERROR: no datapoints at all (did Lua even run?), reading $filename_full " . print_r($extracted, 1));
+				}
+			}
+
+			$counts = array_count_values(array_column($extracted['datapoints'], 'type'));
+			$times = $extracted['times'];
+			self::vlog("Datapoints extracted by type: " . join(", ", array_map(function ($item, $key) use ($times) { return "\x1b[38;5;72m$key\x1b[0m:{$item} ({$times[$key]}s)"; }, array_values($counts), array_keys($counts))));
+
+			/*
+				// locale
+				$lang_match = preg_match("#translation\"\]=\{\[\"(....)\"#",$file,$lang_m);
+					if ($lang_match) {
+						$metrics['languages'][$lang_m[1]]++;
+						$metrics['files_withlang']++;
+					}
+				// wtf is this even?
+			*/
+
+			$extracted['datapoints'] = array_values(array_filter($extracted['datapoints'], function ($dp) use ($last_event_stored) {  return $dp['time'] > $last_event_stored;  })); // only new events
+			self::vlog("Datapoints after filtering out old (<= ".($last_event_stored ? date("Y-m-d H:i:s",$last_event_stored) : "never")."): ".count($extracted['datapoints']));
+
+			// DB STORE TIME!
+
+			self::$db->begin_transaction();
+
+			$inserted = self::db_store_datapoints($flavour,$sv_file_data['id'],$extracted['datapoints']);
+			self::vlog("Datapoints inserted into DB: $inserted");
+
+			$totals['inserted_datapoints'] += $inserted;
+
+			$last_event_time = max(array_column($extracted['datapoints'],'time')) ?: 0;
+			// $last_event_data = array_filter($extracted['datapoints'], function($dp) use ($last_event_time) { return $dp['time'] == $last_event_time; });
+			// print_r($last_event_data);
+			// die("LAST EVENT TIME: $last_event_time");
+
+			self::db_update_sv_file_times($sv_file_data['id'], filemtime($filename_full), NOW, $last_event_time);
+
+			self::$db->commit();
+
+		} catch (FileLockedException $e) {
+			self::vlog($e->getMessage()." - $filename_full");
+			self::$db->rollback();
+			return false;
+		} catch (Exception $e) {
+			self::log(microtime(true)." ERROR processing $filename_full: " . $e->getMessage());
+			throw $e;
+		} finally {
+			// unlock
+			if (isset($fl)) { flock($fl, LOCK_UN); fclose($fl); }
+			if ($got_db_lock) {
+				$unl = self::db_unlock($lock_code);
+				//self::vlog(microtime(true)." DB lock released for $lock_code: ".($unl ? "ok" : "failed"));
+			}
+		}
+
+		return false;
 	}
 
 	static function fetch_last_mtimes($flavour, $files) {
