@@ -1,5 +1,6 @@
 /config.inc.php
 /config-scrape.inc.php
+/config-scrape-packagerlog.inc.php
 *.log
 *.status.json
 /includes/jquery-ui-1.13.2.custom/*
