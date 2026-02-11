@@ -206,8 +206,7 @@ class TelemetryScrapeSVs extends Telemetry {
 		*/
 
 		foreach ($freshfiles_to_process as $n => $filename_full) {
-			$should_break = self::process_single_sv_file($flavour, $filename_full, $n, $topics, $totals, count($freshfiles_to_process));
-			if ($should_break) break;
+			self::process_single_sv_file($flavour, $filename_full, $n, $topics, $totals, count($freshfiles_to_process));
 
 			// obey limit
 			if (isset(self::$CFG['limit']) && $n>=self::$CFG['limit']) {
@@ -232,7 +231,9 @@ class TelemetryScrapeSVs extends Telemetry {
 		self::stat(['status'=>"IDLE"]);
 	}
 
-	/** Run all SV-sourced topic scrapers on a single file */
+	/** Run all SV-sourced topic scrapers on a single file
+	 * @return void
+	 */
 	static function process_single_sv_file($flavour, $filename_full, $topics, &$totals) {
 		self::stat(['file_last'=>$filename_full],true);
 		list ($filename_userfile, $filename_slug) = self::split_filename($filename_full);
@@ -266,10 +267,12 @@ class TelemetryScrapeSVs extends Telemetry {
 
 			self::vlog(" - :. reading SV file...");
 
+			self::$db->begin_transaction(); // need to start here to lock the DB record for this file
+
 			$flavourfile = $flavour."/".$filename_slug; // flavour/user/bnet
 			$sv_file_data = self::db_get_sv_file_data($flavourfile);
 			if (!$sv_file_data) {
-				self::log("Cannot get sv_file_data for $filename_full. Locked?");
+				self::log("Cannot get/set sv_file_data for $filename_full. Locked?");
 				throw new FileLockedException("DB locked for $flavourfile");
 			}
 
@@ -291,12 +294,12 @@ class TelemetryScrapeSVs extends Telemetry {
 					$totals['broken_lua']++;
 					echo $filename_full . ": ERROR: " . $extracted['error'];
 					// SV+Lua broken, it could mean our extraction failed, or the file was broken in the first place.
-					return false; // continue outer loop
+					return;
 				} elseif ($extracted['err'] == "no_zgvs") {
 					$size = filesize($filename_full);
 					if ($size > 500) $totals['files_without_zgvs'][] = $filename_userfile; // just log it
 					$totals['broken_lua']++;
-					return false;
+					return;
 				} elseif (!isset($extracted['datapoints'])) {
 					trigger_error("ERROR: no datapoints at all (did Lua even run?), reading $filename_full " . print_r($extracted, 1));
 				}
@@ -321,8 +324,6 @@ class TelemetryScrapeSVs extends Telemetry {
 
 			// DB STORE TIME!
 
-			self::$db->begin_transaction();
-
 			$inserted = self::db_store_datapoints($flavour,$sv_file_data['id'],$extracted['datapoints']);
 			self::vlog("Datapoints inserted into DB: $inserted");
 
@@ -340,7 +341,7 @@ class TelemetryScrapeSVs extends Telemetry {
 		} catch (FileLockedException $e) {
 			self::vlog($e->getMessage()." - $filename_full");
 			self::$db->rollback();
-			return false;
+			return;
 		} catch (Exception $e) {
 			self::log(microtime(true)." ERROR processing $filename_full: " . $e->getMessage());
 			throw $e;
@@ -352,8 +353,6 @@ class TelemetryScrapeSVs extends Telemetry {
 				//self::vlog(microtime(true)." DB lock released for $lock_code: ".($unl ? "ok" : "failed"));
 			}
 		}
-
-		return false;
 	}
 
 	static function fetch_last_mtimes($flavour, $files) {
@@ -529,6 +528,48 @@ ENDLUA;
 			}
 		}
 		return $formatted;
+	}
+
+	static function db_get_sv_file_data($flavourfile) {
+		$q = self::qesc("SELECT * FROM sv_files WHERE file={s}  LIMIT 1  FOR UPDATE  NOWAIT", $flavourfile);
+		$r = self::$db->query($q);
+		if (!$r && self::$db->errno==3572) { // lock wait timeout
+			return null;
+		}
+		if (!$r) throw new Exception("DB error: ".self::$db->error);
+		if ($r->num_rows) {
+			$row = $r->fetch_assoc();
+			return $row;
+		} else {
+			$q = self::qesc("INSERT INTO sv_files (file) VALUES ({s})", $flavourfile);
+			$r = self::$db->query($q);
+			if (!$r) throw new Exception("DB error: ".self::$db->error);
+			$id = self::$db->insert_id;
+			$q2 = self::qesc("SELECT * FROM sv_files WHERE id={d} LIMIT 1 FOR UPDATE", $id);
+			$r2 = self::$db->query($q2);
+			if (!$r2) throw new Exception("DB error: ".self::$db->error);
+			if ($r2->num_rows) {
+				$row2 = $r2->fetch_assoc();
+				return $row2;
+			}
+		}
+	}
+
+	static function db_update_sv_file_times($sv_file_id,$mtime,$scrape_time,$last_event_time) {
+		$q = self::qesc("UPDATE sv_files SET mtime={d}, scrape_time={d}, last_event_time={d} WHERE id={d}", $mtime, $scrape_time, $last_event_time, $sv_file_id);
+		$r = self::$db->query($q);
+		if (!$r) throw new Exception("DB error: ".self::$db->error);
+		return $r;
+	}
+
+	static function db_get_svfile_mtimes($flavourfiles) {
+		if (!count($flavourfiles)) return [];
+		$q = self::qesc("SELECT file,mtime FROM sv_files WHERE file IN ({sa})", $flavourfiles);
+		$r = self::$db->query($q);
+		if (!$r) throw new Exception("DB error: ".self::$db->error);
+		$res = [];
+		while ($row = $r->fetch_assoc()) $res[$row['file']] = $row['mtime'];
+		return $res;
 	}
 
 

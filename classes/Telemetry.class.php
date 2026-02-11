@@ -493,48 +493,6 @@ class Telemetry {
 		return $inserted;
 	}
 
-	static function db_get_sv_file_data($flavourfile) {
-		$q = self::qesc("SELECT * FROM sv_files WHERE file={s}  LIMIT 1  FOR UPDATE  NOWAIT", $flavourfile);
-		$r = self::$db->query($q);
-		if (!$r && self::$db->errno==3572) { // lock wait timeout
-			return null;
-		}
-		if (!$r) throw new Exception("DB error: ".self::$db->error);
-		if ($r->num_rows) {
-			$row = $r->fetch_assoc();
-			return $row;
-		} else {
-			$q = self::qesc("INSERT INTO sv_files (file) VALUES ({s})", $flavourfile);
-			$r = self::$db->query($q);
-			if (!$r) throw new Exception("DB error: ".self::$db->error);
-			$id = self::$db->insert_id;
-			$q2 = self::qesc("SELECT * FROM sv_files WHERE id={d} LIMIT 1 FOR UPDATE", $id);
-			$r2 = self::$db->query($q2);
-			if (!$r2) throw new Exception("DB error: ".self::$db->error);
-			if ($r2->num_rows) {
-				$row2 = $r2->fetch_assoc();
-				return $row2;
-			}
-		}
-	}
-
-	static function db_update_sv_file_times($sv_file_id,$mtime,$scrape_time,$last_event_time) {
-		$q = self::qesc("UPDATE sv_files SET mtime={d}, scrape_time={d}, last_event_time={d} WHERE id={d}", $mtime, $scrape_time, $last_event_time, $sv_file_id);
-		$r = self::$db->query($q);
-		if (!$r) throw new Exception("DB error: ".self::$db->error);
-		return $r;
-	}
-
-	static function db_get_svfile_mtimes($flavourfiles) {
-		if (!count($flavourfiles)) return [];
-		$q = self::qesc("SELECT file,mtime FROM sv_files WHERE file IN ({sa})", $flavourfiles);
-		$r = self::$db->query($q);
-		if (!$r) throw new Exception("DB error: ".self::$db->error);
-		$res = [];
-		while ($row = $r->fetch_assoc()) $res[$row['file']] = $row['mtime'];
-		return $res;
-	}
-
 	static function call_hooks($hook,$args) {
 		//self::vlog("Hook: $hook calls starting.");
 		foreach (self::$CFG['TOPICS'] as $dp_name=>$dp_def)
