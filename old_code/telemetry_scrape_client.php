@@ -78,6 +78,9 @@ foreach($files as $n=>$filename) {
 			$unique_users_day[$daytime][$user]=$elite;
 			$unique_users_today[$user]=$elite;
 		} elseif (preg_match("/--- (QUERY) : pkg (?:files[^\/]*\/)?(ZygorGuidesViewer[a-zA-Z]*), user=.*? #([\\d]+).*elite=(NO|YES)/",$s,$m)) {
+			$flavour = $m[2];
+			$user = intval($m[3]);
+			$elite = ['YES'=>"e",'NO'=>'b'][$m[4]];
 			$unique_users_today[$user]=$elite;
 		} elseif (preg_match("/--- (?:COMP|LICENSE) : user=.*? #([\\d]+).*elite=(NO|YES)/",$s,$m)) {
 			// old logs
@@ -97,14 +100,14 @@ foreach($files as $n=>$filename) {
 			$unique_users_today[$user]=$elite;
 		}
 	}
-	fclose($f);
+	if (strpos($filename,".bz2")!==FALSE) bzclose($f); else fclose($f);
 
 	$users_flavors=[]; // who has 1, 2, 3?
 	foreach ($premetrics['flavorsinstalled'] as $elite=>&$flavs) {
 		foreach ($flavs as $flav=>&$users) {
 			foreach ($users as $user=>$val)
 				$users_flavors[$elite][$user][$flav]=true;
-			$metrics['flavorsinstalled'][$flav] = count(array_keys($users));
+			$metrics['flavorsinstalled'][$flav] = count($users);
 		}
 	}
 	unset($users);
@@ -113,6 +116,13 @@ foreach($files as $n=>$filename) {
 
 	//print_r($users_flavors);
 
+	$flavbits = [
+		'ZygorGuidesViewer'				  =>['flav'=>"Retail",  'licchar'=>"r",'bit'=>1],
+		'ZygorGuidesViewerClassic'        =>['flav'=>"Classic", 'licchar'=>"c",'bit'=>2],
+		'ZygorGuidesViewerClassicTBC'     =>['flav'=>"MOP",     'licchar'=>"w",'bit'=>4],
+		'ZygorGuidesViewerClassicTBCAnniv'=>['flav'=>"TBCAnniv",'licchar'=>"a",'bit'=>8]
+	];
+	
 	$seen_day=0;
 	foreach ($users_flavors as $elite=>&$userflavs) {
 		echo "..........";
@@ -121,12 +131,11 @@ foreach($files as $n=>$filename) {
 			$seenmarked = Zygor_Amember::mark_user_as_seen($user,$daytime);
 			if ($seenmarked && $elite=="e") Zygor_Amember::mark_user_elite($user,$elite=="e"?1:0);
 			
-			$bit=0;
-			if ($flavors['ZygorGuidesViewer']) { $bit|=1; Zygor_Amember::mark_user_licensed($user,"r",$daytime); }
-			if ($flavors['ZygorGuidesViewerClassic']) { $bit|=2; Zygor_Amember::mark_user_licensed($user,"c",$daytime); }
-			if ($flavors['ZygorGuidesViewerClassicTBC']) { $bit|=4; Zygor_Amember::mark_user_licensed($user,"w",$daytime); }
-			if ($flavors['ZygorGuidesViewerClassicTBCAnniv']) { $bit|=8; Zygor_Amember::mark_user_licensed($user,"a",$daytime); }
-			$metrics['multiflavors'][$elite][['','Retail','Classic','Retail+Classic','WOTLK','Retail+WOTLK','Classic+WOTLK','All'][$bit]]++;
+			$bit=0; $list = [];
+			foreach ($flavbits as $flavname=>&$flavdata) {
+				 if ($flavors[$flavname]) { $bit|=$flavdata['bit']; Zygor_Amember::mark_user_licensed($user,$flavdata['licchar'],$daytime); $list[]=$flavdata['flav']; }
+			}
+			$metrics['multiflavors'][$elite][join("+",$list)]++;
 			$metrics['multiflavors'][$elite][$bit]++;
 
 			$seen_day++;
