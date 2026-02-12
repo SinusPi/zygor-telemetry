@@ -10,12 +10,14 @@
 class TelemetryScrapePackagerLog extends Telemetry {
 	static function init() {
 		parent::init();
-		self::self_tests();
 	}
 
-	static function _sub_config() {
+	static function config($cfg=[]) {
+		parent::config($cfg);
+
 		$configfile = (array)(@include "config-scrape-packagerlog.inc.php"); // load defaults
 		self::$CFG = self::merge_configs(self::$CFG, $configfile);
+		if (!self::$CFG['PACKAGERLOG_PATH']) throw new Exception("PACKAGERLOG_PATH not defined in config, config-scrape-packagerlog.inc.php not loaded?");
 	}
 
 	/**
