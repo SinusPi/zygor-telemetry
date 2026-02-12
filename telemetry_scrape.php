@@ -49,8 +49,7 @@ if (in_array("sv",$OPTS['input'])) {
 	foreach ($FLAVOURS as $flav) TelemetryScrapeSVs::scrape($flav);
 }
 if (in_array("packagerlog",$OPTS['input'])) {
-	TelemetryScrapePackagerLog::config($OPTS);
-	TelemetryScrapePackagerLog::init();
+	TelemetryScrapePackagerLog::startup($OPTS);
 	TelemetryScrapePackagerLog::scrape();
 }
 
