@@ -17,7 +17,8 @@ class Telemetry {
 	static $tag = "";
 	static $last_statuses = [];
 
-	static ?mysqli $db = null;
+	/// @var mysqli|null
+	static $db = null;
 
 	static $DBG = [];
 	static $LAST_QUERY = null;
