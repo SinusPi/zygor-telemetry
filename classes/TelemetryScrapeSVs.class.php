@@ -18,11 +18,11 @@ class TelemetryScrapeSVs extends Telemetry {
 
 		$configfile = (array)(@include "config-scrape.inc.php"); // load defaults
 		self::$CFG = self::merge_configs(self::$CFG, $configfile);
-		if (!self::$CFG['SV_STORAGE_ROOT']) throw new Exception("SV_STORAGE_ROOT not defined in config, config.inc.php not loaded?");
+		if (!self::$CFG['SV_STORAGE_ROOT']) throw new ErrorException("SV_STORAGE_ROOT not defined in config, config.inc.php not loaded?");
 
 		// load sync's config
 		@include self::$CFG['SV_STORAGE_ROOT']."/config.inc.php"; // defines SYNC_CFG
-		if (!$SYNC_CFG) throw new Exception("Failed to load sync config from ".self::$CFG['SV_STORAGE_ROOT']."/config.inc.php");
+		if (!$SYNC_CFG) throw new ErrorException("Failed to load sync config from ".self::$CFG['SV_STORAGE_ROOT']."/config.inc.php");
 		self::$CFG['SV_STORAGE_DATA_PATH'] = self::cfgstr('SV_STORAGE_DATA_PATH',['SYNC_FOLDER'=>$SYNC_CFG['folder']]);
 	}
 
@@ -63,7 +63,7 @@ class TelemetryScrapeSVs extends Telemetry {
 	 * @param string $flavour
 	 */
 	static function scrape($flavour) {
-		if (!in_array($flavour,array_keys(self::$CFG['WOW_FLAVOUR_DATA']))) throw new Exception("Unsupported flavour '{$flavour}' (supported: ".join(", ",array_keys(self::$CFG['WOW_FLAVOUR_DATA'])).")");
+		if (!in_array($flavour,array_keys(self::$CFG['WOW_FLAVOUR_DATA']))) throw new ErrorException("Unsupported flavour '{$flavour}' (supported: ".join(", ",array_keys(self::$CFG['WOW_FLAVOUR_DATA'])).")");
 
 		self::$tag = "SCRAPE-".strtoupper(str_replace("-","_", $flavour));
 		$status = self::get_status(self::$tag, true);
@@ -378,7 +378,7 @@ class TelemetryScrapeSVs extends Telemetry {
 			return ++$totals['tmfiles_empty'];
 		$scrape_folder = self::cfgstr('SCRAPES_PATH',['FLAVOUR'=>$flavour,'DAY'=>$day]);
 		mkdir($scrape_folder,0777,true);
-		if (!is_dir($scrape_folder)) throw new Exception("Failed to create/access scrape folder at $scrape_folder");
+		if (!is_dir($scrape_folder)) throw new ErrorException("Failed to create/access scrape folder at $scrape_folder");
 		$scrape_file = "{$user}@{$acct}.json";
 		$scrape_filepath = $scrape_folder."/".$scrape_file;
 		if (file_exists($scrape_filepath))
@@ -400,16 +400,16 @@ class TelemetryScrapeSVs extends Telemetry {
 		if ($force || time()-$time_last_mtimes >= self::$CFG['MTIMES_WRITE_INTERVAL']) {
 			$mtimes_cache_filename = self::cfgstr('FLAVOUR_PATH',['FLAVOUR'=>$flavour])."/".self::$CFG['MTIMES_CACHE_FILENAME'];
 			$f=file_put_contents($mtimes_cache_filename,json_encode($last_scrape_dates),LOCK_EX);
-			if (!$f) throw new Exception("Cannot write mtimes cache");
+			if (!$f) throw new ErrorException("Cannot write mtimes cache");
 			$time_last_mtimes = time();
 		}
 	}
 
 	static function read_raw_sv($filename) {
 		// read gzipped SV file
-		if (!file_exists($filename)) throw new Exception("TelemetryScrapeSVs::read_raw_sv: File not found: $filename");
+		if (!file_exists($filename)) throw new ErrorException("TelemetryScrapeSVs::read_raw_sv: File not found: $filename");
 		$fp = gzopen($filename, 'rb');
-		if (!$fp) throw new Exception("TelemetryScrapeSVs::read_raw_sv: Cannot open gzipped file: $filename");
+		if (!$fp) throw new ErrorException("TelemetryScrapeSVs::read_raw_sv: Cannot open gzipped file: $filename");
 		$sv_raw = '';
 		while (!gzeof($fp)) {
 			$sv_raw .= gzread($fp, 100000);
@@ -536,18 +536,18 @@ ENDLUA;
 		if (!$r && self::$db->errno==3572) { // lock wait timeout
 			return null;
 		}
-		if (!$r) throw new Exception("DB error: ".self::$db->error);
+		if (!$r) throw new ErrorException("DB error: ".self::$db->error);
 		if ($r->num_rows) {
 			$row = $r->fetch_assoc();
 			return $row;
 		} else {
-			$q = self::qesc("INSERT INTO sv_files (file) VALUES ({s})", $flavourfile);
+			$q = self::qesc($_q="INSERT INTO sv_files (file) VALUES ({s})", $flavourfile);
 			$r = self::$db->query($q);
-			if (!$r) throw new Exception("DB error: ".self::$db->error);
+			if (!$r) throw new ErrorException("DB error, query $_q: ".self::$db->error);
 			$id = self::$db->insert_id;
-			$q2 = self::qesc("SELECT * FROM sv_files WHERE id={d} LIMIT 1 FOR UPDATE", $id);
+			$q2 = self::qesc($_q="SELECT * FROM sv_files WHERE id={d} LIMIT 1 FOR UPDATE", $id);
 			$r2 = self::$db->query($q2);
-			if (!$r2) throw new Exception("DB error: ".self::$db->error);
+			if (!$r2) throw new ErrorException("DB error, query $_q: ".self::$db->error);
 			if ($r2->num_rows) {
 				$row2 = $r2->fetch_assoc();
 				return $row2;
@@ -556,17 +556,17 @@ ENDLUA;
 	}
 
 	static function db_update_sv_file_times($sv_file_id,$mtime,$scrape_time,$last_event_time) {
-		$q = self::qesc("UPDATE sv_files SET mtime={d}, scrape_time={d}, last_event_time={d} WHERE id={d}", $mtime, $scrape_time, $last_event_time, $sv_file_id);
+		$q = self::qesc($_q="UPDATE sv_files SET mtime={d}, scrape_time={d}, last_event_time={d} WHERE id={d}", $mtime, $scrape_time, $last_event_time, $sv_file_id);
 		$r = self::$db->query($q);
-		if (!$r) throw new Exception("DB error: ".self::$db->error);
+		if (!$r) throw new ErrorException("DB error, query $_q: ".self::$db->error);
 		return $r;
 	}
 
 	static function db_get_svfile_mtimes($flavourfiles) {
 		if (!count($flavourfiles)) return [];
-		$q = self::qesc("SELECT file,mtime FROM sv_files WHERE file IN ({sa})", $flavourfiles);
+		$q = self::qesc($_q="SELECT file,mtime FROM sv_files WHERE file IN ({sa})", $flavourfiles);
 		$r = self::$db->query($q);
-		if (!$r) throw new Exception("DB error: ".self::$db->error);
+		if (!$r) throw new ErrorException("DB error, query $_q: ".self::$db->error);
 		$res = [];
 		while ($row = $r->fetch_assoc()) $res[$row['file']] = $row['mtime'];
 		return $res;
@@ -584,7 +584,7 @@ ENDLUA;
 			self::db_create();
 			self::test_status();
 			self::vlog("Database: connected and present.");
-		} catch (Exception $e) {
+		} catch (ErrorException $e) {
 			die("DB Connection to ".self::$CFG['DB']['host']." FAILED - ".$e->getMessage());
 		}
 		self::vlog("Self-tests: \x1b[48;5;70;30mPASS\x1b[0m");
@@ -670,7 +670,7 @@ ENDLUA;
 			";
 			self::$db->query($schema_sql);
 			if (self::$db->error) 
-				throw new Exception("Failed to create table `sv_files`: ".self::$db->error);
+				throw new ErrorException("Failed to create table `sv_files`: ".self::$db->error);
 		}
 
 		self::vlog("DB schema created.");

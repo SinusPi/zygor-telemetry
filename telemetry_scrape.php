@@ -1,3 +1,4 @@
+#!/usr/bin/php
 <?php
 ini_set("max_execution_time",3600);
 
@@ -27,7 +28,7 @@ $OPTS = \Zygor\Shell::better_getopt([
 	['f:','flavour:',      array_keys(Telemetry::$CFG['WOW_FLAVOUR_DATA'])],
 	['',  'maxdays:',      999999], // use to limit how far back to scrape, for debugging only
 	['',  'ignore-mtimes', false], // that is: limit by maxdays... or even not at all
-	['',  'start-day:',    null], // similar to maxdays, but explicit date
+	['',  'start-day:',    "20000101"], // similar to maxdays, but explicit date
 	['',  'limit:',        null], // stop after N files
 	['',  'debug',         false],
 	['',  'debug-lua',     false],
@@ -44,13 +45,27 @@ $OPTS["MAX_DAYS"]=$OPTS['maxdays'];
 if (count(array_intersect($valid_inputs,$OPTS['input']))!=count($OPTS['input'])) {
 	throw new Exception("Invalid input type specified. Valid types are: ".implode(", ",$valid_inputs));
 }
-if (in_array("sv",$OPTS['input'])) {
-	TelemetryScrapeSVs::startup($OPTS);
-	foreach ($FLAVOURS as $flav) TelemetryScrapeSVs::scrape($flav);
-}
-if (in_array("packagerlog",$OPTS['input'])) {
-	TelemetryScrapePackagerLog::startup($OPTS);
-	TelemetryScrapePackagerLog::scrape();
+try {
+	if (in_array("sv",$OPTS['input'])) {
+		try	{
+			echo "*** Scraping source: SVs\n";
+			TelemetryScrapeSVs::startup($OPTS);
+			foreach ($FLAVOURS as $flav) TelemetryScrapeSVs::scrape($flav);
+		} catch (MinorError $e) {
+			echo "Failed: ".$e->getMessage()."\n";
+		}
+	}
+	if (in_array("packagerlog",$OPTS['input'])) {
+		try {
+			echo "*** Scraping source: Packager Logs\n";
+			TelemetryScrapePackagerLog::startup($OPTS);
+			TelemetryScrapePackagerLog::scrape();
+		} catch (MinorError $e) {
+			echo "Failed: ".$e->getMessage()."\n";
+		}
+	}
+} catch (ErrorException $e) {
+	echo "ERROR: ".$e->getMessage()."\n";
 }
 
 /*

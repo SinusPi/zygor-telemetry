@@ -607,6 +607,10 @@ class FileLockedException extends Exception {
 	// Custom exception for file locking issues
 }
 
+class MinorError extends Exception {
+	// Custom exception for error messages
+}
+
 // load dependent classes
 foreach (glob(__DIR__."/*.class.php") as $classfile) {
 	if (basename($classfile)=="Telemetry.class.php") continue;
