@@ -16,9 +16,9 @@ class TelemetryScrapeSVs extends Telemetry {
 	static function config($cfg=[]) {
 		parent::config($cfg);
 
-		$configfile = (array)(@include "config-scrape.inc.php"); // load defaults
+		$configfile = (array)(@include "config-scrape-sv.inc.php"); // load defaults
 		self::$CFG = self::merge_configs(self::$CFG, $configfile);
-		if (!self::$CFG['SV_STORAGE_ROOT']) throw new ErrorException("SV_STORAGE_ROOT not defined in config, config.inc.php not loaded?");
+		if (!self::$CFG['SV_STORAGE_ROOT']) throw new ErrorException("SV_STORAGE_ROOT not defined in config, config-scrape-sv.inc.php not loaded?");
 
 		// load sync's config
 		@include self::$CFG['SV_STORAGE_ROOT']."/config.inc.php"; // defines SYNC_CFG
