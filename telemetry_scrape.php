@@ -42,10 +42,10 @@ $FLAVOURS = $OPTS['f'];
 if (substr($OPTS['start-day'],0,1)=="-") $OPTS['start-day']=date("Ymd",strtotime($OPTS['start-day']." days"));
 $OPTS["MAX_DAYS"]=$OPTS['maxdays'];
 
-if (count(array_intersect($valid_inputs,$OPTS['input']))!=count($OPTS['input'])) {
-	throw new Exception("Invalid input type specified. Valid types are: ".implode(", ",$valid_inputs));
-}
 try {
+	if (array_diff($OPTS['input'],$valid_inputs)) {
+		throw new ErrorException("Invalid input type specified (".implode(",",$OPTS['input'])."). Valid types are: ".implode(", ",$valid_inputs));
+	}
 	if (in_array("sv",$OPTS['input'])) {
 		try	{
 			echo "*** Scraping source: SVs\n";
