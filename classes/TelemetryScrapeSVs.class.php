@@ -206,13 +206,12 @@ class TelemetryScrapeSVs extends Telemetry {
 		*/
 
 		foreach ($freshfiles_to_process as $n => $filename_full) {
-			self::process_single_sv_file($flavour, $filename_full, $n, $topics, $totals, count($freshfiles_to_process));
+			self::process_single_sv_file($flavour, $filename_full, $topics, $totals);
 
 			// obey limit
-			if (isset(self::$CFG['limit']) && $n>=self::$CFG['limit']) {
-				echo "Limit ".self::$CFG['limit']." hit, aborting.\n";
+			if (isset(self::$CFG['limit']) && $n>=self::$CFG['limit']-1) {
 				self::$db->commit();
-				break;
+				throw new ErrorException("Limit ".self::$CFG['limit']." hit, aborting.\n");
 			}
 
 			// update progress
@@ -301,7 +300,7 @@ class TelemetryScrapeSVs extends Telemetry {
 					$totals['broken_lua']++;
 					return;
 				} elseif (!isset($extracted['datapoints'])) {
-					trigger_error("ERROR: no datapoints at all (did Lua even run?), reading $filename_full " . print_r($extracted, 1));
+					throw new ErrorException("ERROR: no datapoints at all (did Lua even run?), reading $filename_full " . print_r($extracted, 1));
 				}
 			}
 
