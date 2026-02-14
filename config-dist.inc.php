@@ -9,6 +9,13 @@ return [
 
 	"WOW_FLAVOURS" => [ 'wow','wow-classic','wow-classic-tbc','wow-classic-tbc-anniv' ],
 
+	"WOW_FLAVOUR_DATA" => [
+		'wow'                   => ['num'=>1],
+		'wow-classic'           => ['num'=>2],
+		'wow-classic-tbc'       => ['num'=>3],
+		'wow-classic-tbc-anniv' => ['num'=>4]
+	],
+
 	"DB" => [
 		'host' => 'localhost',
 		'db'   => 'telemetry_db',
