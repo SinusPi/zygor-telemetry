@@ -350,8 +350,9 @@ class Telemetry {
 	}
 
 	static function flavnum($flavour) {
-		$flavnum = self::$CFG['WOW_FLAVOUR_DATA'][$flavour]['num'] ?: 0;
-		if ($flavnum===0) throw new Exception("Unknown flavour '$flavour', known are: ".implode(", ", array_keys(self::$CFG['WOW_FLAVOUR_DATA'])).".");
+		$fd = self::$CFG['WOW_FLAVOUR_DATA'];
+		$flavnum = $fd[$flavour]['num'] ?: 0;
+		if ($flavnum===0) throw new ErrorException("Unknown flavour '$flavour', known are: ".implode(", ", array_keys($fd)).".");
 		return $flavnum;
 	}
 
@@ -362,14 +363,14 @@ class Telemetry {
 		try {
 			self::$db = self::_connect_db($cfg['host'], $cfg['user'], $cfg['pass'], $cfg['db']);
 		} catch (Exception $e) {
-			throw new Exception("Failed to connect to database '".$cfg['db']."' on '".$cfg['host']."': ".$e->getMessage()."\n");
+			throw new ErrorException("Failed to connect to database '".$cfg['db']."' on '".$cfg['host']."': ".$e->getMessage()."\n");
 		}
 	}
 
 	static function _connect_db($host,$user,$pass,$db) {
 		$mysqli = new mysqli($host, $user, $pass, $db);
 		if ($mysqli->connect_errno) {
-			throw new Exception("Failed to connect to MySQL: (" . $mysqli->connect_errno . ") " . $mysqli->connect_error);
+			throw new ErrorException("Failed to connect to MySQL: (" . $mysqli->connect_errno . ") " . $mysqli->connect_error);
 		}
 		$mysqli->set_charset("utf8mb4");
 		return $mysqli;
