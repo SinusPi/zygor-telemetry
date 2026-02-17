@@ -1,13 +1,11 @@
 <?php
 
 /**
- * Set of utilities to comb through user-supplied SV files for telemetry data.
- * Each datapoint is extracted by a Lua script, has a "type" and "time" field.
+ * Set of utilities to extract data from packager logs.
  * 
- * Input files are logged into 'sv_files' table, with last modified time and last scraped time to only rescrape changed files.
- * Extracted datapoints are stored into 'events' table, with foreign key to sv_files table.
+ * Extracted datapoints are stored into 'events' table, with foreign key to packagerlog_files table.
  */
-class TelemetryScrapePackagerLog extends Telemetry {
+class TelemetryScrapePackagerLog extends TelemetryScrape {
 	static function init() {
 		parent::init();
 	}

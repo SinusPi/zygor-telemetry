@@ -7,7 +7,7 @@
  * Input files are logged into 'sv_files' table, with last modified time and last scraped time to only rescrape changed files.
  * Extracted datapoints are stored into 'events' table, with foreign key to sv_files table.
  */
-class TelemetryScrapeSVs extends Telemetry {
+class TelemetryScrapeSVs extends TelemetryScrape {
 	static function init() {
 		parent::init();
 		// any local inits?
