@@ -113,8 +113,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		$dupes = array_filter($counts,function($c) { return $c>1; });
 		if (count($dupes)) {
 			self::stat(['status'=>"ERROR",'error'=>"Duplicate files found, see log."]);
-			self::log("Warning: ".count($dupes)." duplicate files found (same name in different folders): ".join(", ",array_keys($dupes)).". They will be processed only once.");
-			die();
+			throw new ErrorException(count($dupes)." duplicate files found (same name in different folders): ".join(", ",array_keys($dupes)).". They will be processed only once.");
 		}
 
 		self::stat(['status'=>"EXTRACTING",'files_fresh'=>count($freshfiles),'files_skipped'=>0,'tmfiles_skipped'=>0,'tmfiles_written'=>0,'tmfiles_last'=>"",'file_last'=>"",'not_files'=>0,'broken_lua'=>0]);
