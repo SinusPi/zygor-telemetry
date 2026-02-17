@@ -83,7 +83,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		self::log("Enumerating files matching ".self::$CFG['filemask']);
 		
 		$t1 = microtime(true);
-		$files = self::find_files($sync_path, self::$CFG['filemask'], true); // FINDING FILES. TAKES LONG.
+		$files = self::find_files($sync_path, self::$CFG['filemask'], true); // FINDING FILES. TAKES LONG. We're not expecting filecount to exceed memory... yet...
 		$total_filecount = count($files);
 		self::vlog("Found $total_filecount files [".round(microtime(true)-$t1,2)."s]");
 
@@ -455,28 +455,23 @@ ENDLUA;
 ENDLUA;
 
 		$lua = $lua_head . $lua_extractors . $lua_foot;
+
 		$lua = preg_replace_callback("/%([A-Z_]+)%/",function($s) use ($flavour) { return self::$CFG['WOW_FLAVOUR_DATA'][$flavour][$s[1]]; },$lua);
 		if (self::$CFG['debug_lua']) echo $lua;
 		unset(self::$CFG['debug_lua']);
 
-		$descriptorspec = [
-			0 => ["pipe", "r"],  // stdin is a pipe that the child will read from
-			1 => ["pipe", "w"],  // stdout is a pipe that the child will write to
-			2 => ["pipe", "w"]  // NOPE:pipe // stderr is a file to write to
-		];
-		$process = proc_open(self::$CFG['LUA_PATH'], $descriptorspec, $pipes, null, []);
-		
-		fwrite($pipes[0],$sv_raw); // ZGVSV
-		fwrite($pipes[0],$lua);
-	
-		fclose($pipes[0]); // Lua runs
+		file_put_contents("last_lua.lua",$sv_raw);
+		file_put_contents("last_lua.lua",$lua,FILE_APPEND);
 
-		$datapoints = stream_get_contents($pipes[1])."\n";
-		fclose($pipes[1]);
-		$stderr = stream_get_contents($pipes[2]);
-		fclose($pipes[2]);
-		$errcode = proc_close($process);
-   
+		$is_linux = (strpos(PHP_OS, 'WIN') === 0) ? false : true;
+		if ($is_linux) {
+			// cleaner, no temp files
+			list ($errcode, $datapoints, $stderr) = self::execute_lua_procopen($sv_raw, $lua);
+		} else {
+			// windows PHP has a weird bug in proc_open, so just use temp files :(
+			list ($errcode, $datapoints, $stderr) = self::execute_lua_exec($sv_raw, $lua);
+		}
+	
 		if ($errcode!=0) return ['status'=>"err",'err'=>"errcode_nonzero",'errcode'=>$errcode,'error'=>$stderr];
 		if ($stderr) return ['status'=>"err",'err'=>"stderr_output",'error'=>$stderr,'source_lua'=>$lua,'cwd'=>getcwd(),'luapath'=>self::$CFG['LUA_PATH']];
 		$arr = @json_decode($datapoints,true);
@@ -484,6 +479,72 @@ ENDLUA;
 		if (!$arr) { return ['status'=>"err",'err'=>"bad_json_output",'json_err'=>json_last_error_msg(),'len'=>strlen($datapoints),'partial'=>substr($datapoints,0,6000)]; }
 		return $arr;
    	}
+
+	static function execute_lua_exec($sv_raw, $extraction_code) {
+		$tmp_in = tempnam(sys_get_temp_dir(), "lua_in_");
+		file_put_contents($tmp_in, $sv_raw . "\n" . $extraction_code);
+		$tmp_err = tempnam(sys_get_temp_dir(), "lua_err_");
+
+		$cmd = self::$CFG['LUA_PATH'];
+		ob_start();
+		$result = passthru($cmd." <$tmp_in 2>$tmp_err", $errcode);
+		$stdout = ob_get_clean();
+		unlink($tmp_in);
+		$stderr = file_get_contents($tmp_err);
+		unlink($tmp_err);
+		if ($result === false) $errcode=-1;
+		return [$errcode, $stdout, $stderr];
+	}
+
+	static function execute_lua_procopen($sv_raw, $extraction_code) {
+		$stderr_filename = "last_lua_err__".uniqid().".log";
+		$descriptorspec = [
+			0 => ["pipe", "r"],  // stdin is a pipe that the child will read from
+			1 => ["pipe", "w"],  // stdout is a pipe that the child will write to
+			2 => ["pipe", "w"] // stderr is a pipe to write to
+		];
+
+		$process = proc_open(self::$CFG['LUA_PATH'], $descriptorspec, $pipes, null, []);
+		if (!is_resource($process))
+			return [-1, "", "Failed to start Lua process"];
+
+		fwrite($pipes[0],$sv_raw); // ZGVSV
+		fwrite($pipes[0],$extraction_code);
+		fclose($pipes[0]);
+		// Lua runs
+
+		//echo "Waiting for Lua process to finish...";
+
+		$mt = microtime(true);
+		for ($i=0;$i<10000;$i++) { // wait for process to finish, but not forever
+			$status = proc_get_status($process);
+			//echo ".";
+			if (!$status['running']) break;
+			usleep(100000); // 0.1s
+		}
+		//echo microtime(true)-$mt . "s\n";
+		if ($i>=9999) {
+			proc_terminate($process);
+			return [-1, "", "Lua process timeout"];
+		}
+		//echo "\n";
+
+		//echo "Lua process finished, getting output...\n";
+		$datapoints = stream_get_contents($pipes[1]);
+		//echo "Lua process finished, output length: ".strlen($datapoints).". Reading stderr...\n";
+		fclose($pipes[1]);
+
+		//echo "Reading stderr...\n";
+		$stderr = stream_get_contents($pipes[2]);
+		//echo "Lua process finished, output length: ".strlen($datapoints).", stderr length: ".strlen($stderr)."\n";
+		fclose($pipes[2]);
+
+		//echo "Closing process...\n";
+		$errcode = proc_close($process);
+		//echo "Lua script finished with code $errcode, output length: ".strlen($datapoints).", stderr length: ".strlen($stderr)."\n";
+
+		return [$errcode, $datapoints, $stderr];
+	}
 
 	static function group_ranges($arr) {
 		// join consecutive yyyymmdd values with "-", replacing 3,4,5,6,7 with "3-7"
