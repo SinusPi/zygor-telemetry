@@ -15,7 +15,7 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 
 		$configfile = (array)(@include "config-scrape-packagerlog.inc.php"); // load defaults
 		self::$CFG = self::merge_configs(self::$CFG, $configfile);
-		if (!self::$CFG['PACKAGERLOG_PATH']) throw new Exception("PACKAGERLOG_PATH not defined in config, config-scrape-packagerlog.inc.php not loaded?");
+		if (!self::$CFG['PACKAGERLOG_PATH']) throw new ErrorException("PACKAGERLOG_PATH not defined in config, config-scrape-packagerlog.inc.php not loaded?");
 	}
 
 	/**
@@ -25,10 +25,7 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 	static function scrape() {
 		self::$tag = "SCRAPEPACKLOG";
 		$status = self::get_status(self::$tag, true);
-		if ($status['status']=="SCRAPING") {
-			self::log("Another scrape of packager log is already in progress, aborting.");
-			return;
-		}
+		if ($status['status']=="SCRAPING") throw new MinorError("Another scrape of packager logs is already in progress, aborting.");
 
 		// TODO : go through log-<Y>-<M>-<D> files, bzipped or not, extract flavour update lines, treat them similarly to "ui-VERSION" type events (but store them separately!). Remember which logs were parsed.
 
@@ -374,16 +371,16 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 		if ($force || time()-$time_last_mtimes >= self::$CFG['MTIMES_WRITE_INTERVAL']) {
 			$mtimes_cache_filename = self::cfgstr('FLAVOUR_PATH',['FLAVOUR'=>$flavour])."/".self::$CFG['MTIMES_CACHE_FILENAME'];
 			$f=file_put_contents($mtimes_cache_filename,json_encode($last_scrape_dates),LOCK_EX);
-			if (!$f) throw new Exception("Cannot write mtimes cache");
+			if (!$f) throw new ErrorException("Cannot write mtimes cache");
 			$time_last_mtimes = time();
 		}
 	}
 
 	static function read_raw_sv($filename) {
 		// read gzipped SV file
-		if (!file_exists($filename)) throw new Exception("TelemetryScrapeSVs::read_raw_sv: File not found: $filename");
+		if (!file_exists($filename)) throw new ErrorException("TelemetryScrapeSVs::read_raw_sv: File not found: $filename");
 		$fp = gzopen($filename, 'rb');
-		if (!$fp) throw new Exception("TelemetryScrapeSVs::read_raw_sv: Cannot open gzipped file: $filename");
+		if (!$fp) throw new ErrorException("TelemetryScrapeSVs::read_raw_sv: Cannot open gzipped file: $filename");
 		$sv_raw = '';
 		while (!gzeof($fp)) {
 			$sv_raw .= gzread($fp, 100000);
@@ -512,7 +509,7 @@ ENDLUA;
 			self::db_create();
 			self::test_status();
 			self::vlog("Database: connected and present.");
-		} catch (Exception $e) {
+		} catch (ErrorException $e) {
 			die("DB Connection to ".self::$CFG['DB']['host']." FAILED - ".$e->getMessage());
 		}
 		self::vlog("Self-tests: \x1b[48;5;70;30mPASS\x1b[0m");
@@ -581,7 +578,7 @@ ENDLUA;
 			";
 			self::$db->query($schema_sql);
 			if (self::$db->error) 
-				throw new Exception("Failed to create table `packagerlog_files`: ".self::$db->error);
+				throw new ErrorException("Failed to create table `packagerlog_files`: ".self::$db->error);
 			self::vlog("DB schema created.");
 		}
 
