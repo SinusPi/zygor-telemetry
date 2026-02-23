@@ -142,15 +142,9 @@ class Telemetry {
 			self::write_error_to_status($err['type'],$err['message'],$err['file'],$err['line']);
 	}
 
-	
 	static function &get_status($tag,$force=false) {
-		if ($force || !isset(self::$last_statuses[$tag])) {
-			$r = self::db_qesc("SELECT status FROM status WHERE tag={s} LIMIT 1", $tag);
-			if ($r) {
-				$status = $r->fetch_row()[0];
-				self::$last_statuses[$tag] = json_decode($status, true);
-			}
-		}
+		if ($force || !isset(self::$last_statuses[$tag]) && $last = self::db_get_status($tag))
+			self::$last_statuses[$tag] = $last;
 		if (!isset(self::$last_statuses[$tag]))
 			self::$last_statuses[$tag] = [];
 		return self::$last_statuses[$tag];
@@ -162,7 +156,7 @@ class Telemetry {
 
 		self::$last_statuses[$tag] = $last_status;
 
-		self::db_qesc("INSERT INTO status (tag,status) VALUES ({s},{s}) ON DUPLICATE KEY UPDATE status={s}", $tag, json_encode($last_status), json_encode($last_status));
+		self::db_set_status($tag, $last_status);
 	}
 	static function test_status() {
 		$testtag="TEST";
@@ -174,9 +168,9 @@ class Telemetry {
 		$status = self::get_status($testtag);
 		if ($status['status']!="TESTING2" || $status['foo']!="bar") throw new Exception("Status test failed 2: ".print_r($status,true));
 
-		self::db_qesc("DELETE FROM status WHERE tag={s}", $testtag);
+		self::db_delete_status($testtag);
 	}
-	
+
 	static function stat($data,$keep=false) {
 		return self::status(self::$tag,$data,$keep);
 	}
@@ -400,11 +394,43 @@ class Telemetry {
 		return $r->fetch_row()[0];
 	}
 
+	
+	
+	static function db_get_status($tag) {
+		$r = self::db_qesc("SELECT status FROM status WHERE tag={s} LIMIT 1", $tag);
+		if ($r && $r->num_rows) return json_decode($r->fetch_row()[0], true);
+	}
+	
+	static function db_set_status($tag, $status) {
+		$status_json = json_encode($status);
+		self::db_qesc("INSERT INTO status (tag, status) VALUES ({s}, {s}) ON DUPLICATE KEY UPDATE status={s}", $tag, $status_json, $status_json);
+	}
+
+	static function db_delete_status($tag) {
+		self::db_qesc("DELETE FROM status WHERE tag={s}", $tag);
+	}
+	
+	
+	static function db_get_file($filename) {
+		$r = self::db_qesc("SELECT * FROM files WHERE filename={s} LIMIT 1", $filename);
+		if ($r && $r->num_rows) return $r->fetch_assoc();
+	}
+
+	static function db_upsert_file($filename) {
+		self::db_qesc("INSERT INTO files (filename) VALUES ({s}) ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)", $filename);
+		return self::$db->insert_id;
+	}
+
+	static function db_delete_file($filename) {
+		self::db_qesc("DELETE FROM files WHERE filename={s} OR id={d}", $filename, is_numeric($filename) ? intval($filename) : -1);
+	}
+
+	
+	
 	static function db_create() {
 		self::$db->query("SHOW CREATE TABLE status;");
 		if (self::$db->error) {
-			$schema_sql = "
-				CREATE TABLE `status` (
+			$schema_sql = "CREATE TABLE `status` (
 					`tag` char(20) NOT NULL,
 					`status` varchar(200) DEFAULT NULL,
 					UNIQUE KEY `tag` (`tag`)
@@ -418,13 +444,29 @@ class Telemetry {
 			if (self::$db->error) 
 				throw new Exception("Failed to create table `status`: ".self::$db->error);
 		}
+
+
+		self::$db->query("SHOW CREATE TABLE files;");
+		if (self::$db->error) {
+			$schema_sql = "CREATE TABLE `files` (
+					`id` int(11) NOT NULL AUTO_INCREMENT,
+					`filename` varchar(255) NOT NULL,
+					UNIQUE KEY `id` (`id`),
+					UNIQUE KEY `filename` (`filename`)
+				) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+				COMMENT='list of all parsed files, for bookkeeping and reference from events';
+			";
+			self::$db->query($schema_sql);
+			if (self::$db->error) 
+				throw new Exception("Failed to create table `files`: ".self::$db->error);
+		}
+
 		self::$db->query("SHOW CREATE TABLE events;");
 		if (self::$db->error) {
-			$schema_sql = "
-				CREATE TABLE `events` (
+			$schema_sql = "CREATE TABLE `events` (
 					`id` int(11) NOT NULL AUTO_INCREMENT,
 					`flavnum` int(1) NOT NULL,
-					`svfile_id` int(11),
+					`file_id` int(11),
 					`time` int(10) NOT NULL,
 					`type` char(40) NOT NULL,
 					`data` text NOT NULL,
@@ -444,6 +486,7 @@ class Telemetry {
 			if (self::$db->error) 
 				throw new Exception("Failed to create table `events`: ".self::$db->error);
 		}
+
 	}
 
 	/**
@@ -473,7 +516,7 @@ class Telemetry {
 		$totals['tmfiles_written']++;
 	}
 
-	static function db_store_datapoints($flavour,$sv_file_id=null,$datapoints) {
+	static function db_store_datapoints($flavour,$file_id=null,$datapoints) {
 		if (!count($datapoints)) return;
 		$chunk_size = 100;
 		$values = [];
@@ -482,12 +525,12 @@ class Telemetry {
 			$time = intval($dp['time'] ?: 0); unset($dp['time']);
 			$type = $dp['type'] ?: '?'; unset($dp['type']);
 			if ($type=="ui") { $type="ui_".($dp['event'] ?: '?'); unset($dp['event']); }
-			$values[] = self::qesc("({d},{d},{d},{s},{s})", $flavnum, $sv_file_id, $time, $type, json_encode($dp));
+			$values[] = self::qesc("({d},{d},{d},{s},{s})", $flavnum, $file_id, $time, $type, json_encode($dp));
 		}
 		$chunks = array_chunk($values, $chunk_size);
 		$inserted = 0;
 		foreach ($chunks as $chunk) {
-			$q = "INSERT INTO events (flavnum,svfile_id,time,type,data) VALUES ".join(",",$chunk);
+			$q = "INSERT INTO events (flavnum,file_id,time,type,data) VALUES ".join(",",$chunk);
 			$r = self::$db->query($q);
 			if (!$r) throw new Exception("DB error: ".self::$db->error);
 			$inserted += self::$db->affected_rows;
