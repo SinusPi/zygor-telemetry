@@ -190,45 +190,6 @@ class Telemetry {
 		return $result;
 	}
 
-	// use glob to find all matching files, allowing ** to recurse into all folders
-	/** @deprecated */
-	static function __rglob__old($pat) {
-		$p = strpos($pat, '**');
-		if ($p === false) {
-			//echo "$pat: just glob\n";
-			return glob($pat);
-		}
-		$before = substr($pat, 0, $p);
-		$after = substr($pat, $p + 3);
-
-		$files = glob($before.$after); // seeking fee/**/bar*fle.txt, try to match fee/bar*fle.txt first
-		//echo "plain glob $before.$after = ".count($files)."\n";
-		
-		$gl = $before === '' ? '*' : "{$before}*";
-		$folders = glob($gl,GLOB_ONLYDIR);
-		//echo "$pat: glob $gl\n";
-		foreach ($folders as $folder) {
-			//echo "- rglob $folder/**/$after\n";
-			$files = array_merge($files, self::rglob("$folder/**/$after"));
-		}
-		return $files;
-	}
-
-	static function rglob($pat,$limit=10) {
-		$p = strpos($pat, '**/');
-		if ($p === false) {
-			return glob($pat); // quit wasting my time!
-		}
-		$before = substr($pat, 0, $p);
-		$after = substr($pat, $p + 3);
-		$files=[];
-		for ($i=1;$i<=$limit;$i++) {
-			$asterisks = str_repeat("*/", $i);
-			$files = array_merge($files, glob("$before$asterisks$after",GLOB_NOSORT));
-		}
-		return $files;
-	}
-
 	static function get_counts($flavour,$topic) {
 		$def = self::$CFG['TOPICS'][$topic] ?: null;
 		if (!$def) return ['total'=>0,'matching'=>0];
