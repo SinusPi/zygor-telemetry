@@ -112,6 +112,8 @@ class TelemetryScrape extends Telemetry {
 	 */
 	static function rglob_gen($startfolder,$pat,$depthlimit=10) {
 		$afterPattern = $pat;
+
+		echo "rglob_gen: Searching for $afterPattern in $startfolder with depth limit $depthlimit...\n";
 		
 		$recursiveDir = function($dir, $depthlimit) use (&$recursiveDir, $afterPattern) {
 			if (!is_dir($dir)) return;
@@ -177,7 +179,7 @@ class TelemetryScrape extends Telemetry {
 	/**
 	 * Helper generator to yield batches of items from an iterable.
 	 */
-	static function get_batches($iterable, $batch_size) {
+	static function batchify($iterable, $batch_size) {
 		$batch = [];
 		foreach ($iterable as $item) {
 			$batch[] = $item;
@@ -191,53 +193,89 @@ class TelemetryScrape extends Telemetry {
 		}
 	}
 
-	static function get_fresh_files_gen($topic, $filemask, $batch_size=20) {
-		$files_gen = self::rglob_gen($filemask,10);
-		$file_batches_gen = self::get_batches($files_gen, $batch_size);
+	/**
+	 * Generator that yields only files "fresh" for given topic(s) (with mtimes newer than the last recorded scrape time for that topic)
+	 */
+	static function get_fresh_files_gen($topics, $startfolder, $filemask, $prefix, $batch_size=20) {
+		self::vlog("Finding files in $startfolder matching $filemask...");
+		$files_gen = self::rglob_gen($startfolder,$filemask,10);
+		$file_batches_gen = self::batchify($files_gen, $batch_size);
 		foreach ($file_batches_gen as $batch) {
-			$filenames = array_map(function($f) { return self::split_filename($f)[1]; }, $batch);
-			foreach (self::get_file_times_generic_gen($topic, $filenames) as $times) {
-				yield $times;
+			self::vlog("Processing batch of ".count($batch)." files...");
+			// filenames in batch are full; need to shorten for DB
+			// add prefix to batch items, e.g. "flavour/filename"
+			$batch_slugs = str_replace($startfolder,$prefix,$batch);
+			$files = self::db_get_files($batch_slugs,true); // same order maintained
+			$ids = array_column($files, 'id');
+			$batch_scrapetimes = self::get_file_scrapetimes_batch($topics,$ids);
+			
+			// add full file names and mtimes to results for easier filtering below
+			$results = array_map(function($b,$slug,$scrapetimes) {
+				return [ 'fullpath' => $b, 'slug' => $slug ] + $scrapetimes;
+			}, $batch, $batch_slugs, $batch_scrapetimes);
+
+			// mark fresh or not
+			$results = array_map(function($data) use ($topics) {
+				$mtime = filemtime($data['fullpath']);
+				foreach ($topics as $topic) 
+					$data['topics'][$topic]['fresh'] = $mtime > ($data['topics'][$topic]['scrape_time'] ?: 0);
+				$data['any_fresh'] = $data['newest_scrape_time'] < $mtime;
+				return $data;
+			}, $results);
+
+			foreach ($results as $data) {
+				// if any of the topics has never been scraped for this file, or if the newest scrape time across all topics is older than the file's mtime, yield it
+				if ($data['any_fresh'])
+					yield $data;
 			}
 		}
 	}
 
-	static function get_file_times_generic_gen($topic, $filenames, $batch_size=20) {
-		for ($i = 0; $i < count($filenames); $i += $batch_size) {
-			$batch = array_slice($filenames, $i, $batch_size);
-			$results = self::get_file_times_generic($topic, $batch);
-			if ($results) {
-				foreach ($results as $row) {
-					yield $row;
-				}
-			}
-		}
+	static function get_file_scrapetimes_batch($topics, $ids) {
+		$r = self::db_qesc($_q="SELECT * FROM `topic_scrapetimes` WHERE `topic` IN ({sa}) AND `fileid` IN ({sa})", $topics, $ids);
+		if (!$r) throw new ErrorException("DB error in $_q: ".self::$db->error);
+
+		// aggregate by fileid
+		$files = [];
+		while ($row = $r->fetch_assoc())
+			$files[$row['fileid']]['topics'][$row['topic']] = $row;
+		
+		// add field for newest scrape time for this file across all topics, to make it easier to filter out old files in the generator
+		foreach ($files as &$data) {
+			$data['newest_scrape_time'] = max(array_column($data['topics'], 'scrape_time'));
+		} unset($data);
+
+		// reorder by ids
+		$results = array_map(function($id) use ($files) {
+			return $files[$id] ?: ['topics' => [], 'newest_scrape_time' => -1];
+		}, $ids);
+		return $results;
+	}
+
+	static function db_set_file_scrapetimes($topics, $fileid, $scrape_time=null) {
+		$values = [];
+		foreach ($topics as $topic)
+			$values[] = self::qesc("({s}, {d}, {d})", $topic, $fileid, $scrape_time ?: time());
+		$q = self::qesc($_q="INSERT INTO `topic_scrapetimes` (topic, fileid, scrape_time) VALUES ".join(", ", $values)." ON DUPLICATE KEY UPDATE scrape_time=VALUES(scrape_time)");
+		$r = self::$db->query($q);
+		if (!$r) throw new ErrorException("DB error, query $_q: ".self::$db->error);
+	}
+
+	static function db_set_file_scrapetime($topic, $fileid, $scrape_time=null) {
+		$q = self::qesc($_q="INSERT INTO `topic_scrapetimes` (topic, fileid, scrape_time) VALUES ({s}, {d}, {d}) ON DUPLICATE KEY UPDATE scrape_time=VALUES(scrape_time)", $topic, $fileid, $scrape_time ?: time());
+		$r = self::$db->query($q);
+		if (!$r) throw new ErrorException("DB error, query $_q: ".self::$db->error);
 	}
 
 	// Tests, DB schemas
-	static function get_file_times_generic($topic, $filenames) {
-		$q = self::qesc($_q="SELECT * FROM `topic_times_file`,`files` WHERE `topic_times_file`.`fileid`=`files`.`id` AND `topic`={s} AND `filename` IN ({sa})", $topic, $filenames);
-		$r = self::$db->query($q);
-		if (!$r) throw new ErrorException("DB error in $_q: ".self::$db->error);
-		if ($r->num_rows) {
-			$row = $r->fetch_assoc();
-			return $row;
-		}
-		return null;
-	}
-	
-	static function set_file_times_generic($topic, $filetype, $fileid, $scrape_time=null, $mtime=null) {
-		$q = self::qesc($_q="INSERT INTO topic_times_file (topic, filetype, fileid, scrape_time, mtime) VALUES ({s}, {s}, {d}, {d}, {d}) ON DUPLICATE KEY UPDATE scrape_time=VALUES(scrape_time), mtime=VALUES(mtime)", $topic, $filetype, $fileid, $scrape_time ?: time(), $mtime ?: time());
-		$r = self::$db->query($q);
-		if (!$r) throw new ErrorException("DB error, query $_q: ".self::$db->error);
-		return $r;
-	}
 
 	/**
 	 * Create generic scraping-related tables. None so far.
 	 */
 	static function db_create() {
 		parent::db_create();
+
+		self::db_create_topic_scrapetimes();
 	}
 
 	/**
@@ -245,28 +283,26 @@ class TelemetryScrape extends Telemetry {
 	 * Every scraper flavour should use this to mark which files it has processed, and skip files that are already marked as seen.
 	 */
 
-	static function db_create_topic_seen_file() {
-		self::$db->query("SHOW CREATE TABLE topic_seen_file;");
+	static function db_create_topic_scrapetimes() {
+		self::$db->query("SHOW CREATE TABLE topic_scrapetimes;");
 		if (self::$db->error) {
 			$schema_sql =
-				"CREATE TABLE `topic_seen_file` (
+				"CREATE TABLE `topic_scrapetimes` (
 					`topic` char(10) NOT NULL,
 					`fileid` int(10) NOT NULL,
 					`scrape_time` int(11) DEFAULT NULL,
-					`mtime` int(11) DEFAULT NULL,
 					UNIQUE KEY `topic_file` (`topic`, `fileid`)
 				)
 				ENGINE=InnoDB
 				DEFAULT CHARSET=latin1
 				COLLATE=latin1_swedish_ci
-				COMMENT='used to mark which SV files have been processed and when';
+				COMMENT='used to mark which files have been processed and when';
 			";
 			self::$db->query($schema_sql);
-			if (self::$db->error) 
-				throw new ErrorException("Failed to create table `topic_seen_file`: ".self::$db->error);
+			if (self::$db->error)
+				throw new ErrorException("Failed to create table `topic_scrapetimes`: ".self::$db->error);
+			self::vlog("DB table `topic_scrapetimes` created.");
 		}
-
-		self::vlog("DB schema created.");
 	}
 
 	static function self_tests() {

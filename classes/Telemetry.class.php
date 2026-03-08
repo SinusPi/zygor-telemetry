@@ -312,6 +312,15 @@ class Telemetry {
 	}
 
 
+	static function filter_gen($iterable, $callback) {
+		foreach ($iterable as $key => $value) {
+			if ($callback($value, $key)) {
+				yield $key => $value;
+			}
+		}
+	}
+
+
 
 	static function db_connect() {
 		$cfg = self::$CFG['DB'];
@@ -372,14 +381,42 @@ class Telemetry {
 	}
 	
 	
+
 	static function db_get_file($filename) {
-		$r = self::db_qesc("SELECT * FROM files WHERE filename={s} LIMIT 1", $filename);
+		$r = self::db_qesc("SELECT * FROM files WHERE filename={s} OR id={d} LIMIT 1", $filename, is_numeric($filename) ? intval($filename) : -1);
 		if ($r && $r->num_rows) return $r->fetch_assoc();
+		self::db_qesc("INSERT INTO files (filename,mtime) VALUES ({s},0)   ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)", $filename);
+		return ['id' => self::$db->insert_id, 'filename' => $filename, 'mtime' => 0];
 	}
 
-	static function db_upsert_file($filename) {
-		self::db_qesc("INSERT INTO files (filename) VALUES ({s}) ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)", $filename);
-		return self::$db->insert_id;
+	/**
+	 * Returns file records for the given filenames.
+	 * If $do_insert_missing is true, missing filenames will be inserted with mtime=0 and included in the results. 
+	 */
+	static function db_get_files($filenames,$do_insert_missing=true) {
+		$r = self::db_qesc("SELECT * FROM files WHERE filename in ({sa})", $filenames, $filenames);
+		if ($r && $r->num_rows) $file_rows = $r->fetch_all(MYSQLI_ASSOC);
+		else $file_rows = [];
+		$filenames_found = array_column($file_rows, 'filename');
+		$filenames_not_found = array_diff($filenames, $filenames_found);
+		if ($do_insert_missing && count($filenames_not_found)) {
+			foreach ($filenames_not_found as $nf) {
+				self::db_qesc("INSERT INTO files (filename,mtime) VALUES ({s},0)   ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)", $nf);
+				if (self::$db->error) throw new ErrorException("DB error inserting file '$nf': ".self::$db->error);
+				$file_rows[] = ['id' => self::$db->insert_id, 'filename' => $nf, 'mtime' => 0]; // mock entry
+			}
+		}
+		// sort result array in the same order as $filenames
+		$file_rows_by_filename = array_column($file_rows, null, 'filename');
+		$sorted_file_rows = [];
+		foreach ($filenames as $fn) {
+			$sorted_file_rows[] = $file_rows_by_filename[$fn] ?: null;
+		}
+		return $sorted_file_rows;
+	}
+
+	static function db_update_file_mtime($filename, $mtime) {
+		self::db_qesc("UPDATE files SET mtime={d} WHERE filename={s} OR id={d}", $mtime, $filename, is_numeric($filename) ? intval($filename) : -1);
 	}
 
 	static function db_delete_file($filename) {
@@ -404,6 +441,7 @@ class Telemetry {
 			self::$db->query($schema_sql);
 			if (self::$db->error) 
 				throw new Exception("Failed to create table `status`: ".self::$db->error);
+			self::vlog("DB table `status` created.");
 		}
 
 
@@ -412,6 +450,7 @@ class Telemetry {
 			$schema_sql = "CREATE TABLE `files` (
 					`id` int(11) NOT NULL AUTO_INCREMENT,
 					`filename` varchar(255) NOT NULL,
+					`mtime` int(10) NOT NULL,
 					UNIQUE KEY `id` (`id`),
 					UNIQUE KEY `filename` (`filename`)
 				) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
@@ -420,6 +459,7 @@ class Telemetry {
 			self::$db->query($schema_sql);
 			if (self::$db->error) 
 				throw new Exception("Failed to create table `files`: ".self::$db->error);
+			self::vlog("DB table `files` created.");
 		}
 
 		self::$db->query("SHOW CREATE TABLE events;");
@@ -446,6 +486,7 @@ class Telemetry {
 			self::$db->query($schema_sql);
 			if (self::$db->error) 
 				throw new Exception("Failed to create table `events`: ".self::$db->error);
+			self::vlog("DB table `events` created.");
 		}
 
 	}

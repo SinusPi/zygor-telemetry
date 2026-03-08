@@ -29,70 +29,49 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 
 		// TODO : go through log-<Y>-<M>-<D> files, bzipped or not, extract flavour update lines, treat them similarly to "ui-VERSION" type events (but store them separately!). Remember which logs were parsed.
 
-		$topics = self::$CFG['SCRAPE_TOPICS'];
-		$topics = array_filter($topics, function($t) { return ($t['input']?:"") == "packagerlog"; });
-
-		self::log("Starting scrape of topics: '\x1b[38;5;78m".implode(", ",array_keys($topics))."\x1b[0m' in packager logs.");
-
-		return;
-
-		self::stat(['status'=>"ENUMERATING",'stage'=>1,'stageof'=>2,'flavour'=>$flavour,'progress'=>[],'time_started'=>time(),'time_started_hr'=>date("Y-m-d H:i:s")]);		
-
-		self::log("Enumerating files matching ".self::$CFG['filemask']);
+		$topics = self::$CFG['TOPICS'];
 		
-		$t1 = microtime(true);
-		$files = self::find_files($sync_path, self::$CFG['filemask'], true); // FINDING FILES. TAKES LONG.
+		// pick just the topics relevant to packager logs
+		//$topics = array_filter($topics, function($t) { return ($t['scraper']['input']?:"") == "packagerlog"; });
+		//if (!count($topics)) throw new MinorError("No topics to scrape for packager logs, aborting.");
+		
+		self::log("Starting scrape of topics: \x1b[38;5;78m".implode(", ",array_keys($topics))."\x1b[0m in packager logs.");
+
+		self::stat(['status'=>"ENUMERATING",'stage'=>1,'stageof'=>2,'progress'=>[],'time_started'=>time(),'time_started_hr'=>date("Y-m-d H:i:s")]);		
+		self::log("Enumerating files matching ".self::$CFG['PACKAGERLOG_MASK']." in ".self::$CFG['PACKAGERLOG_PATH']);
+		
+		$files = self::find_logs();
 		$total_filecount = count($files);
-		self::vlog("Found $total_filecount files [".round(microtime(true)-$t1,2)."s]");
+		self::vlog("Found $total_filecount files.");
 
-		if (isset(self::$CFG['TELEMETRY_FILE_AGE'])) {
-			$days_old = intval(self::$CFG['TELEMETRY_FILE_AGE']/DAY)+1; // old way of detecting file age
-			$files = self::filter_younger_files($files, $days_old);
-			$t1 = microtime(true);
-			self::vlog("Filtered out files older than $days_old days: {$total_filecount} -> ".count($files)." files [".round(microtime(true)-$t1,2)."s]");
-		}
-
-		while ($files[0]==="") array_shift($files);
-		//$files = str_replace($sync_path."/","",$files);
+		$files = self::filter_by_dates($files);
 
 		self::stat(['files_total'=>count($files)],true);
 		self::log(count($files)." files to process.");
+		self::log(join(",",$files));
 
-		if (!count($files)) {
+		$freshfiles = self::db_get_unprocessed_logfiles($files,array_keys($topics));
+
+		if (!count($freshfiles)) {
 			self::log("Nothing to do here.");
 			self::stat(['status'=>"IDLE"]);
 			return;
 		}
 
-		$freshfiles = $files; //array_values(array_filter($files,function($f) { return NOW-filemtime($f)<=TELEMETRY_INTERVAL; }));
-
-		$freshhashes = array_map(function($f) use ($flavour) { return substr(md5($flavour."/".$f),0,8); },$freshfiles);
-		$counts = array_count_values($freshhashes);
-		$dupes = array_filter($counts,function($c) { return $c>1; });
-		if (count($dupes)) {
-			self::stat(['status'=>"ERROR",'error'=>"Duplicate files found, see log."]);
-			self::log("Warning: ".count($dupes)." duplicate files found (same name in different folders): ".join(", ",array_keys($dupes)).". They will be processed only once.");
-			die();
-		}
-
 		self::stat(['status'=>"EXTRACTING",'files_fresh'=>count($freshfiles),'files_skipped'=>0,'tmfiles_skipped'=>0,'tmfiles_written'=>0,'tmfiles_last'=>"",'file_last'=>"",'not_files'=>0,'broken_lua'=>0]);
 
-		//self::log(count($freshfiles)." of them are fresh enough (".intval(TELEMETRY_INTERVAL/DAY)." days).");
-
-		//$telefolder = self::cfgstr('FLAVOUR_PATH',['FLAVOUR'=>$flavour]);
-		//$last_scrape_dates = (array)@json_decode(@file_get_contents($telefolder."/".self::$CFG['MTIMES_CACHE_FILENAME'])); // names relative to sync folder
-		$t1 = microtime(true);
-		$last_mtimes = self::fetch_last_mtimes($flavour, $freshfiles);
-		$t2 = microtime(true);
-		self::vlog("Loaded ".count($last_mtimes)." last scrape dates from DB in ".self::$DBG['mtime_queries']." queries [".round($t2-$t1,2)."s]");
-		
 		$totals=[];
+
+		return;
+		
+		/*
 		$first_day_relevant = date("Ymd",time()-self::$CFG['TELEMETRY_DATA_AGE']);
 		self::log("We check for data max \x1b[1m".round(self::$CFG['TELEMETRY_DATA_AGE']/86400)."\x1b[0m days old (>= \x1b[38;5;118m$first_day_relevant\x1b[0m)");
+		*/
 
-		
 		// prepare list of files to actually process
 
+		/*
 		$freshfiles_to_process = [];
 
 		foreach ($freshfiles as $n=>$filename_full) {
@@ -119,14 +98,10 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 
 			$freshfiles_to_process[]=$filename_full;
 		}
+		*/
+		$freshfiles_to_process = $freshfiles; // for now, process all files
 	
-		self::log(sprintf(
-			"Processing %d files (%s%s%d not changed since scrape).",
-			count($freshfiles_to_process),
-			$totals['files_skipped'] ? $totals['files_skipped'] . " skipped, " : "",
-			$totals['not_files'] ? $totals['not_files'] . " not files, " : "",
-			count($freshfiles) - count($freshfiles_to_process)
-		));
+		self::log(sprintf("Processing %d logs.",count($freshfiles_to_process)));
 		
 		unset($freshfiles);
 
@@ -163,42 +138,28 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 
 		*/
 
-		foreach ($freshfiles_to_process as $n=>$filename_full) {
-			self::stat(['file_last'=>$filename_full],true);
-			list (,$filename_slug) = self::split_filename($filename_full);
-			$bnet = basename($filename_slug);
-			$user = basename(dirname($filename_slug));
-			$userfolder = dirname($filename_full);
+		foreach ($freshfiles_to_process as $n=>$filename) {
+			self::stat(['file_last'=>$filename],true);
 
-			self::vlog("Scraping SV: \x1b[38;5;110m$user\x1b[0m/\x1b[38;5;116m$bnet\x1b[0m\x1b[30;1m--SavedVariables...\x1b[0m");
+			self::vlog("Scraping Packager log: \x1b[38;5;110m$filename\x1b[0m");
 
-			$is_windows = (strpos(PHP_OS, 'WIN') === 0); $is_linux = !$is_windows;
-			$lock_code = $flavour."/".$filename_slug;
+			$lock_code = $filename;
 			$got_db_lock = false;
 
 			try { // flock block
-				if ($is_linux) {
-					$fl = fopen($userfolder, 'rb');
-					if (!$fl) throw new FileLockedException("Cannot open input folder for locking: $userfolder");
-					if (!flock($fl, LOCK_EX | LOCK_NB)) {
-						fclose($fl);
-						throw new FileLockedException("Input folder locked: $userfolder");
-					}
-				} else {
-					// Windows: use DB locks
-					$got_db_lock = self::db_lock($lock_code);
-					if (!$got_db_lock) {
-						throw new FileLockedException("Input folder locked (DB): $lock_code");
-					} else {
-						//self::vlog(microtime(true)." DB lock acquired for $lock_code");
-					}
+				$fl = fopen(self::$CFG['PACKAGERLOG_PATH']."/".$filename, 'r');
+				if (!$fl) throw new FileLockedException("Cannot open logfile for locking: $filename");
+				if (!flock($fl, LOCK_EX | LOCK_NB)) {
+					fclose($fl);
+					throw new FileLockedException("Logfile locked: $filename");
 				}
 
 				self::$db->begin_transaction();
 
-				self::vlog(" - :. reading SV file...");
+				self::vlog(" - :. reading logfile...");
 
-				$flavourfile = $flavour."/".$filename_slug; // flavour/user/bnet
+
+
 				$sv_file_data = self::db_get_sv_file_data($flavourfile);
 				if (!$sv_file_data) {
 					self::log("Cannot get sv_file_data for $filename_full. Locked?");
@@ -326,18 +287,11 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 		self::stat(['status'=>"IDLE"]);
 	}
 
-	static function fetch_last_mtimes($flavour, $files) {
-		$slice=100; $qs=0;
-		$last_mtimes = [];
-		for ($ffi=0;$ffi<count($files);$ffi+=$slice) {
-			$batch = array_slice($files,$ffi,$slice);
-			$batch = array_map(function($f) use ($flavour) { $f=self::split_filename($f)[1]; return $flavour."/".$f; }, $batch);  // flavour/user/bnet
-			$last_mtimes_batch = self::db_get_svfile_mtimes($batch);
-			$qs++;
-			if ($last_mtimes_batch) $last_mtimes += $last_mtimes_batch;
-		}
-		self::$DBG['mtime_queries'] = $qs;
-		return $last_mtimes;
+	static function find_logs() {
+		$mask = self::$CFG['PACKAGERLOG_PATH']."/".str_replace(['<Y>','<M>','<D>'],"*",self::$CFG['PACKAGERLOG_MASK']); // log-*-*-*.txt*
+		$files = glob($mask);
+		$files = array_map('basename', $files);
+		return $files;
 	}
 
 	/**
@@ -349,7 +303,7 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 			return ++$totals['tmfiles_empty'];
 		$scrape_folder = self::cfgstr('SCRAPES_PATH',['FLAVOUR'=>$flavour,'DAY'=>$day]);
 		mkdir($scrape_folder,0777,true);
-		if (!is_dir($scrape_folder)) throw new Exception("Failed to create/access scrape folder at $scrape_folder");
+		if (!is_dir($scrape_folder)) throw new ErrorException("Failed to create/access scrape folder at $scrape_folder");
 		$scrape_file = "{$user}@{$acct}.json";
 		$scrape_filepath = $scrape_folder."/".$scrape_file;
 		if (file_exists($scrape_filepath))
@@ -499,6 +453,53 @@ ENDLUA;
 		return $formatted;
 	}
 
+	static function db_get_logfile_data($logfile) {
+		$q = self::qesc($_q="SELECT * FROM packagerlog_files WHERE file={s}  LIMIT 1  FOR UPDATE  NOWAIT", $logfile);
+		$r = self::$db->query($q);
+		if (!$r && self::$db->errno==3572) { // lock wait timeout
+			return null;
+		}
+		if (!$r) throw new ErrorException("DB error in $_q: ".self::$db->error);
+		if ($r->num_rows) {
+			$row = $r->fetch_assoc();
+			return $row;
+		} else {
+			$q = self::qesc($_q="INSERT INTO packagerlog_files (file) VALUES ({s})", $logfile);
+			$r = self::$db->query($q);
+			if (!$r) throw new ErrorException("DB error in $_q: ".self::$db->error);
+			$id = self::$db->insert_id;
+			$q2 = self::qesc($_q="SELECT * FROM packagerlog_files WHERE id={d} LIMIT 1 FOR UPDATE", $id);
+			$r2 = self::$db->query($q2);
+			if (!$r2) throw new ErrorException("DB error in $_q: ".self::$db->error);
+			if ($r2->num_rows) {
+				$row2 = $r2->fetch_assoc();
+				return $row2;
+			}
+		}
+	}
+
+	static function db_update_logfile_processed($log_file_id,$processed) {
+		$q = self::qesc($_q="UPDATE packagerlog_files SET processed={d} WHERE id={d}", $processed, $log_file_id);
+		$r = self::$db->query($q);
+		if (!$r) throw new ErrorException("DB error in $_q: ".self::$db->error);
+		return $r;
+	}
+
+	/**
+	 * Given a list of logfiles, return an associative array with the ones that need processing (not marked as processed in the DB) for the given topics. The array keys are the logfiles, and the values are the processed_topics field from the DB.
+	 */
+	static function db_get_unprocessed_logfiles($logfiles,$topics) {
+		if (!count($logfiles)) return [];
+		$q = self::qesc($_q="SELECT file,processed_topics FROM packagerlog_files WHERE file IN ({sa}) AND processed_topics IN ({sa})", $logfiles,$topics);
+		$r = self::$db->query($q);
+		if (!$r) throw new ErrorException("DB error in $_q: ".self::$db->error);
+		$res = array_fill_keys($logfiles, $topics); // default is all topics unprocessed
+		while ($row = $r->fetch_assoc()) {
+			$processed_topics = explode(",",$row['processed_topics']);
+			$res[$row['file']] = array_diff($topics,$processed_topics);
+		}
+		return $res;
+	}
 
 	// Tests, DB schemas
 
@@ -530,7 +531,7 @@ ENDLUA;
 	}
 
 	static function test_datapoints() {
-		$test_dataps = self::extract_datapoints_with_lua("ZygorGuidesViewerSettings={char={bar={guidestephistory={foo={lasttime=12345}}}}}","wow",self::$CFG['SCRAPE_TOPICS']);
+		$test_dataps = self::extract_datapoints_with_lua("ZygorGuidesViewerSettings={char={bar={guidestephistory={foo={lasttime=12345}}}}}","wow",self::$CFG['TOPICS']);
 		if (!($test_dataps['status']=="ok" && $test_dataps['datapoints'][0]['type']=="usedguide" && $test_dataps['datapoints'][0]['time']==12345)) die("FAILED testing datapoint defs:\n".print_r($test_dataps,1)."\n");
 	}
 
@@ -547,6 +548,16 @@ ENDLUA;
 			$data_by_days[$lineday][]=$line;
 		}
 		return $data_by_days;
+	}
+
+	static function filter_by_dates($files) {
+		return array_filter($files, function($f) {
+				$datepart = preg_replace("/.*-(\d{2})-(\d{2})-(\d{2}).*/","20$1$2$3",$f);
+				if (!$datepart) return false;
+				return ($datepart >= date("Ymd", time() - self::$CFG['maxdays'] * 86400))
+				    && ($datepart >= self::$CFG['start-day'])
+					&& ($datepart <= date("Ymd", time() - (self::$CFG['today-too'] ? 0 : 86400)));
+		});
 	}
 
 	// test group_ranges
@@ -568,6 +579,7 @@ ENDLUA;
 				CREATE TABLE `packagerlog_files` (
 					`id` int(11) NOT NULL AUTO_INCREMENT,
 					`file` char(50) NOT NULL,
+					`processed_topics` varchar(100) NOT NULL DEFAULT '',
 					UNIQUE KEY `file` (`file`),
 					UNIQUE KEY `id` (`id`)
 				)

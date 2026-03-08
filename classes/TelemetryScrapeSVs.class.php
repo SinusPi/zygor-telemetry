@@ -34,35 +34,13 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		}));
 	}
 	
-	static function find_files($path, $filemask, $loud=false) {
-		$files = self::rglob($path."/**/".$filemask, 10);
-		return array_values($files);
-
-
-
-		/*
-		$find_cmd = "find ".escapeshellarg($path)." ".($days_old ? "-mtime -$days_old " : "")." -name ".escapeshellarg($filemask);
-		$proc = popen($find_cmd, 'r');
-		if (!$proc) throw new Exception("Failed to execute find command");
-		$files = [];
-		echo "\n\x1b[1A;";
-		$t=0;
-		while ($line = fgets($proc)) {
-			$files[] = trim($line);
-			$c = count($files);
-			if ($loud && $c%100==0 && time()>=$t+1) { echo "\r$c"; $t=time(); }
-		}
-		echo "\r          \r";
-		pclose($proc);
-		return $files;
-		*/
-	}
-
 	/**
 	 * Grab data from SVs, store into db
 	 * @param string $flavour
 	 */
 	static function scrape($flavour) {
+		return self::scrape2($flavour); // new scrape method with generator for files, but keep old one for now for comparison and safety
+
 		if (!in_array($flavour,array_keys(self::$CFG['WOW_FLAVOUR_DATA']))) throw new ErrorException("Unsupported flavour '{$flavour}' (supported: ".join(", ",array_keys(self::$CFG['WOW_FLAVOUR_DATA'])).")");
 
 		self::$tag = "SCRAPE-".strtoupper(str_replace("-","_", $flavour));
@@ -229,6 +207,67 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		self::stat(['status'=>"IDLE"]);
 	}
 
+	/**
+	 * Grab data from SVs, store into db
+	 * @param string $flavour
+	 */
+	static function scrape2($flavour) {
+		if (!in_array($flavour,array_keys(self::$CFG['WOW_FLAVOUR_DATA']))) throw new ErrorException("Unsupported flavour '{$flavour}' (supported: ".join(", ",array_keys(self::$CFG['WOW_FLAVOUR_DATA'])).")");
+
+		self::$tag = "SCRAPE-".strtoupper(str_replace("-","_", $flavour));
+		$status = self::get_status(self::$tag, true);
+		if ($status['status']=="SCRAPING") {
+			self::log("Another scrape for flavour '\x1b[38;5;78m{$flavour}\x1b[0m' is already in progress, aborting.");
+			return;
+		}
+
+		$topics = self::$CFG['TOPICS'];
+		$topics = array_filter($topics, function($t) { return ($t['scraper']['input']?:"") == "sv"; });
+		$sync_path = self::cfgstr('SV_STORAGE_FLAVOUR_PATH',["FLAVOUR"=>$flavour]);
+
+		self::log("Starting scrape of flavour '\x1b[38;5;78m{$flavour}\x1b[0m' in \x1b[33;1m{$sync_path}\x1b[0m.");
+
+		// get svfiles that may have fresh data for the topics listed
+		$gen_fresh_svfiles = self::get_fresh_files_gen(array_keys($topics), $sync_path, self::$CFG['filemask'], $flavour);
+
+		// narrow down per configuration
+		$gen_narrowed_svfiles_1 = self::filter_gen($gen_fresh_svfiles, function($filedata) {
+			return (isset(self::$CFG['TELEMETRY_FILE_AGE']) && (time() - $filedata['mtime'] > self::$CFG['TELEMETRY_FILE_AGE']*DAY) ? false : true);
+		});
+
+		// skip today's files if not explicitly included
+		$gen_narrowed_svfiles_2	= self::filter_gen($gen_narrowed_svfiles_1, function($filedata) {
+			return (!self::$CFG['today-too'] || date("Ymd", $filedata['mtime']) != date("Ymd", time()));
+		});
+		
+		foreach ($gen_narrowed_svfiles_2 as $n => $filedata) {
+			$fresh_topics_in_file = array_filter($topics, function($topic,$name) use ($filedata) { return $filedata['topics'][$name]['fresh']; },ARRAY_FILTER_USE_BOTH);
+			self::process_single_sv_file($flavour, $filedata['fullpath'], $fresh_topics_in_file, $totals);
+
+			// obey limit
+			if (isset(self::$CFG['limit']) && $n>=self::$CFG['limit']-1) {
+				self::$db->commit();
+				throw new ErrorException("Limit ".self::$CFG['limit']." hit, aborting.\n");
+			}
+
+			// update progress
+			//self::update_progress(self::$tag,$n,count($gen_narrowed_svfiles_2),['totals'=>$totals],self::$CFG['verbose']);
+		}
+
+		//self::write_intermediate_mtimes($flavour,$last_scrape_dates,true);
+		
+		/*
+		$tot1 = array_filter($totals,function($v) { return is_numeric($v); });
+		$tots = array_map(function($k,$v) { return "$k=$v"; }, array_keys($tot1), array_values($tot1));
+		self::log("Scrape of $flavour complete; ".implode(", ",$tots));
+
+		if (count($totals['files_without_zgvs'])/(count($freshfiles_to_process)-$totals['files_skipped'])>0.5)
+			self::log("Weird. Out of ".(count($freshfiles_to_process)-$totals['files_skipped'])." files read, ".count($totals['files_without_zgvs'])." had no ZGVs.");
+		*/
+
+		self::stat(['status'=>"IDLE"]);
+	}
+
 	/** Run all SV-sourced topic scrapers on a single file
 	 * @return void
 	 */
@@ -239,7 +278,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		$user = basename(dirname($filename_slug));
 		$userfolder = dirname($filename_full);
 
-		self::vlog("Scraping SV: \x1b[38;5;110m$user\x1b[0m/\x1b[38;5;116m$bnet\x1b[0m\x1b[30;1m--SavedVariables...\x1b[0m");
+		self::vlog("Scraping SV: \x1b[38;5;110m$user\x1b[0m/\x1b[38;5;116m$bnet\x1b[0m\x1b[30;1m--SavedVariables\x1b[0m for topics: ".join(", ", array_keys($topics)));
 
 		$is_windows = (strpos(PHP_OS, 'WIN') === 0); $is_linux = !$is_windows;
 		$lock_code = $flavour."/".$filename_slug;
@@ -333,6 +372,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			// die("LAST EVENT TIME: $last_event_time");
 
 			self::db_update_sv_file_times($sv_file_data['id'], filemtime($filename_full), NOW, $last_event_time);
+			self::db_set_file_scrapetimes(array_keys($topics), $sv_file_data['id'], $last_event_time);
 
 			self::$db->commit();
 
@@ -646,7 +686,7 @@ ENDLUA;
 		} catch (ErrorException $e) {
 			die("DB Connection to ".self::$CFG['DB']['host']." FAILED - ".$e->getMessage());
 		}
-		self::vlog("Self-tests: \x1b[48;5;70;30mPASS\x1b[0m");
+		self::vlog("Self-tests: \x1b[48;5;72;30mPASS\x1b[0m");
 	}
 
 	static function test_paths() {
@@ -712,8 +752,7 @@ ENDLUA;
 
 		self::$db->query("SHOW CREATE TABLE sv_files;");
 		if (self::$db->error) {
-			$schema_sql = "
-				CREATE TABLE `sv_files` (
+			$schema_sql = "CREATE TABLE `sv_files` (
 					`id` int(11) NOT NULL AUTO_INCREMENT,
 					`file` char(50) NOT NULL,
 					`scrape_time` int(11) DEFAULT NULL,
@@ -730,8 +769,8 @@ ENDLUA;
 			self::$db->query($schema_sql);
 			if (self::$db->error) 
 				throw new ErrorException("Failed to create table `sv_files`: ".self::$db->error);
+			self::vlog("DB table `sv_files` created.");
 		}
 
-		self::vlog("DB schema created.");
 	}
 }
