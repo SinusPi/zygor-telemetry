@@ -397,6 +397,9 @@ class Telemetry {
 	/**
 	 * Returns file records for the given filenames.
 	 * If $do_insert_missing is true, missing filenames will be inserted and included in the results. 
+	 * @param string[] $slugnames array of slugnames to look up, may be full filenames or just slugs, but must be in the same format as stored in the DB (i.e. "user/bnet--SavedVariables--ZygorGuidesViewer.lua.gz")
+	 * @param bool $do_insert_missing whether to insert missing slugnames into the 
+	 * @return File[] array of File objects in the same order as $slugnames, null for not found (if $do_insert_missing is false) or inserted (if $do_insert_missing is true)
 	 */
 	static function db_get_files($slugnames,$do_insert_missing=true) {
 		$r = self::db_qesc("SELECT * FROM files WHERE slugname in ({sa})", $slugnames, $slugnames);

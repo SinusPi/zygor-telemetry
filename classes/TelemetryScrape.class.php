@@ -210,8 +210,8 @@ class TelemetryScrape extends Telemetry {
 			// filenames in batch are full; need to shorten for DB
 			// add prefix to batch items, e.g. "flavour/filename"
 			$batch_slugs = str_replace($startfolder,$prefix,$batch);
-			$files = self::db_get_files($batch_slugs,true); // same order maintained
-			$ids = array_map(function($f) { return $f['id'] ?: null; },	$files);
+			$files = parent::db_get_files($batch_slugs,true); // same order maintained
+			$ids = array_map(function($f) { return $f->id ?: null; },	$files);
 			$batch_scrapetimes = self::get_file_scrapetimes_batch($topics,$ids);
 			
 			foreach ($files as $i=>$file) {
