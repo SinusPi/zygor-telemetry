@@ -60,7 +60,7 @@ class Telemetry {
 		foreach (glob("topic-*.inc.php") as $topic_file) {
 			$topic_name = preg_replace("/^.*topic-(.*)\\.inc\\.php$/","$1",$topic_file);
 			if (preg_match("/[^a-z0-9_]/i",$topic_name)) continue;
-			$topic_data = self::get_file($topic_file);
+			$topic_data = self::safely_load_php($topic_file);
 			if (!$topic_data) continue;
 			if ($topic_data['crunchers_load']) $topic_data['crunchers'] = self::load_topic_crunchers($topic_name); // if a topic has many crunchers for its subtypes
 			$topic_data = array_merge([
@@ -96,7 +96,7 @@ class Telemetry {
 	static function load_topic_crunchers($topic_name) {
 		$crunchers = [];
 		foreach (glob("topic-{$topic_name}-*.inc.php") as $crunch_file) {
-			$crunch = self::get_file($crunch_file);
+			$crunch = self::safely_load_php($crunch_file);
 			if (!is_array($crunch)) continue; // allow empty files
 			if (!$crunch['name']) $crunch['name'] = preg_replace("/.*topic-{$topic_name}-([^.]+)\.inc\.php$/","$1",$crunch_file);
 			$crunch = array_merge([
@@ -109,7 +109,7 @@ class Telemetry {
 		return $crunchers;
 	}
 
-	static function get_file($filename) {
+	static function safely_load_php($filename) {
 		try {
 			$parse = token_get_all(file_get_contents($filename));
 			$file = include $filename;
