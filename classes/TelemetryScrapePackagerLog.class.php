@@ -572,27 +572,18 @@ ENDLUA;
 
 	static function db_create() {
 		parent::db_create();
+	}
 
-		self::$db->query("SHOW CREATE TABLE packagerlog_files;");
-		if (self::$db->error) {
-			$schema_sql = "
-				CREATE TABLE `packagerlog_files` (
-					`id` int(11) NOT NULL AUTO_INCREMENT,
-					`file` char(50) NOT NULL,
-					`processed_topics` varchar(100) NOT NULL DEFAULT '',
-					UNIQUE KEY `file` (`file`),
-					UNIQUE KEY `id` (`id`)
-				)
-				ENGINE=InnoDB
-				DEFAULT CHARSET=latin1
-				COLLATE=latin1_swedish_ci
-				COMMENT='used to mark which log files have been processed and when';
-			";
-			self::$db->query($schema_sql);
-			if (self::$db->error) 
-				throw new ErrorException("Failed to create table `packagerlog_files`: ".self::$db->error);
-			self::vlog("DB schema created.");
-		}
+	/** Convert full file path to flavour/account/filename slug. */
+	static function file_path_to_slug($path) {
+		$svstorage_path = self::$CFG['PACKAGERLOG_PATH'];
+		$relative_path = str_replace($svstorage_path."/", "", $path); // remove base path; should leave "flavour/user/filename"
+		$relative_path = str_replace("\\", "/", $relative_path); // normalize slashes
+		return $relative_path; // "flavour/user/filename"
+	}
 
+	/** Convert file slug (flavour/account/filename) to full file path. */
+	static function file_slug_to_path($slug) {
+		return self::$CFG['PACKAGERLOG_PATH']."/".$slug;
 	}
 }
