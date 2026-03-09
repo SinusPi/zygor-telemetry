@@ -1,5 +1,3 @@
 Now, each Cruncher def can have subdefs, but that doesn't create a proper "topic" for View and Endpoint.
 Need to treat sub-crunchers as Topics.
 Or extract the cruncher part from them?
-
-Adding a new Topic must reprocess all relevant source material; source files must be therefore marked as "already processed" PER TOPIC.
