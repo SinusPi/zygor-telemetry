@@ -230,7 +230,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		self::log("Starting scrape of flavour '\x1b[38;5;78m{$flavour}\x1b[0m' in \x1b[33;1m{$sync_path}\x1b[0m.");
 
 		// get svfiles that may have fresh data for the topics listed
-		$gen_fresh_svfiles = self::get_fresh_files_gen(array_keys($topics_sv), $sync_path, self::$CFG['filemask'], $flavour);
+		$gen_fresh_svfiles = self::get_fresh_files_gen(array_keys($topics_sv), $sync_path, self::$CFG['filemask'], __CLASS__.'::file_path_to_slug', "sv", self::$CFG['BATCH_SIZE']);
 
 		// narrow down per configuration
 		$gen_narrowed_svfiles_1 = self::filter_gen($gen_fresh_svfiles, function($file) {
@@ -351,7 +351,6 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 				}
 				return $carry;
 			}, array_map(function($topic) { return $topic['last_event_time'] ?: 0; }, $file->topics));
-			var_dump($newest_per_topic);
 			$last_event_time = max(array_column($extracted['datapoints'],'time')) ?: 0;
 			self::vlog("Datapoints after filtering out old: ".count($extracted['datapoints']));
 
@@ -368,7 +367,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 
 			//self::db_update_sv_file_times($file->id, filemtime($filename_full), NOW, $last_event_time);
 			
-			self::db_set_file_scrapetimes(array_keys($topics), $file->id, $newest_per_topic, $last_event_time);
+			self::db_set_file_scrapetimes(array_keys($topics), $file->id, $newest_per_topic, $file->mtime);
 
 			self::$db->commit();
 
@@ -389,6 +388,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		}
 	}
 
+	/*
 	static function fetch_last_mtimes($flavour, $files) {
 		$slice=100; $qs=0;
 		$last_mtimes = [];
@@ -402,6 +402,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		self::$DBG['mtime_queries'] = $qs;
 		return $last_mtimes;
 	}
+	*/
 
 	/**
 	 * Save scraped data for a specific day and user/account.
@@ -732,13 +733,15 @@ ENDLUA;
 	static function file_path_to_slug($path) {
 		$svstorage_path = self::$CFG['SV_STORAGE_DATA_PATH'];
 		$relative_path = str_replace($svstorage_path."/", "", $path); // remove base path; should leave "flavour/user/filename"
-		$parts = explode(DIRECTORY_SEPARATOR, $relative_path); if (count($parts)!=3) throw new ErrorException("Unexpected file path structure after removing base path: $relative_path");
+		$relative_path = str_replace("\\", "/", $relative_path); // normalize slashes
+		$relative_path = preg_replace("/--SavedVariables.*$/", "", $relative_path); // get back to "flavour/user/filename" if the filename has the "--SavedVariables" suffix
+		$parts = explode("/", $relative_path); if (count($parts)!=3) throw new ErrorException("Unexpected file path structure after removing base path: $relative_path");
 		return $relative_path; // "flavour/user/filename"
 	}
 
 	/** Convert file slug (flavour/account/filename) to full file path. */
 	static function file_slug_to_path($slug) {
 		list($flavour, $acctfile) = explode("/", $slug, 2);
-		return self::cfgstr('SV_STORAGE_FLAVOUR_PATH',['FLAVOUR'=>$flavour])."/".$acctfile;
+		return self::cfgstr('SV_STORAGE_FLAVOUR_PATH',['FLAVOUR'=>$flavour])."/".$acctfile."--SavedVariables--ZygorGuidesViewer.lua.gz";
 	}
 }

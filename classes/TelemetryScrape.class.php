@@ -201,7 +201,7 @@ class TelemetryScrape extends Telemetry {
 	 * @param string $prefix prefix replacing $startfolder in the file paths when looking up in DB
 	 * @yield File $file
 	 */
-	static function get_fresh_files_gen($topics, $startfolder, $filemask, $prefix, $batch_size=20) {
+	static function get_fresh_files_gen($topics, $startfolder, $filemask, $cb_slugger, $filetype, $batch_size=20) {
 		self::vlog("Finding files in $startfolder matching $filemask...");
 		$files_gen = self::rglob_gen($startfolder,$filemask,10);
 		$file_batches_gen = self::batchify($files_gen, $batch_size);
@@ -209,8 +209,8 @@ class TelemetryScrape extends Telemetry {
 			self::vlog("Processing batch of ".count($batch)." files...");
 			// filenames in batch are full; need to shorten for DB
 			// add prefix to batch items, e.g. "flavour/filename"
-			$batch_slugs = str_replace($startfolder,$prefix,$batch);
-			$files = parent::db_get_files($batch_slugs,true); // same order maintained
+			$batch_slugs = array_map($cb_slugger,$batch);
+			$files = parent::db_get_files($batch_slugs,$filetype,true); // same order maintained
 			$ids = array_map(function($f) { return $f->id ?: null; },	$files);
 			$batch_scrapetimes = self::get_file_scrapetimes_batch($topics,$ids);
 			
@@ -221,13 +221,22 @@ class TelemetryScrape extends Telemetry {
 				
 				$current_mtime = filemtime($file->fullpath);
 				$file->mtime = $current_mtime;
-				foreach ($file->topics as $topic => $topicdata) {
+				foreach ($topics as $topic) {
 					// if the file has never been scraped for this topic, or if the scrape time for this topic is older than the file's mtime, mark it as fresh
+					$topicdata = $file->topics[$topic] ?: ['scrape_time' => 0];
 					$file->topics[$topic]['fresh'] = $current_mtime > ($topicdata['scrape_time'] ?: 0);
 					if ($file->topics[$topic]['fresh']) {
 						$file->any_fresh = true;
-						self::vlog("- File {$file->fullpath} is fresh for topic $topic (file mtime: $current_mtime, scrape time: ".($topicdata['scrape_time'] ?: "never").")");
 					}
+				}
+
+				if (!$file->any_fresh) {
+					self::vlog("- File {$file->slug} is NOT fresh for any of the topics (mtimes: ".join(", ", array_map(function($t) use ($file) { return "$t=".($file->topics[$t]['scrape_time'] ?: 0); }, $topics))."), skipping.");
+				} else {
+					// list fresh topics with mtimes
+					$fresh_topics = array_filter($topics, function($t) use ($file) { return $file->topics[$t]['fresh']; });
+					$mtime = $file->mtime;
+					self::vlog("- File {$file->slug} ($mtime) is fresh for topics: ".join(", ", array_map(function($t) use ($file) { return "$t (mtime: ".($file->topics[$t]['scrape_time'] ?: 0).")"; }, $fresh_topics)));
 				}
 			}
 			
@@ -250,7 +259,10 @@ class TelemetryScrape extends Telemetry {
 		// aggregate by file_id
 		$files = [];
 		while ($row = $r->fetch_assoc())
-			$files[$row['file_id']]['topics'][$row['topic']] = $row;
+			$files[$row['file_id']]['topics'][$row['topic']] = [
+				'scrape_time' => $row['scrape_time'],
+				'last_event_time' => $row['last_event_time'],
+			];
 		
 		// add field for newest scrape time for this file across all topics, to make it easier to filter out old files in the generator
 		foreach ($files as &$data) {
@@ -274,6 +286,7 @@ class TelemetryScrape extends Telemetry {
 		$q = self::qesc($_q="INSERT INTO `topic_scrapetimes` (topic, file_id, scrape_time, last_event_time) VALUES $values ON DUPLICATE KEY UPDATE scrape_time=VALUES(scrape_time), last_event_time=VALUES(last_event_time)");
 		$r = self::$db->query($q);
 		if (!$r) throw new ErrorException("DB error, query $_q: ".self::$db->error);
+		self::vlog("Updated scrape times for file_id $file_id and topics: scrape time $scrape_time, ".join(", ",array_map(function($t) use ($last_events_per_topic) { return $t."=".$last_events_per_topic[$t] ?: 0; }, $topics)));
 	}
 
 	/**

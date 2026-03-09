@@ -401,8 +401,8 @@ class Telemetry {
 	 * @param bool $do_insert_missing whether to insert missing slugnames into the 
 	 * @return File[] array of File objects in the same order as $slugnames, null for not found (if $do_insert_missing is false) or inserted (if $do_insert_missing is true)
 	 */
-	static function db_get_files($slugnames,$do_insert_missing=true) {
-		$r = self::db_qesc("SELECT * FROM files WHERE slugname in ({sa})", $slugnames, $slugnames);
+	static function db_get_files($slugnames,$filetype,$do_insert_missing=true) {
+		$r = self::db_qesc("SELECT * FROM files WHERE slugname in ({sa}) AND filetype={s}", $slugnames, $filetype);
 		if (self::$db->error) throw new ErrorException("DB error getting files '".join(", ",array_slice($slugnames,0,5))."...': ".self::$db->error);
 		if ($r && $r->num_rows) $file_rows = $r->fetch_all(MYSQLI_ASSOC);
 		else $file_rows = [];
@@ -410,7 +410,7 @@ class Telemetry {
 		$files_not_found = array_diff($slugnames, $files_found);
 		if ($do_insert_missing && count($files_not_found)) {
 			foreach ($files_not_found as $nf) {
-				self::db_qesc("INSERT INTO files (slugname) VALUES ({s})   ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)", $nf);
+				self::db_qesc("INSERT INTO files (slugname, filetype) VALUES ({s}, {s})   ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)", $nf, $filetype);
 				if (self::$db->error) throw new ErrorException("DB error inserting file '$nf': ".self::$db->error);
 				$file_rows[] = ['id' => self::$db->insert_id, 'slugname' => $nf]; // mock entry
 			}
@@ -456,6 +456,7 @@ class Telemetry {
 			$schema_sql = "CREATE TABLE `files` (
 					`id` int(11) NOT NULL AUTO_INCREMENT,
 					`slugname` varchar(255) NOT NULL, -- may not be an exact filename, may even be virtual, just unique
+					`filetype` char(2) NOT NULL, -- 'sv','pl'; will govern slug-to-fullpath logic, etc.
 					UNIQUE KEY `id` (`id`),
 					UNIQUE KEY `slugname` (`slugname`)
 				) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
