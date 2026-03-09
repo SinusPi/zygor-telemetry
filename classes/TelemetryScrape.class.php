@@ -195,6 +195,11 @@ class TelemetryScrape extends Telemetry {
 
 	/**
 	 * Generator that yields only files "fresh" for given topic(s) (with mtimes newer than the last recorded scrape time for that topic)
+	 * @param string[] $topics list of topic names to check freshness
+	 * @param string $startfolder folder to start searching in
+	 * @param string $filemask glob pattern to match files, e.g. "*.lua*"
+	 * @param string $prefix prefix replacing $startfolder in the file paths when looking up in DB
+	 * @yield File $file
 	 */
 	static function get_fresh_files_gen($topics, $startfolder, $filemask, $prefix, $batch_size=20) {
 		self::vlog("Finding files in $startfolder matching $filemask...");
@@ -206,39 +211,46 @@ class TelemetryScrape extends Telemetry {
 			// add prefix to batch items, e.g. "flavour/filename"
 			$batch_slugs = str_replace($startfolder,$prefix,$batch);
 			$files = self::db_get_files($batch_slugs,true); // same order maintained
-			$ids = array_column($files, 'id');
+			$ids = array_map(function($f) { return $f['id'] ?: null; },	$files);
 			$batch_scrapetimes = self::get_file_scrapetimes_batch($topics,$ids);
 			
-			// add full file names and mtimes to results for easier filtering below
-			$results = array_map(function($b,$slug,$scrapetimes) {
-				return [ 'fullpath' => $b, 'slug' => $slug ] + $scrapetimes;
-			}, $batch, $batch_slugs, $batch_scrapetimes);
-
-			// mark fresh or not
-			$results = array_map(function($data) use ($topics) {
-				$mtime = filemtime($data['fullpath']);
-				foreach ($topics as $topic) 
-					$data['topics'][$topic]['fresh'] = $mtime > ($data['topics'][$topic]['scrape_time'] ?: 0);
-				$data['any_fresh'] = $data['newest_scrape_time'] < $mtime;
-				return $data;
-			}, $results);
-
-			foreach ($results as $data) {
+			foreach ($files as $i=>$file) {
+				// add full file names and mtimes to results for easier filtering below
+				$file->fullpath = $batch[$i];
+				$file->topics = $batch_scrapetimes[$i]['topics'] ?: [];
+				
+				$current_mtime = filemtime($file->fullpath);
+				$file->mtime = $current_mtime;
+				foreach ($file->topics as $topic => $topicdata) {
+					// if the file has never been scraped for this topic, or if the scrape time for this topic is older than the file's mtime, mark it as fresh
+					$file->topics[$topic]['fresh'] = $current_mtime > ($topicdata['scrape_time'] ?: 0);
+					if ($file->topics[$topic]['fresh']) {
+						$file->any_fresh = true;
+						self::vlog("- File {$file->fullpath} is fresh for topic $topic (file mtime: $current_mtime, scrape time: ".($topicdata['scrape_time'] ?: "never").")");
+					}
+				}
+			}
+			
+			foreach ($files as $file) {
 				// if any of the topics has never been scraped for this file, or if the newest scrape time across all topics is older than the file's mtime, yield it
-				if ($data['any_fresh'])
-					yield $data;
+				if ($file->any_fresh)
+					yield $file;
 			}
 		}
 	}
 
+	/**
+	 * Get scrape times for multiple files and topics in one query, returning an array of scrape times grouped by file_id
+	 * @return array [ file_id => [ 'topics' => [ topic:string => scrape_time:int ], 'newest_scrape_time' => int ] ]
+	 */
 	static function get_file_scrapetimes_batch($topics, $ids) {
-		$r = self::db_qesc($_q="SELECT * FROM `topic_scrapetimes` WHERE `topic` IN ({sa}) AND `fileid` IN ({sa})", $topics, $ids);
+		$r = self::db_qesc($_q="SELECT * FROM `topic_scrapetimes` WHERE `topic` IN ({sa}) AND `file_id` IN ({sa})", $topics, $ids);
 		if (!$r) throw new ErrorException("DB error in $_q: ".self::$db->error);
 
-		// aggregate by fileid
+		// aggregate by file_id
 		$files = [];
 		while ($row = $r->fetch_assoc())
-			$files[$row['fileid']]['topics'][$row['topic']] = $row;
+			$files[$row['file_id']]['topics'][$row['topic']] = $row;
 		
 		// add field for newest scrape time for this file across all topics, to make it easier to filter out old files in the generator
 		foreach ($files as &$data) {
@@ -252,17 +264,23 @@ class TelemetryScrape extends Telemetry {
 		return $results;
 	}
 
-	static function db_set_file_scrapetimes($topics, $fileid, $scrape_time=null) {
-		$values = [];
-		foreach ($topics as $topic)
-			$values[] = self::qesc("({s}, {d}, {d})", $topic, $fileid, $scrape_time ?: time());
-		$q = self::qesc($_q="INSERT INTO `topic_scrapetimes` (topic, fileid, scrape_time) VALUES ".join(", ", $values)." ON DUPLICATE KEY UPDATE scrape_time=VALUES(scrape_time)");
+	/**
+	 * Update scrape times for multiple topics on a file
+	 */
+	static function db_set_file_scrapetimes($topics, $file_id, $last_events_per_topic=[], $scrape_time=null) {
+		$values = join(", ", array_map(function($topic) use ($file_id, $scrape_time, $last_events_per_topic) {
+			return self::qesc("({s}, {d}, {d}, {d})", $topic, $file_id, $scrape_time ?: time(), $last_events_per_topic[$topic] ?: null);
+		}, $topics));
+		$q = self::qesc($_q="INSERT INTO `topic_scrapetimes` (topic, file_id, scrape_time, last_event_time) VALUES $values ON DUPLICATE KEY UPDATE scrape_time=VALUES(scrape_time), last_event_time=VALUES(last_event_time)");
 		$r = self::$db->query($q);
 		if (!$r) throw new ErrorException("DB error, query $_q: ".self::$db->error);
 	}
 
-	static function db_set_file_scrapetime($topic, $fileid, $scrape_time=null) {
-		$q = self::qesc($_q="INSERT INTO `topic_scrapetimes` (topic, fileid, scrape_time) VALUES ({s}, {d}, {d}) ON DUPLICATE KEY UPDATE scrape_time=VALUES(scrape_time)", $topic, $fileid, $scrape_time ?: time());
+	/**
+	 * Update one topic scrape time for a file
+	 */
+	static function db_set_file_scrapetime($topic, $file_id, $scrape_time=null, $last_event_time=null) {
+		$q = self::qesc($_q="INSERT INTO `topic_scrapetimes` (topic, file_id, scrape_time, last_event_time) VALUES ({s}, {d}, {d}, {d}) ON DUPLICATE KEY UPDATE scrape_time=VALUES(scrape_time), last_event_time=VALUES(last_event_time)", $topic, $file_id, $scrape_time ?: time(), $last_event_time ?: null);
 		$r = self::$db->query($q);
 		if (!$r) throw new ErrorException("DB error, query $_q: ".self::$db->error);
 	}
@@ -289,9 +307,10 @@ class TelemetryScrape extends Telemetry {
 			$schema_sql =
 				"CREATE TABLE `topic_scrapetimes` (
 					`topic` char(10) NOT NULL,
-					`fileid` int(10) NOT NULL,
+					`file_id` int(10) NOT NULL,
 					`scrape_time` int(11) DEFAULT NULL,
-					UNIQUE KEY `topic_file` (`topic`, `fileid`)
+					`last_event_time` int(10) DEFAULT NULL,
+					UNIQUE KEY `topic_file` (`topic`, `file_id`)
 				)
 				ENGINE=InnoDB
 				DEFAULT CHARSET=latin1
@@ -316,3 +335,4 @@ class TelemetryScrape extends Telemetry {
 	}
 
 }
+

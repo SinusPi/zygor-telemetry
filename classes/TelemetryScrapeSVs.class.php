@@ -41,6 +41,8 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 	static function scrape($flavour) {
 		return self::scrape2($flavour); // new scrape method with generator for files, but keep old one for now for comparison and safety
 
+		// THE REST IS DEPRECATED
+
 		if (!in_array($flavour,array_keys(self::$CFG['WOW_FLAVOUR_DATA']))) throw new ErrorException("Unsupported flavour '{$flavour}' (supported: ".join(", ",array_keys(self::$CFG['WOW_FLAVOUR_DATA'])).")");
 
 		self::$tag = "SCRAPE-".strtoupper(str_replace("-","_", $flavour));
@@ -183,7 +185,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		*/
 
 		foreach ($freshfiles_to_process as $n => $filename_full) {
-			self::process_single_sv_file($flavour, $filename_full, $topics, $totals);
+			self::process_single_sv_file($flavour, ['filename_full'=>$filename_full], $topics, $totals);
 
 			// obey limit
 			if (isset(self::$CFG['limit']) && $n>=self::$CFG['limit']-1) {
@@ -222,27 +224,27 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		}
 
 		$topics = self::$CFG['TOPICS'];
-		$topics = array_filter($topics, function($t) { return ($t['scraper']['input']?:"") == "sv"; });
+		$topics_sv = array_filter($topics, function($t) { return ($t['scraper']['input']?:"") == "sv"; });
 		$sync_path = self::cfgstr('SV_STORAGE_FLAVOUR_PATH',["FLAVOUR"=>$flavour]);
 
 		self::log("Starting scrape of flavour '\x1b[38;5;78m{$flavour}\x1b[0m' in \x1b[33;1m{$sync_path}\x1b[0m.");
 
 		// get svfiles that may have fresh data for the topics listed
-		$gen_fresh_svfiles = self::get_fresh_files_gen(array_keys($topics), $sync_path, self::$CFG['filemask'], $flavour);
+		$gen_fresh_svfiles = self::get_fresh_files_gen(array_keys($topics_sv), $sync_path, self::$CFG['filemask'], $flavour);
 
 		// narrow down per configuration
-		$gen_narrowed_svfiles_1 = self::filter_gen($gen_fresh_svfiles, function($filedata) {
-			return (isset(self::$CFG['TELEMETRY_FILE_AGE']) && (time() - $filedata['mtime'] > self::$CFG['TELEMETRY_FILE_AGE']*DAY) ? false : true);
+		$gen_narrowed_svfiles_1 = self::filter_gen($gen_fresh_svfiles, function($file) {
+			return (isset(self::$CFG['TELEMETRY_FILE_AGE']) && (time() - $file->mtime > self::$CFG['TELEMETRY_FILE_AGE']*DAY) ? false : true);
 		});
 
 		// skip today's files if not explicitly included
-		$gen_narrowed_svfiles_2	= self::filter_gen($gen_narrowed_svfiles_1, function($filedata) {
-			return (!self::$CFG['today-too'] || date("Ymd", $filedata['mtime']) != date("Ymd", time()));
+		$gen_narrowed_svfiles_2	= self::filter_gen($gen_narrowed_svfiles_1, function($file) {
+			return (!self::$CFG['today-too'] || date("Ymd", $file->mtime) != date("Ymd", time()));
 		});
-		
-		foreach ($gen_narrowed_svfiles_2 as $n => $filedata) {
-			$fresh_topics_in_file = array_filter($topics, function($topic,$name) use ($filedata) { return $filedata['topics'][$name]['fresh']; },ARRAY_FILTER_USE_BOTH);
-			self::process_single_sv_file($flavour, $filedata['fullpath'], $fresh_topics_in_file, $totals);
+
+		foreach ($gen_narrowed_svfiles_2 as $n => $file) {
+			$fresh_topics_in_file = array_filter($topics, function($topic,$name) use ($file) { return $file->topics[$name]['fresh']; },ARRAY_FILTER_USE_BOTH);
+			self::process_single_sv_file($flavour, $file, $fresh_topics_in_file, $totals);
 
 			// obey limit
 			if (isset(self::$CFG['limit']) && $n>=self::$CFG['limit']-1) {
@@ -271,7 +273,8 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 	/** Run all SV-sourced topic scrapers on a single file
 	 * @return void
 	 */
-	static function process_single_sv_file($flavour, $filename_full, $topics, &$totals) {
+	static function process_single_sv_file($flavour, $file, $topics, &$totals) {
+		$filename_full = $file->fullpath;
 		self::stat(['file_last'=>$filename_full],true);
 		list ($filename_userfile, $filename_slug) = self::split_filename($filename_full);
 		$bnet = basename($filename_slug);
@@ -306,16 +309,11 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 
 			self::$db->begin_transaction(); // need to start here to lock the DB record for this file
 
-			$flavourfile = $flavour."/".$filename_slug; // flavour/user/bnet
-			$sv_file_data = self::db_get_sv_file_data($flavourfile);
-			if (!$sv_file_data) {
-				self::log("Cannot get/set sv_file_data for $filename_full. Locked?");
-				throw new FileLockedException("DB locked for $flavourfile");
-			}
+			$flavourfile = $file->slug; // $flavour."/".$filename_slug; // flavour/user/bnet
 
-			$last_event_stored = $sv_file_data['last_event_time'] ?: 0;
-
-			// ===============================================================
+			//
+			// TODO: lock file
+			//
 
 			$sv_raw = self::read_raw_sv($filename_full);
 
@@ -356,23 +354,32 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 				// wtf is this even?
 			*/
 
-			$extracted['datapoints'] = array_values(array_filter($extracted['datapoints'], function ($dp) use ($last_event_stored) {  return $dp['time'] > $last_event_stored;  })); // only new events
-			self::vlog("Datapoints after filtering out old (<= ".($last_event_stored ? date("Y-m-d H:i:s",$last_event_stored) : "never")."): ".count($extracted['datapoints']));
+			$extracted['datapoints'] = array_values(array_filter($extracted['datapoints'], function ($dp) use ($file) {  return $dp['time'] > $file->topics[$dp['type']]['last_event_time'];  })); // only new events
+			$newest_per_topic = array_reduce($extracted['datapoints'], function($carry, $dp) {
+				if (!isset($carry[$dp['type']]) || $dp['time'] > $carry[$dp['type']]) {
+					$carry[$dp['type']] = $dp['time'];
+				}
+				return $carry;
+			}, array_map(function($topic) { return $topic['last_event_time'] ?? 0; }, $file->topics));
+			var_dump($newest_per_topic);
+			$last_event_time = max(array_column($extracted['datapoints'],'time')) ?: 0;
+			self::vlog("Datapoints after filtering out old: ".count($extracted['datapoints']));
 
 			// DB STORE TIME!
 
-			$inserted = self::db_store_datapoints($flavour,$sv_file_data['id'],$extracted['datapoints']);
+			$inserted = self::db_store_datapoints($flavour,$file->id,$extracted['datapoints']);
 			self::vlog("Datapoints inserted into DB: $inserted");
 
 			$totals['inserted_datapoints'] += $inserted;
 
-			$last_event_time = max(array_column($extracted['datapoints'],'time')) ?: 0;
 			// $last_event_data = array_filter($extracted['datapoints'], function($dp) use ($last_event_time) { return $dp['time'] == $last_event_time; });
 			// print_r($last_event_data);
 			// die("LAST EVENT TIME: $last_event_time");
 
-			self::db_update_sv_file_times($sv_file_data['id'], filemtime($filename_full), NOW, $last_event_time);
-			self::db_set_file_scrapetimes(array_keys($topics), $sv_file_data['id'], $last_event_time);
+			//self::db_update_sv_file_times($file->id, filemtime($filename_full), NOW, $last_event_time);
+			
+			self::db_set_file_scrapetimes(array_keys($topics), $file->id, $newest_per_topic, $last_event_time);
+			// TODO: modify svfile db structure to store BOTH last scrape time and last event time, to detect when "file gets changed but no new events" 
 
 			self::$db->commit();
 
@@ -629,29 +636,9 @@ ENDLUA;
 		return $formatted;
 	}
 
+	/*
 	static function db_get_sv_file_data($flavourfile) {
-		$q = self::qesc("SELECT * FROM sv_files WHERE file={s}  LIMIT 1  FOR UPDATE  NOWAIT", $flavourfile);
-		$r = self::$db->query($q);
-		if (!$r && self::$db->errno==3572) { // lock wait timeout
-			return null;
-		}
-		if (!$r) throw new ErrorException("DB error: ".self::$db->error);
-		if ($r->num_rows) {
-			$row = $r->fetch_assoc();
-			return $row;
-		} else {
-			$q = self::qesc($_q="INSERT INTO sv_files (file) VALUES ({s})", $flavourfile);
-			$r = self::$db->query($q);
-			if (!$r) throw new ErrorException("DB error, query $_q: ".self::$db->error);
-			$id = self::$db->insert_id;
-			$q2 = self::qesc($_q="SELECT * FROM sv_files WHERE id={d} LIMIT 1 FOR UPDATE", $id);
-			$r2 = self::$db->query($q2);
-			if (!$r2) throw new ErrorException("DB error, query $_q: ".self::$db->error);
-			if ($r2->num_rows) {
-				$row2 = $r2->fetch_assoc();
-				return $row2;
-			}
-		}
+		return self::db_get_file($flavourfile);
 	}
 
 	static function db_update_sv_file_times($sv_file_id,$mtime,$scrape_time,$last_event_time) {
@@ -670,6 +657,7 @@ ENDLUA;
 		while ($row = $r->fetch_assoc()) $res[$row['file']] = $row['mtime'];
 		return $res;
 	}
+	*/
 
 
 	// Tests, DB schemas
@@ -749,28 +737,19 @@ ENDLUA;
 
 	static function db_create() {
 		parent::db_create();
+	}
 
-		self::$db->query("SHOW CREATE TABLE sv_files;");
-		if (self::$db->error) {
-			$schema_sql = "CREATE TABLE `sv_files` (
-					`id` int(11) NOT NULL AUTO_INCREMENT,
-					`file` char(50) NOT NULL,
-					`scrape_time` int(11) DEFAULT NULL,
-					`mtime` int(10) DEFAULT NULL,
-					`last_event_time` int(10) DEFAULT NULL,
-					UNIQUE KEY `file` (`file`),
-					UNIQUE KEY `id` (`id`)
-				)
-				ENGINE=InnoDB
-				DEFAULT CHARSET=latin1
-				COLLATE=latin1_swedish_ci
-				COMMENT='used to mark which SV files have been processed and when';
-			";
-			self::$db->query($schema_sql);
-			if (self::$db->error) 
-				throw new ErrorException("Failed to create table `sv_files`: ".self::$db->error);
-			self::vlog("DB table `sv_files` created.");
-		}
+	/** Convert full file path to flavour/account/filename slug. */
+	static function file_path_to_slug($path) {
+		$svstorage_path = self::$CFG['SV_STORAGE_DATA_PATH'];
+		$relative_path = str_replace($svstorage_path."/", "", $path); // remove base path; should leave "flavour/user/filename"
+		$parts = explode(DIRECTORY_SEPARATOR, $relative_path); if (count($parts)!=3) throw new ErrorException("Unexpected file path structure after removing base path: $relative_path");
+		return $relative_path; // "flavour/user/filename"
+	}
 
+	/** Convert file slug (flavour/account/filename) to full file path. */
+	static function file_slug_to_path($slug) {
+		list($flavour, $acctfile) = explode("/", $slug, 2);
+		return self::cfgstr('SV_STORAGE_FLAVOUR_PATH',['FLAVOUR'=>$flavour])."/".$acctfile;
 	}
 }
