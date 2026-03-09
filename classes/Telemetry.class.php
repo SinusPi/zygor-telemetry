@@ -384,43 +384,46 @@ class Telemetry {
 
 	static function db_get_file($filename) {
 		$r = self::db_qesc("SELECT * FROM files WHERE filename={s} OR id={d} LIMIT 1", $filename, is_numeric($filename) ? intval($filename) : -1);
-		if ($r && $r->num_rows) return $r->fetch_assoc();
-		self::db_qesc("INSERT INTO files (filename,mtime) VALUES ({s},0)   ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)", $filename);
-		return ['id' => self::$db->insert_id, 'filename' => $filename, 'mtime' => 0];
+		if (!$r && self::$db->errno==3572) throw new FileLockedException(); // lock wait timeout
+		if (self::$db->error) throw new ErrorException("DB error getting file '$filename': ".self::$db->error);
+		if ($r && $r->num_rows) {
+			$file = $r->fetch_assoc();
+			return new File($file['id'], $file['slugname']);
+		}
+		self::db_qesc("INSERT INTO files (slugname) VALUES ({s})   ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)", $filename);
+		return new File(self::$db->insert_id, $filename);
 	}
 
 	/**
 	 * Returns file records for the given filenames.
-	 * If $do_insert_missing is true, missing filenames will be inserted with mtime=0 and included in the results. 
+	 * If $do_insert_missing is true, missing filenames will be inserted and included in the results. 
 	 */
-	static function db_get_files($filenames,$do_insert_missing=true) {
-		$r = self::db_qesc("SELECT * FROM files WHERE filename in ({sa})", $filenames, $filenames);
+	static function db_get_files($slugnames,$do_insert_missing=true) {
+		$r = self::db_qesc("SELECT * FROM files WHERE filename in ({sa})", $slugnames, $slugnames);
+		if (self::$db->error) throw new ErrorException("DB error getting files '".join(", ",array_slice($slugnames,0,5))."...': ".self::$db->error);
 		if ($r && $r->num_rows) $file_rows = $r->fetch_all(MYSQLI_ASSOC);
 		else $file_rows = [];
-		$filenames_found = array_column($file_rows, 'filename');
-		$filenames_not_found = array_diff($filenames, $filenames_found);
-		if ($do_insert_missing && count($filenames_not_found)) {
-			foreach ($filenames_not_found as $nf) {
-				self::db_qesc("INSERT INTO files (filename,mtime) VALUES ({s},0)   ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)", $nf);
+		$files_found = array_column($file_rows, 'slugname');
+		$files_not_found = array_diff($slugnames, $files_found);
+		if ($do_insert_missing && count($files_not_found)) {
+			foreach ($files_not_found as $nf) {
+				self::db_qesc("INSERT INTO files (slugname) VALUES ({s})   ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)", $nf);
 				if (self::$db->error) throw new ErrorException("DB error inserting file '$nf': ".self::$db->error);
-				$file_rows[] = ['id' => self::$db->insert_id, 'filename' => $nf, 'mtime' => 0]; // mock entry
+				$file_rows[] = ['id' => self::$db->insert_id, 'slugname' => $nf]; // mock entry
 			}
 		}
 		// sort result array in the same order as $filenames
-		$file_rows_by_filename = array_column($file_rows, null, 'filename');
+		$file_rows_by_slugname = array_column($file_rows, null, 'slugname');
 		$sorted_file_rows = [];
-		foreach ($filenames as $fn) {
-			$sorted_file_rows[] = $file_rows_by_filename[$fn] ?: null;
+		foreach ($slugnames as $fn) {
+			$row = $file_rows_by_slugname[$fn];
+			$sorted_file_rows[] = $row ? new File($row['id'], $row['slugname']) : null;
 		}
 		return $sorted_file_rows;
 	}
 
-	static function db_update_file_mtime($filename, $mtime) {
-		self::db_qesc("UPDATE files SET mtime={d} WHERE filename={s} OR id={d}", $mtime, $filename, is_numeric($filename) ? intval($filename) : -1);
-	}
-
-	static function db_delete_file($filename) {
-		self::db_qesc("DELETE FROM files WHERE filename={s} OR id={d}", $filename, is_numeric($filename) ? intval($filename) : -1);
+	static function db_delete_file($slugname_or_id) {
+		self::db_qesc("DELETE FROM files WHERE slugname={s} OR id={d}", $slugname_or_id, is_numeric($slugname_or_id) ? intval($slugname_or_id) : -1);
 	}
 
 	
@@ -449,10 +452,9 @@ class Telemetry {
 		if (self::$db->error) {
 			$schema_sql = "CREATE TABLE `files` (
 					`id` int(11) NOT NULL AUTO_INCREMENT,
-					`filename` varchar(255) NOT NULL,
-					`mtime` int(10) NOT NULL,
+					`slugname` varchar(255) NOT NULL, -- may not be an exact filename, may even be virtual, just unique
 					UNIQUE KEY `id` (`id`),
-					UNIQUE KEY `filename` (`filename`)
+					UNIQUE KEY `slugname` (`slugname`)
 				) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
 				COMMENT='list of all parsed files, for bookkeeping and reference from events';
 			";
@@ -661,4 +663,19 @@ class MinorError extends Exception {
 foreach (glob(__DIR__."/*.class.php") as $classfile) {
 	if (basename($classfile)=="Telemetry.class.php") continue;
 	require_once $classfile;
+}
+
+class File {
+	public $id;
+	public $fullpath;
+	public $slug;
+	public $topics;
+	public $newest_scrape_time;
+	public $any_fresh;
+	
+	public function __construct($id, $fileslug) {
+		$this->id = $id;
+		$this->slug = $fileslug;
+	}
+
 }
