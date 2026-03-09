@@ -300,8 +300,8 @@ class Telemetry {
 	 */
 	static function split_filename($fullpath) {
 		$filename_userfile = basename(dirname($fullpath))."/".basename($fullpath); // remains: user/bnet--SavedVariables--Zygor.....lua.gz
-		$filename_slug = preg_replace("/--SavedVariables--ZygorGuidesViewer.*[\\.luagz]+/","",$filename_userfile); // remains: user/bnet
-		return [$filename_userfile, $filename_slug];
+		$filename_userbnet = preg_replace("/--SavedVariables--ZygorGuidesViewer.*[\\.luagz]+/","",$filename_userfile); // remains: user/bnet
+		return [$filename_userfile, $filename_userbnet];
 	}
 
 	static function flavnum($flavour) {
@@ -672,6 +672,8 @@ class File {
 	public $topics;
 	public $newest_scrape_time;
 	public $any_fresh;
+
+	public $mtime; // not stored
 	
 	public function __construct($id, $fileslug) {
 		$this->id = $id;
