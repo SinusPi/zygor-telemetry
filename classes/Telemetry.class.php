@@ -383,7 +383,7 @@ class Telemetry {
 	
 
 	static function db_get_file($filename) {
-		$r = self::db_qesc("SELECT * FROM files WHERE filename={s} OR id={d} LIMIT 1", $filename, is_numeric($filename) ? intval($filename) : -1);
+		$r = self::db_qesc("SELECT * FROM files WHERE slugname={s} OR id={d} LIMIT 1", $filename, is_numeric($filename) ? intval($filename) : -1);
 		if (!$r && self::$db->errno==3572) throw new FileLockedException(); // lock wait timeout
 		if (self::$db->error) throw new ErrorException("DB error getting file '$filename': ".self::$db->error);
 		if ($r && $r->num_rows) {
@@ -399,7 +399,7 @@ class Telemetry {
 	 * If $do_insert_missing is true, missing filenames will be inserted and included in the results. 
 	 */
 	static function db_get_files($slugnames,$do_insert_missing=true) {
-		$r = self::db_qesc("SELECT * FROM files WHERE filename in ({sa})", $slugnames, $slugnames);
+		$r = self::db_qesc("SELECT * FROM files WHERE slugname in ({sa})", $slugnames, $slugnames);
 		if (self::$db->error) throw new ErrorException("DB error getting files '".join(", ",array_slice($slugnames,0,5))."...': ".self::$db->error);
 		if ($r && $r->num_rows) $file_rows = $r->fetch_all(MYSQLI_ASSOC);
 		else $file_rows = [];

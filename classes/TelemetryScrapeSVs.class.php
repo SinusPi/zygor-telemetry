@@ -344,23 +344,13 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			$times = $extracted['times'];
 			self::vlog("Datapoints extracted by type: " . join(", ", array_map(function ($item, $key) use ($times) { return "\x1b[38;5;72m$key\x1b[0m:{$item} ({$times[$key]}s)"; }, array_values($counts), array_keys($counts))));
 
-			/*
-				// locale
-				$lang_match = preg_match("#translation\"\]=\{\[\"(....)\"#",$file,$lang_m);
-					if ($lang_match) {
-						$metrics['languages'][$lang_m[1]]++;
-						$metrics['files_withlang']++;
-					}
-				// wtf is this even?
-			*/
-
 			$extracted['datapoints'] = array_values(array_filter($extracted['datapoints'], function ($dp) use ($file) {  return $dp['time'] > $file->topics[$dp['type']]['last_event_time'];  })); // only new events
 			$newest_per_topic = array_reduce($extracted['datapoints'], function($carry, $dp) {
 				if (!isset($carry[$dp['type']]) || $dp['time'] > $carry[$dp['type']]) {
 					$carry[$dp['type']] = $dp['time'];
 				}
 				return $carry;
-			}, array_map(function($topic) { return $topic['last_event_time'] ?? 0; }, $file->topics));
+			}, array_map(function($topic) { return $topic['last_event_time'] ?: 0; }, $file->topics));
 			var_dump($newest_per_topic);
 			$last_event_time = max(array_column($extracted['datapoints'],'time')) ?: 0;
 			self::vlog("Datapoints after filtering out old: ".count($extracted['datapoints']));
@@ -379,7 +369,6 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			//self::db_update_sv_file_times($file->id, filemtime($filename_full), NOW, $last_event_time);
 			
 			self::db_set_file_scrapetimes(array_keys($topics), $file->id, $newest_per_topic, $last_event_time);
-			// TODO: modify svfile db structure to store BOTH last scrape time and last event time, to detect when "file gets changed but no new events" 
 
 			self::$db->commit();
 
