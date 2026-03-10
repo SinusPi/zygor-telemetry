@@ -51,6 +51,7 @@ try {
 			echo "*** Scraping source: SVs\n";
 			TelemetryScrapeSVs::startup($OPTS);
 			foreach ($FLAVOURS as $flav) TelemetryScrapeSVs::scrape($flav);
+			echo "*** Done scraping SVs.\n";
 		} catch (MinorError $e) {
 			echo "Failed: ".$e->getMessage()."\n";
 		}
