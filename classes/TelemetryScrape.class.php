@@ -137,28 +137,25 @@ class TelemetryScrape extends Telemetry {
 		$files_gen = FileTools::rglob_gen($startfolder,$filemask,10);
 		$file_batches_gen = self::batchify($files_gen, $batch_size);
 		foreach ($file_batches_gen as $batch) {
-			self::vlog("Processing batch of ".count($batch)." files...");
+			self::vlog("* Processing batch of ".count($batch)." files...");
 			// filenames in batch are full; need to shorten for DB
 			// add prefix to batch items, e.g. "flavour/filename"
 			$batch_slugs = array_map($cb_slugger,$batch);
 			$files = parent::db_get_files($batch_slugs,$filetype,true); // same order maintained
-			$ids = array_map(function($f) { return $f->id ?: null; },	$files);
+			$ids = array_map(function($f) { return $f->id ?: null; }, $files);
 			$batch_scrapetimes = self::get_file_scrapetimes_batch($topics,$ids);
 			
 			foreach ($files as $i=>$file) {
 				// add full file names and mtimes to results for easier filtering below
 				$file->fullpath = $batch[$i];
 				$file->topics = $batch_scrapetimes[$i]['topics'] ?: [];
+				$file->mtime = filemtime($file->fullpath);
 				
-				$current_mtime = filemtime($file->fullpath);
-				$file->mtime = $current_mtime;
+				// determine freshness: is file mtime newer than scrape time for any of the topics?
 				foreach ($topics as $topic) {
-					// if the file has never been scraped for this topic, or if the scrape time for this topic is older than the file's mtime, mark it as fresh
-					$topicdata = $file->topics[$topic] ?: ['scrape_time' => 0];
-					$file->topics[$topic]['fresh'] = $current_mtime > ($topicdata['scrape_time'] ?: 0);
-					if ($file->topics[$topic]['fresh']) {
+					$file->topics[$topic]['fresh'] = $file->mtime > ($file->topics[$topic]['scrape_time'] ?: 0);
+					if ($file->topics[$topic]['fresh'])
 						$file->any_fresh = true;
-					}
 				}
 
 				if (!$file->any_fresh) {
@@ -168,14 +165,11 @@ class TelemetryScrape extends Telemetry {
 					$fresh_topics = array_filter($topics, function($t) use ($file) { return $file->topics[$t]['fresh']; });
 					$mtime = $file->mtime;
 					self::vlog("- File {$file->slug} ($mtime) is fresh for topics: ".join(", ", array_map(function($t) use ($file) { return "$t (mtime: ".($file->topics[$t]['scrape_time'] ?: 0).")"; }, $fresh_topics)));
+					
+					yield $file;
 				}
 			}
-			
-			foreach ($files as $file) {
-				// if any of the topics has never been scraped for this file, or if the newest scrape time across all topics is older than the file's mtime, yield it
-				if ($file->any_fresh)
-					yield $file;
-			}
+			self::vlog("* Batch complete.");
 		}
 	}
 
