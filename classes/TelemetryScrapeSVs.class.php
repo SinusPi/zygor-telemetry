@@ -731,12 +731,13 @@ ENDLUA;
 
 	/** Convert full file path to flavour/account/filename slug. */
 	static function file_path_to_slug($path) {
-		$svstorage_path = self::$CFG['SV_STORAGE_DATA_PATH'];
-		$relative_path = str_replace($svstorage_path."/", "", $path); // remove base path; should leave "flavour/user/filename"
-		$relative_path = str_replace("\\", "/", $relative_path); // normalize slashes
-		$relative_path = preg_replace("/--SavedVariables.*$/", "", $relative_path); // get back to "flavour/user/filename" if the filename has the "--SavedVariables" suffix
-		$parts = explode("/", $relative_path); if (count($parts)!=3) throw new ErrorException("Unexpected file path structure after removing base path: $relative_path");
-		return $relative_path; // "flavour/user/filename"
+		if (preg_match("/([^\/]+)\/([^\/]+)\/([^\/]+)--SavedVariables--Zygor.*$/", $path, $matches)) {
+			$flavour = $matches[1];
+			$user = $matches[2];
+			$filename = $matches[3];
+			return "$flavour/$user/$filename";
+		} else
+			throw new ErrorException("Cannot slugify file path: $path");
 	}
 
 	/** Convert file slug (flavour/account/filename) to full file path. */
