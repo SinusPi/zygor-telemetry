@@ -453,54 +453,6 @@ ENDLUA;
 		return $formatted;
 	}
 
-	static function db_get_logfile_data($logfile) {
-		$q = self::qesc($_q="SELECT * FROM packagerlog_files WHERE file={s}  LIMIT 1  FOR UPDATE  NOWAIT", $logfile);
-		$r = self::$db->query($q);
-		if (!$r && self::$db->errno==3572) { // lock wait timeout
-			return null;
-		}
-		if (!$r) throw new ErrorException("DB error in $_q: ".self::$db->error);
-		if ($r->num_rows) {
-			$row = $r->fetch_assoc();
-			return $row;
-		} else {
-			$q = self::qesc($_q="INSERT INTO packagerlog_files (file) VALUES ({s})", $logfile);
-			$r = self::$db->query($q);
-			if (!$r) throw new ErrorException("DB error in $_q: ".self::$db->error);
-			$id = self::$db->insert_id;
-			$q2 = self::qesc($_q="SELECT * FROM packagerlog_files WHERE id={d} LIMIT 1 FOR UPDATE", $id);
-			$r2 = self::$db->query($q2);
-			if (!$r2) throw new ErrorException("DB error in $_q: ".self::$db->error);
-			if ($r2->num_rows) {
-				$row2 = $r2->fetch_assoc();
-				return $row2;
-			}
-		}
-	}
-
-	static function db_update_logfile_processed($log_file_id,$processed) {
-		$q = self::qesc($_q="UPDATE packagerlog_files SET processed={d} WHERE id={d}", $processed, $log_file_id);
-		$r = self::$db->query($q);
-		if (!$r) throw new ErrorException("DB error in $_q: ".self::$db->error);
-		return $r;
-	}
-
-	/**
-	 * Given a list of logfiles, return an associative array with the ones that need processing (not marked as processed in the DB) for the given topics. The array keys are the logfiles, and the values are the processed_topics field from the DB.
-	 */
-	static function db_get_unprocessed_logfiles($logfiles,$topics) {
-		if (!count($logfiles)) return [];
-		$q = self::qesc($_q="SELECT file,processed_topics FROM packagerlog_files WHERE file IN ({sa}) AND processed_topics IN ({sa})", $logfiles,$topics);
-		$r = self::$db->query($q);
-		if (!$r) throw new ErrorException("DB error in $_q: ".self::$db->error);
-		$res = array_fill_keys($logfiles, $topics); // default is all topics unprocessed
-		while ($row = $r->fetch_assoc()) {
-			$processed_topics = explode(",",$row['processed_topics']);
-			$res[$row['file']] = array_diff($topics,$processed_topics);
-		}
-		return $res;
-	}
-
 	// Tests, DB schemas
 
 	static function self_tests() {
