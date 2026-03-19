@@ -65,9 +65,26 @@ This repository is designed to handle telemetry data for Zygor products. It incl
 - Each topic file corresponds to a `topic` parameter in requests handled by `telemetry_endpoint.php`.
 - These files define the following:
   - **Scraper Configuration**: Specifies how data is extracted, often using Lua scripts (e.g., `extraction_lua`).
-  - **Crunchers**: Define how raw data is processed and inserted into the database, including table schemas and transformation logic.
-  - **Endpoint**: Contains the `queryfunc` function to fetch data from the database based on request parameters.
+  - **Crunchers**: Define how raw data is processed and inserted into the database, including table schemas and transformation logic. One topic can have multiple crunchers, and additional crunchers can be loaded from separate files.
+  - **Endpoint**: Contains the queries fetching data from the database based on request parameters.
   - **View Configuration**: Defines how the data is visualized, including HTML forms and JavaScript for rendering charts.
+  - **Table Schema**: Specifies the structure of the database tables used to store processed telemetry data.
+- File structure:
+  - Each topic file is named `topic-{topicname}.inc.php` and is located in the root directory.
+  - Returns a PHP array with the following fields:
+    - `name` (optional): Topic name; defaults to the filename part `{topicname}` if omitted.
+    - `scraper` (optional): Array defining how data is scraped from a source:
+      - `input`: `"sv"` or `"packagerlog"` specifying the data source.
+      - `extraction_lua`: Lua script executed in the context of the data source to extract events as JSON objects (one per line).
+    - `crunchers` (optional): Array of cruncher definitions that process raw events and insert them into the database. Each cruncher is an array with:
+      - `function`: Callable that receives a raw event line and returns an associative array of processed values.
+      - `action`: The operation to perform on the processed data, typically `"insert"` to write to the database.
+      - `table`: The database table name where processed data is stored.
+      - `table_schema`: SQL CREATE TABLE statement defining the table structure (use `<TABLE>` as placeholder for the actual table name).
+    - `crunchers_load` (optional): If `true`, loads additional cruncher definitions from files named `topic-{topicname}-*.inc.php`.
+    - `endpoint` (optional): Array
+	  - `queryfunc`: callable that queries the database for processed data.
+    - `view` (optional): Array with `title`, `class`, and `printer` callable for rendering the topic data in a web interface.
 
 ### Example: `topic-search.inc.php`
 - **Scraper**: Extracts search history data from saved variables.
