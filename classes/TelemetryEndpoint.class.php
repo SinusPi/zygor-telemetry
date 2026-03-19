@@ -12,31 +12,47 @@ class TelemetryEndpoint extends Telemetry {
 	}
 
 	static function serveRequest() {
-		$flavour = $_REQUEST['flavour'] ?: "";
-		$flavnum = self::$CFG['WOW_FLAVOUR_DATA'][$flavour]['num'] ?: 0;
-		if (!$flavnum) self::response(["success"=>false,"error"=>"Invalid flavour specified","errcode"=>"BAD_FLAVOUR"]);
+		$from = isset($_REQUEST['from']) ? $_REQUEST['from'] : null;
+		$to = isset($_REQUEST['to']) ? $_REQUEST['to'] : null;
+		$topic = isset($_REQUEST['topic']) ? $_REQUEST['topic'] : null;
+
+		if ($from && $to && $topic) {
+			return self::serveDataRequest($from, $to, $topic);
+		}
+
+		// Handle other requests here
+		self::response([
+			"success" => false,
+			"code" => 400,
+			"error" => "Invalid request parameters",
+		]);
+	}
+
+	static function serveDataRequest($from, $to, $topic) {
+		$flavour = isset($_REQUEST['flavour']) ? $_REQUEST['flavour'] : "";
+		$flavnum = isset(self::$CFG['WOW_FLAVOUR_DATA'][$flavour]['num']) ? self::$CFG['WOW_FLAVOUR_DATA'][$flavour]['num'] : 0;
+		if (!$flavnum) self::response(["success" => false, "error" => "Invalid flavour specified", "errcode" => "BAD_FLAVOUR"]);
 
 		try {
-			$from = parent::parse_date($_REQUEST['from']);
-			$to = parent::parse_date($_REQUEST['to']);
+			$from = parent::parse_date($from);
+			$to = parent::parse_date($to);
 		} catch (Exception $e) {
 			self::response([
-				"success"=>false,
-				"code"=>400,
-				"error"=>"Invalid date in from/to parameters: ".$e->getMessage(),
-				"errcode"=>"BAD_DATE",
+				"success" => false,
+				"code" => 400,
+				"error" => "Invalid date in from/to parameters: " . $e->getMessage(),
+				"errcode" => "BAD_DATE",
 			]);
 		}
 
-		$topic = $_REQUEST['topic'] ?: null;
-		$topicendpoint = self::$CFG['TOPICS'][$topic]['endpoint'] ?: null;
+		$topicendpoint = isset(self::$CFG['TOPICS'][$topic]['endpoint']) ? self::$CFG['TOPICS'][$topic]['endpoint'] : null;
 		if (!$topic || !$topicendpoint || !is_callable($topicendpoint['queryfunc'])) {
 			self::response([
-				"success"=>false,
-				"code"=>400,
-				"error"=>"Invalid topic parameter, or no endpoint defined for topic",
-				"topic"=>$topic,
-				"errcode"=>"BAD_TOPIC",
+				"success" => false,
+				"code" => 400,
+				"error" => "Invalid topic parameter, or no endpoint defined for topic",
+				"topic" => $topic,
+				"errcode" => "BAD_TOPIC",
 			]);
 		}
 
@@ -44,27 +60,27 @@ class TelemetryEndpoint extends Telemetry {
 			self::db_connect();
 		} catch (Exception $e) {
 			self::response([
-				"success"=>false,
-				"code"=>500,
-				"error"=>"Database connection error: ".$e->getMessage(),
-				"errcode"=>"DB_ERROR",
+				"success" => false,
+				"code" => 500,
+				"error" => "Database connection error: " . $e->getMessage(),
+				"errcode" => "DB_ERROR",
 			]);
 		}
 
 		try {
-			$data = $topicendpoint['queryfunc']($from,$to,$flavnum); // any other parameters should be handled by the queryfunc itself, not here
+			$data = call_user_func($topicendpoint['queryfunc'], $from, $to, $flavnum);
 			self::response([
-				"success"=>true,
-				"code"=>200,
-				"id"=>intval($_REQUEST['id']?:0),
-				"data"=>$data,
-				"query"=>self::$LAST_QUERY
+				"success" => true,
+				"code" => 200,
+				"id" => intval(isset($_REQUEST['id']) ? $_REQUEST['id'] : 0),
+				"data" => $data,
+				"query" => self::$LAST_QUERY,
 			]);
 		} catch (Exception $e) {
 			self::response([
-				"success"=>false,
-				"code"=>500,
-				"error"=>"Exception while processing topic ".$topic.": ".$e->getMessage(),
+				"success" => false,
+				"code" => 500,
+				"error" => "Exception while processing topic " . $topic . ": " . $e->getMessage(),
 			]);
 		}
 	}
