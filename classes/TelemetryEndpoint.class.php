@@ -18,12 +18,8 @@ class TelemetryEndpoint extends Telemetry {
 			return self::serveListTopics();
 		}
 
-		$from = isset($_REQUEST['from']) ? $_REQUEST['from'] : null;
-		$to = isset($_REQUEST['to']) ? $_REQUEST['to'] : null;
-		$topic = isset($_REQUEST['topic']) ? $_REQUEST['topic'] : null;
-
-		if ($from && $to && $topic) {
-			return self::serveDataRequest($from, $to, $topic);
+		if (isset($_REQUEST['topic'])) {
+			return self::serveDataRequest($_REQUEST['topic']);
 		}
 
 		// Handle other requests here
@@ -37,12 +33,22 @@ class TelemetryEndpoint extends Telemetry {
 	static function serveListTopics() {
 		$topics = [];
 		foreach (self::$CFG['TOPICS'] as $name => $config) {
-			$scraper = isset($config['scraper']['input']) ? $config['scraper']['input'] : 'unknown';
+			$scraper = isset($config['scraper']['input']) ? $config['scraper']['input'] : null;
+			$has_crunchers = isset($config['crunchers']) && is_array($config['crunchers']) && count($config['crunchers']) > 0;
+			$has_endpoint = isset($config['endpoint']);
+			$has_view = isset($config['view']);
+			
+			$cruncher_count = 0;
+			if ($has_crunchers) {
+				$cruncher_count = count($config['crunchers']);
+			}
+			
 			$topics[$name] = [
 				'name' => $name,
 				'scraper' => $scraper,
-				'has_endpoint' => isset($config['endpoint']),
-				'has_view' => isset($config['view']),
+				'crunchers' => $cruncher_count,
+				'endpoint' => $has_endpoint,
+				'view' => $has_view,
 			];
 		}
 		self::response([
@@ -52,14 +58,14 @@ class TelemetryEndpoint extends Telemetry {
 		]);
 	}
 
-	static function serveDataRequest($from, $to, $topic) {
+	static function serveDataRequest($topic) {
 		$flavour = isset($_REQUEST['flavour']) ? $_REQUEST['flavour'] : "";
 		$flavnum = isset(self::$CFG['WOW_FLAVOUR_DATA'][$flavour]['num']) ? self::$CFG['WOW_FLAVOUR_DATA'][$flavour]['num'] : 0;
 		if (!$flavnum) self::response(["success" => false, "error" => "Invalid flavour specified", "errcode" => "BAD_FLAVOUR"]);
 
 		try {
-			$from = parent::parse_date($from);
-			$to = parent::parse_date($to);
+			$from = parent::parse_date($_REQUEST['from']);
+			$to = parent::parse_date($_REQUEST['to']);
 		} catch (Exception $e) {
 			self::response([
 				"success" => false,

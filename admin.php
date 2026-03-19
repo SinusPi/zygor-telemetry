@@ -13,7 +13,7 @@
 			background-color: #f5f5f5;
 		}
 		.container {
-			max-width: 800px;
+			max-width: 1000px;
 			margin: 0 auto;
 			background-color: white;
 			padding: 20px;
@@ -23,44 +23,43 @@
 		h1 {
 			color: #333;
 		}
-		.topic-list {
-			list-style: none;
-			padding: 0;
+		table {
+			width: 100%;
+			border-collapse: collapse;
+			margin-top: 20px;
 		}
-		.scraper-group {
-			margin-bottom: 30px;
+		table thead {
+			background-color: #1976d2;
+			color: white;
 		}
-		.scraper-group h3 {
-			color: #1976d2;
-			border-bottom: 2px solid #1976d2;
-			padding-bottom: 10px;
-			margin-top: 0;
-		}
-		.topic-item {
-			background-color: #f9f9f9;
-			border: 1px solid #ddd;
-			padding: 15px;
-			margin-bottom: 10px;
-			border-radius: 3px;
-		}
-		.topic-name {
+		table th {
+			padding: 12px;
+			text-align: left;
 			font-weight: bold;
-			font-size: 16px;
-			color: #333;
 		}
-		.topic-info {
-			font-size: 12px;
-			color: #666;
-			margin-top: 8px;
+		table td {
+			padding: 10px 12px;
+			border-bottom: 1px solid #ddd;
+		}
+		table tbody tr:hover {
+			background-color: #f5f5f5;
+		}
+		table tbody tr:nth-child(odd) {
+			background-color: #fafafa;
 		}
 		.badge {
 			display: inline-block;
-			padding: 2px 8px;
+			padding: 4px 8px;
 			margin-right: 5px;
-			background-color: #e3f2fd;
-			color: #1976d2;
+			background-color: #4caf50;
+			color: white;
 			border-radius: 3px;
 			font-size: 11px;
+			font-weight: bold;
+		}
+		.badge.disabled {
+			background-color: #ccc;
+			color: #666;
 		}
 		.loading {
 			text-align: center;
@@ -108,43 +107,34 @@
 		}
 
 		function displayTopics(topics) {
-			var grouped = {};
+			var html = '<table>';
+			html += '<thead>';
+			html += '<tr>';
+			html += '<th>Topic Name</th>';
+			html += '<th>Scraper Source</th>';
+			html += '<th>Crunchers</th>';
+			html += '<th>Endpoint</th>';
+			html += '<th>View</th>';
+			html += '</tr>';
+			html += '</thead>';
+			html += '<tbody>';
 			
-			// Group topics by scraper
-			$.each(topics, function(name, topic) {
-				var scraper = topic.scraper || 'unknown';
-				if (!grouped[scraper]) {
-					grouped[scraper] = [];
-				}
-				grouped[scraper].push(topic);
-			});
-			
-			var html = '';
-			
-			// Display each scraper group
-			$.each(grouped, function(scraper, topicList) {
-				html += '<div class="scraper-group">';
-				html += '<h3>Scraper: ' + escapeHtml(scraper) + '</h3>';
-				html += '<ul class="topic-list">';
-				
-				$.each(topicList, function(index, topic) {
-					html += '<li class="topic-item">';
-					html += '<div class="topic-name">' + escapeHtml(topic.name) + '</div>';
-					html += '<div class="topic-info">';
-					if (topic.has_endpoint) {
-						html += '<span class="badge">Has Endpoint</span>';
-					}
-					if (topic.has_view) {
-						html += '<span class="badge">Has View</span>';
-					}
-					html += '</div>';
-					html += '</li>';
+			if (Object.keys(topics).length === 0) {
+				html += '<tr><td colspan="5" style="text-align: center;">No topics available</td></tr>';
+			} else {
+				$.each(topics, function(name, topic) {
+					html += '<tr>';
+					html += '<td><strong>' + escapeHtml(topic.name) + '</strong></td>';
+					html += '<td>' + (topic.scraper ? escapeHtml(topic.scraper) : '<em>N/A</em>') + '</td>';
+					html += '<td style="text-align: center;">' + (topic.crunchers > 0 ? '<span class="badge">' + topic.crunchers + '</span>' : '<span class="badge disabled">—</span>') + '</td>';
+					html += '<td style="text-align: center;">' + (topic.endpoint ? '<span class="badge">✓</span>' : '<span class="badge disabled">—</span>') + '</td>';
+					html += '<td style="text-align: center;">' + (topic.view ? '<span class="badge">✓</span>' : '<span class="badge disabled">—</span>') + '</td>';
+					html += '</tr>';
 				});
-				
-				html += '</ul>';
-				html += '</div>';
-			});
+			}
 			
+			html += '</tbody>';
+			html += '</table>';
 			$('#topics-container').html(html);
 		}
 
