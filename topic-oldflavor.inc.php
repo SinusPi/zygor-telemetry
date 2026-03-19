@@ -1,4 +1,6 @@
 <?php
 return [
-		'input'=>"packagerlog",
+	'scraper' => [
+		'input' => "packagerlog",
+	],
 ];

@@ -59,6 +59,33 @@ This repository is designed to handle telemetry data for Zygor products. It incl
 - `telemetry_endpoint.php` serves as the API endpoint for querying processed telemetry data.
 - `telemetry_scrape.php` and `telemetry_crunch.php` are CLI scripts for data collection and processing, respectively.
 
+## Topic Files
+
+- Topic files (e.g., `topic-search.inc.php`, `topic-usedguide.inc.php`) define specific telemetry data endpoints and their associated logic.
+- Each topic file corresponds to a `topic` parameter in requests handled by `telemetry_endpoint.php`.
+- These files define the following:
+  - **Scraper Configuration**: Specifies how data is extracted, often using Lua scripts (e.g., `extraction_lua`).
+  - **Crunchers**: Define how raw data is processed and inserted into the database, including table schemas and transformation logic.
+  - **Endpoint**: Contains the `queryfunc` function to fetch data from the database based on request parameters.
+  - **View Configuration**: Defines how the data is visualized, including HTML forms and JavaScript for rendering charts.
+
+### Example: `topic-search.inc.php`
+- **Scraper**: Extracts search history data from saved variables.
+- **Crunchers**: Processes search events and inserts them into the `search` table.
+- **Endpoint**: Provides a `queryfunc` to retrieve search data grouped by query.
+- **Table Schema**: Defines the `search` table structure, including columns for event ID, time, query, faction, and results.
+
+### Example: `topic-usedguide.inc.php`
+- **Scraper**: Extracts guide usage data from saved variables.
+- **Crunchers**: Processes guide usage events and inserts them into the `usedguide` table.
+- **Endpoint**: Provides a `queryfunc` to retrieve guide usage data, with filtering options for type and search terms.
+- **View**: Includes a form and JavaScript to display guide usage data as a pie chart.
+
+### Adding a New Topic
+1. Create a new file in the root directory (e.g., `topic-newtopic.inc.php`).
+2. Define the scraper, crunchers, endpoint, and view configurations as needed.
+3. Update the `TOPICS` configuration in `config-endpoint.inc.php` to include the new topic.
+
 ## Examples
 
 ### Adding a New Telemetry Processor

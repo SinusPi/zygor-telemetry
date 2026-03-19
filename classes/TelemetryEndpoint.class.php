@@ -12,6 +12,12 @@ class TelemetryEndpoint extends Telemetry {
 	}
 
 	static function serveRequest() {
+		$do = isset($_REQUEST['do']) ? $_REQUEST['do'] : null;
+		
+		if ($do === 'list_topics') {
+			return self::serveListTopics();
+		}
+
 		$from = isset($_REQUEST['from']) ? $_REQUEST['from'] : null;
 		$to = isset($_REQUEST['to']) ? $_REQUEST['to'] : null;
 		$topic = isset($_REQUEST['topic']) ? $_REQUEST['topic'] : null;
@@ -25,6 +31,24 @@ class TelemetryEndpoint extends Telemetry {
 			"success" => false,
 			"code" => 400,
 			"error" => "Invalid request parameters",
+		]);
+	}
+
+	static function serveListTopics() {
+		$topics = [];
+		foreach (self::$CFG['TOPICS'] as $name => $config) {
+			$scraper = isset($config['scraper']['input']) ? $config['scraper']['input'] : 'unknown';
+			$topics[$name] = [
+				'name' => $name,
+				'scraper' => $scraper,
+				'has_endpoint' => isset($config['endpoint']),
+				'has_view' => isset($config['view']),
+			];
+		}
+		self::response([
+			"success" => true,
+			"code" => 200,
+			"topics" => $topics,
 		]);
 	}
 
