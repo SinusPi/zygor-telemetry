@@ -75,17 +75,6 @@ class TelemetryEndpoint extends Telemetry {
 			]);
 		}
 
-		$topicendpoint = isset(self::$CFG['TOPICS'][$topic]['endpoint']) ? self::$CFG['TOPICS'][$topic]['endpoint'] : null;
-		if (!$topic || !$topicendpoint || !is_callable($topicendpoint['queryfunc'])) {
-			self::response([
-				"success" => false,
-				"code" => 400,
-				"error" => "Invalid topic parameter, or no endpoint defined for topic",
-				"topic" => $topic,
-				"errcode" => "BAD_TOPIC",
-			]);
-		}
-
 		try {
 			self::db_connect();
 		} catch (Exception $e) {
@@ -95,6 +84,22 @@ class TelemetryEndpoint extends Telemetry {
 				"error" => "Database connection error: " . $e->getMessage(),
 				"errcode" => "DB_ERROR",
 			]);
+		}
+
+		$topicendpoint = isset(self::$CFG['TOPICS'][$topic]['endpoint']) ? self::$CFG['TOPICS'][$topic]['endpoint'] : null;
+		if (!$topicendpoint || !is_callable($topicendpoint['queryfunc'])) {
+			self::response([
+				"success" => false,
+				"code" => 400,
+				"error" => "Invalid topic parameter, or no endpoint defined for topic",
+				"topic" => $topic,
+				"errcode" => "BAD_TOPIC",
+			]);
+		}
+
+		$variant = isset($_REQUEST['variant']) ? $_REQUEST['variant'] : null;
+		if ($variant === 'daymap') {
+			return self::serveDataRequestDaymap($topic, $from, $to, $flavnum);
 		}
 
 		try {
@@ -111,6 +116,61 @@ class TelemetryEndpoint extends Telemetry {
 				"success" => false,
 				"code" => 500,
 				"error" => "Exception while processing topic " . $topic . ": " . $e->getMessage(),
+			]);
+		}
+	}
+
+	static function serveDataRequestDaymap($topic, $from, $to, $flavnum) {
+		$topicendpoint = isset(self::$CFG['TOPICS'][$topic]['endpoint']) ? self::$CFG['TOPICS'][$topic]['endpoint'] : null;
+		$table = isset(self::$CFG['TOPICS'][$topic]['crunchers'][0]['table']) ? self::$CFG['TOPICS'][$topic]['crunchers'][0]['table'] : null;
+		
+		if (!$table) {
+			self::response([
+				"success" => false,
+				"code" => 400,
+				"error" => "Topic does not have a database table configured for daymap variant",
+				"errcode" => "NO_TABLE",
+			]);
+		}
+
+		try {
+			// Build daymap for entire range in one query
+			$query = self::db_qesc(
+				"SELECT FROM_UNIXTIME(`time`, '%Y-%m-%d') as day, COUNT(*) as cnt FROM `$table`
+				WHERE `flavnum`={d} AND `time`>={d} AND `time`<{d}
+				GROUP BY day
+				ORDER BY day ASC",
+				$flavnum, $from, $to
+			);
+			$result = $query->fetch_all(MYSQLI_ASSOC);
+			
+			$daymap = [];
+
+			// Initialize all days in range with 0
+			// $current_day = intval($from / 86400) * 86400;
+			// $end_day = intval($to / 86400) * 86400;
+			// while ($current_day <= $end_day) {
+			// 	$daymap[date('Y-m-d', $current_day)] = 0;
+			// 	$current_day += 86400;
+			// }
+			
+			// Fill in actual counts from query results
+			foreach ($result as $row) {
+				$daymap[$row['day']] = intval($row['cnt']);
+			}
+			
+			self::response([
+				"success" => true,
+				"code" => 200,
+				"id" => intval(isset($_REQUEST['id']) ? $_REQUEST['id'] : 0),
+				"data" => $daymap,
+				"query" => self::$LAST_QUERY,
+			]);
+		} catch (Exception $e) {
+			self::response([
+				"success" => false,
+				"code" => 500,
+				"error" => "Exception while processing daymap for topic " . $topic . ": " . $e->getMessage(),
 			]);
 		}
 	}
