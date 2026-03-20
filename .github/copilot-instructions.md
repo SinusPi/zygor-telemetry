@@ -55,7 +55,7 @@ This repository is designed to handle telemetry data for Zygor products. It incl
 
 ## Access Points
 
-- `index.php` and `telemetry_view.php` are designed to be accessed from the web.
+- `index.php` and `admin.php` are designed to be accessed from the web.
 - `telemetry_endpoint.php` serves as the API endpoint for querying processed telemetry data.
 - `telemetry_scrape.php` and `telemetry_crunch.php` are CLI scripts for data collection and processing, respectively.
 
