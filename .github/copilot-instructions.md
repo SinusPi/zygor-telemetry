@@ -115,6 +115,9 @@ This repository is designed to handle telemetry data for Zygor products. It incl
 2. Verify data integrity using `TelemetryCrunch`.
 3. Use mock data to replicate the issue.
 
+### MINOR DETAILS
+- Ensure all new code is compatible with PHP 5.6.
+- Follow the existing coding style and conventions for consistency.
+- SQL queries in PHP strings should start on the same line as the opening quote for better syntax colorization in editors. The rest of the query can be on subsequent lines for readability, but the first line should contain the opening quote and the first SELECT/INSERT/UPDATE part of the query.
 ---
 
-Feel free to update this document as the project evolves.
