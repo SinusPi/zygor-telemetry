@@ -18,6 +18,10 @@ class TelemetryEndpoint extends Telemetry {
 			return self::serveListTopics();
 		}
 
+		if ($do === 'list_sources') {
+			return self::serveListSources();
+		}
+
 		if (isset($_REQUEST['topic'])) {
 			return self::serveDataRequest($_REQUEST['topic']);
 		}
@@ -55,6 +59,67 @@ class TelemetryEndpoint extends Telemetry {
 			"success" => true,
 			"code" => 200,
 			"topics" => $topics,
+		]);
+	}
+
+	static function serveListSources() {
+		$sources = [];
+		
+		// Dynamically discover all TelemetryScrape subclasses
+		$scraper_classes = TelemetryScrape::getSubclasses();
+		
+		foreach ($scraper_classes as $class) {
+			try {
+				if (class_exists($class)) {
+					$class::init();
+				}
+			} catch (Exception $e) {
+				// Silently skip if init fails
+			}
+		}
+		
+		// Get registered sources from TelemetryScrape
+		$registered = TelemetryScrape::getRegisteredSources();
+		
+		foreach ($registered as $key => $source_info) {
+			$class = $source_info['class'];
+			$topic_count = 0;
+			$status = 'unknown';
+			
+			try {
+				// Load scraper config to get more details
+				if (class_exists($class)) {
+					$class::config();
+					$cfg = $class::$CFG;
+					
+					// Count topics using this scraper
+					$topic_count = count(array_filter((array)$cfg['TOPICS'], function($t) use ($key) {
+						return isset($t['scraper']['input']) && $t['scraper']['input'] === $key;
+					}));
+					
+					// Determine status based on config paths
+					if ($key === 'sv' && isset($cfg['SV_STORAGE_ROOT']) && is_dir($cfg['SV_STORAGE_ROOT'])) {
+						$status = 'configured';
+					} elseif ($key === 'packagerlog' && isset($cfg['PACKAGERLOG_PATH']) && is_dir($cfg['PACKAGERLOG_PATH'])) {
+						$status = 'configured';
+					} else {
+						$status = 'not-configured';
+					}
+				}
+			} catch (Exception $e) {
+				$status = 'error: ' . $e->getMessage();
+			}
+			
+			$sources[$key] = array_merge($source_info, [
+				'topics' => $topic_count,
+				'status' => $status
+			]);
+		}
+		
+		self::response([
+			"success" => true,
+			"code" => 200,
+			"sources" => $sources,
 		]);
 	}
 

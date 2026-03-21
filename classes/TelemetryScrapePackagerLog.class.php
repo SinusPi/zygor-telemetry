@@ -8,6 +8,12 @@
 class TelemetryScrapePackagerLog extends TelemetryScrape {
 	static function init() {
 		parent::init();
+		// Register this scraper source
+		parent::registerSource('packagerlog', [
+			'class' => 'TelemetryScrapePackagerLog',
+			'label' => 'Packager Logs',
+			'description' => 'Packager build and deployment logs'
+		]);
 	}
 
 	static function config($cfg=[]) {

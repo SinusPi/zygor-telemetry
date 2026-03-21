@@ -13,11 +13,15 @@
 		<h1>Telemetry Administration</h1>
 		<h2>Available Topics</h2>
 		<div id="topics-container" class="loading">Loading topics...</div>
+
+		<h2>Available Sources</h2>
+		<div id="sources-container" class="loading">Loading sources...</div>
 	</div>
 
 	<script>
 		$(function() {
 			loadTopics();
+			loadSources();
 		});
 
 		function loadTopics() {
@@ -30,11 +34,30 @@
 					if (response.success) {
 						displayTopics(response.topics);
 					} else {
-						showError('Failed to load topics: ' + response.error);
+						showError('Failed to load topics: ' + response.error, 'topics-container');
 					}
 				},
 				error: function(xhr, status, error) {
-					showError('Error loading topics: ' + error);
+					showError('Error loading topics: ' + error, 'topics-container');
+				}
+			});
+		}
+
+		function loadSources() {
+			$.ajax({
+				url: 'telemetry_endpoint.php',
+				type: 'GET',
+				data: { do: 'list_sources' },
+				dataType: 'json',
+				success: function(response) {
+					if (response.success) {
+						displaySources(response.sources);
+					} else {
+						showError('Failed to load sources: ' + response.error, 'sources-container');
+					}
+				},
+				error: function(xhr, status, error) {
+					showError('Error loading sources: ' + error, 'sources-container');
 				}
 			});
 		}
@@ -73,8 +96,52 @@
 			$('#topics-container').html(html);
 		}
 
-		function showError(message) {
-			$('#topics-container').html('<div class="error">' + escapeHtml(message) + '</div>');
+		function displaySources(sources) {
+			var html = '<table>';
+			html += '<thead>';
+			html += '<tr>';
+			html += '<th>Source</th>';
+			html += '<th>Description</th>';
+			html += '<th>Class</th>';
+			html += '<th>Topics</th>';
+			html += '<th>Status</th>';
+			html += '</tr>';
+			html += '</thead>';
+			html += '<tbody>';
+			
+			if (Object.keys(sources).length === 0) {
+				html += '<tr><td colspan="5" style="text-align: center;">No sources available</td></tr>';
+			} else {
+				$.each(sources, function(key, source) {
+					var statusBadge = '<span class="badge';
+					if (source.status === 'configured') {
+						statusBadge += '">✓ Configured</span>';
+					} else if (source.status === 'not-configured') {
+						statusBadge += ' disabled">⚠ Not Configured</span>';
+					} else if (source.status.indexOf('error') === 0) {
+						statusBadge += ' error">✗ Error</span>';
+					} else {
+						statusBadge += '">? Unknown</span>';
+					}
+					
+					html += '<tr>';
+					html += '<td><strong>' + escapeHtml(source.label) + '</strong></td>';
+					html += '<td>' + escapeHtml(source.description) + '</td>';
+					html += '<td><code>' + escapeHtml(source.class) + '</code></td>';
+					html += '<td style="text-align: center;"><span class="badge">' + source.topics + '</span></td>';
+					html += '<td style="text-align: center;">' + statusBadge + '</td>';
+					html += '</tr>';
+				});
+			}
+			
+			html += '</tbody>';
+			html += '</table>';
+			$('#sources-container').html(html);
+		}
+
+		function showError(message, container) {
+			var containerId = container || 'topics-container';
+			$('#' + containerId).html('<div class="error">' + escapeHtml(message) + '</div>');
 		}
 
 		function escapeHtml(text) {

@@ -10,7 +10,12 @@
 class TelemetryScrapeSVs extends TelemetryScrape {
 	static function init() {
 		parent::init();
-		// any local inits?
+		// Register this scraper source
+		parent::registerSource('sv', [
+			'class' => 'TelemetryScrapeSVs',
+			'label' => 'Saved Variables',
+			'description' => 'User-submitted game client saved variables'
+		]);
 	}
 
 	static function config($cfg=[]) {

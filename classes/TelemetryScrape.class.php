@@ -6,6 +6,9 @@
  * 
  */
 class TelemetryScrape extends Telemetry {
+	// Registry of available scraper sources
+	static $SOURCES = [];
+
 	static function init() {
 		parent::init();
 		// any local inits?
@@ -16,6 +19,38 @@ class TelemetryScrape extends Telemetry {
 
 		$configfile = (array)(@include "config-scrape.inc.php"); // load scraping defaults
 		self::$CFG = self::merge_configs(self::$CFG, $configfile);
+	}
+
+	/**
+	 * Register a scraper source type
+	 * @param string $key Unique identifier for the source (e.g., 'sv', 'packagerlog')
+	 * @param array $info Source information containing 'class', 'label', 'description'
+	 */
+	static function registerSource($key, $info) {
+		self::$SOURCES[$key] = array_merge(['key' => $key], $info);
+	}
+
+	/**
+	 * Get all registered sources
+	 */
+	static function getRegisteredSources() {
+		return self::$SOURCES;
+	}
+
+	/**
+	 * Get all subclasses of TelemetryScrape by scanning the classes directory
+	 * @return array List of subclass names
+	 */
+	static function getSubclasses() {
+		$subclasses = [];
+		
+		foreach (get_declared_classes() as $classname) {
+			if (get_parent_class($classname) === 'TelemetryScrape') {
+				$subclasses[] = $classname;
+			}
+		}
+		
+		return $subclasses;
 	}
 
 	static function filter_younger_files($files, $days_old) {
