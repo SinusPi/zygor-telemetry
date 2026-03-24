@@ -38,19 +38,13 @@ class TelemetryScrape extends Telemetry {
 	}
 
 	/**
-	 * Get all subclasses of TelemetryScrape by scanning the classes directory
+	 * Get all subclasses of TelemetryScrape
 	 * @return array List of subclass names
 	 */
 	static function getSubclasses() {
-		$subclasses = [];
-		
-		foreach (get_declared_classes() as $classname) {
-			if (get_parent_class($classname) === 'TelemetryScrape') {
-				$subclasses[] = $classname;
-			}
-		}
-		
-		return $subclasses;
+		return array_filter(get_declared_classes(), function($classname) {
+			return get_parent_class($classname) === self::class;
+		});
 	}
 
 	/**
