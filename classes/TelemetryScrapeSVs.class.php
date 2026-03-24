@@ -11,11 +11,6 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 	static function init() {
 		parent::init();
 		// Register this scraper source
-		parent::registerSource('sv', [
-			'class' => 'TelemetryScrapeSVs',
-			'label' => 'Saved Variables',
-			'description' => 'User-submitted game client saved variables'
-		]);
 	}
 
 	static function config($cfg=[]) {
@@ -31,6 +26,33 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		self::$CFG['SV_STORAGE_DATA_PATH'] = self::cfgstr('SV_STORAGE_DATA_PATH',['SYNC_FOLDER'=>$SYNC_CFG['folder']]);
 	}
 
+	static function registerSelf() {
+		parent::registerSource('sv', [
+			'class' => self::class,
+			'label' => 'Saved Variables',
+			'description' => 'User-submitted game client saved variables'
+		]);
+	}
+
+	/**
+	 * Get configured paths for this scraper
+	 * @return array Array of configured storage paths
+	 */
+	static function getConfiguredPaths() {
+		try {
+			self::config();
+			$paths = [];
+			if (isset(self::$CFG['SV_STORAGE_ROOT'])) {
+				$paths[] = self::$CFG['SV_STORAGE_ROOT'];
+			}
+			if (isset(self::$CFG['SV_STORAGE_DATA_PATH'])) {
+				$paths[] = self::$CFG['SV_STORAGE_DATA_PATH'];
+			}
+			return $paths;
+		} catch (Exception $e) {
+			return [];
+		}
+	}
 
 	static function filter_younger_files($files, $days_old) {
 		$time_limit = time() - ($days_old * DAY);
@@ -751,3 +773,5 @@ ENDLUA;
 		return self::cfgstr('SV_STORAGE_FLAVOUR_PATH',['FLAVOUR'=>$flavour])."/".$acctfile."--SavedVariables--ZygorGuidesViewer.lua.gz";
 	}
 }
+
+TelemetryScrapeSVs::registerSelf();

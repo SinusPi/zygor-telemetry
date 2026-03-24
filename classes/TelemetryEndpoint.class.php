@@ -42,15 +42,24 @@ class TelemetryEndpoint extends Telemetry {
 			$has_endpoint = isset($config['endpoint']);
 			$has_view = isset($config['view']);
 			
-			$cruncher_count = 0;
+			$crunchers_list = [];
 			if ($has_crunchers) {
-				$cruncher_count = count($config['crunchers']);
+				foreach ($config['crunchers'] as $idx => $cruncher) {
+					$eventtype = isset($cruncher['eventtype']) ? $cruncher['eventtype'] : 'unknown';
+					$table = isset($cruncher['table']) ? $cruncher['table'] : null;
+					$crunchers_list[] = [
+						'index' => $idx,
+						'eventtype' => $eventtype,
+						'table' => $table,
+					];
+				}
 			}
 			
 			$topics[$name] = [
 				'name' => $name,
 				'scraper' => $scraper,
-				'crunchers' => $cruncher_count,
+				'crunchers' => count($crunchers_list),
+				'crunchers_list' => $crunchers_list,
 				'endpoint' => $has_endpoint,
 				'view' => $has_view,
 			];
@@ -65,26 +74,15 @@ class TelemetryEndpoint extends Telemetry {
 	static function serveListSources() {
 		$sources = [];
 		
-		// Dynamically discover all TelemetryScrape subclasses
-		$scraper_classes = TelemetryScrape::getSubclasses();
-		
-		foreach ($scraper_classes as $class) {
-			try {
-				if (class_exists($class)) {
-					$class::init();
-				}
-			} catch (Exception $e) {
-				// Silently skip if init fails
-			}
-		}
-		
 		// Get registered sources from TelemetryScrape
 		$registered = TelemetryScrape::getRegisteredSources();
 		
 		foreach ($registered as $key => $source_info) {
 			$class = $source_info['class'];
 			$topic_count = 0;
+			$topics_list = [];
 			$status = 'unknown';
+			$source_paths = [];
 			
 			try {
 				// Load scraper config to get more details
@@ -92,19 +90,17 @@ class TelemetryEndpoint extends Telemetry {
 					$class::config();
 					$cfg = $class::$CFG;
 					
-					// Count topics using this scraper
-					$topic_count = count(array_filter((array)$cfg['TOPICS'], function($t) use ($key) {
+					// Count topics using this scraper and collect topic names
+					$topics_list = array_keys(array_filter((array)$cfg['TOPICS'], function($t) use ($key) {
 						return isset($t['scraper']['input']) && $t['scraper']['input'] === $key;
 					}));
+					$topic_count = count($topics_list);
 					
-					// Determine status based on config paths
-					if ($key === 'sv' && isset($cfg['SV_STORAGE_ROOT']) && is_dir($cfg['SV_STORAGE_ROOT'])) {
-						$status = 'configured';
-					} elseif ($key === 'packagerlog' && isset($cfg['PACKAGERLOG_PATH']) && is_dir($cfg['PACKAGERLOG_PATH'])) {
-						$status = 'configured';
-					} else {
-						$status = 'not-configured';
-					}
+					// Get configured paths from the scraper class itself
+					$source_paths = $class::getConfiguredPaths();
+					
+					// Determine if scraper is configured based on whether paths exist
+					$status = (count($source_paths) > 0 && self::allPathsExist($source_paths)) ? 'configured' : 'not-configured';
 				}
 			} catch (Exception $e) {
 				$status = 'error: ' . $e->getMessage();
@@ -112,7 +108,9 @@ class TelemetryEndpoint extends Telemetry {
 			
 			$sources[$key] = array_merge($source_info, [
 				'topics' => $topic_count,
-				'status' => $status
+				'topics_list' => $topics_list,
+				'status' => $status,
+				'source_paths' => $source_paths
 			]);
 		}
 		
@@ -121,6 +119,18 @@ class TelemetryEndpoint extends Telemetry {
 			"code" => 200,
 			"sources" => $sources,
 		]);
+	}
+
+	/**
+	 * Helper to check if all paths exist
+	 */
+	private static function allPathsExist($paths) {
+		foreach ($paths as $path) {
+			if (!is_dir($path)) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	static function serveDataRequest($topic) {

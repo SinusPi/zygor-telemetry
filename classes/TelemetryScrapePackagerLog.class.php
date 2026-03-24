@@ -8,12 +8,6 @@
 class TelemetryScrapePackagerLog extends TelemetryScrape {
 	static function init() {
 		parent::init();
-		// Register this scraper source
-		parent::registerSource('packagerlog', [
-			'class' => 'TelemetryScrapePackagerLog',
-			'label' => 'Packager Logs',
-			'description' => 'Packager build and deployment logs'
-		]);
 	}
 
 	static function config($cfg=[]) {
@@ -22,6 +16,31 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 		$configfile = (array)(@include "config-scrape-packagerlog.inc.php"); // load defaults
 		self::$CFG = self::merge_configs(self::$CFG, $configfile);
 		if (!self::$CFG['PACKAGERLOG_PATH']) throw new ErrorException("PACKAGERLOG_PATH not defined in config, config-scrape-packagerlog.inc.php not loaded?");
+	}
+
+	static function registerSelf() {
+		parent::registerSource('packagerlog', [
+			'class' => self::class,
+			'label' => 'Packager Logs',
+			'description' => 'Packager build and deployment logs'
+		]);
+	}
+
+	/**
+	 * Get configured paths for this scraper
+	 * @return array Array of configured log paths
+	 */
+	static function getConfiguredPaths() {
+		try {
+			self::config();
+			$paths = [];
+			if (isset(self::$CFG['PACKAGERLOG_PATH'])) {
+				$paths[] = self::$CFG['PACKAGERLOG_PATH'];
+			}
+			return $paths;
+		} catch (Exception $e) {
+			return [];
+		}
 	}
 
 	/**
@@ -545,3 +564,5 @@ ENDLUA;
 		return self::$CFG['PACKAGERLOG_PATH']."/".$slug;
 	}
 }
+
+TelemetryScrapePackagerLog::registerSelf();

@@ -80,7 +80,7 @@
 				html += '<tr><td colspan="6" style="text-align: center;">No topics available</td></tr>';
 			} else {
 				$.each(topics, function(name, topic) {
-					html += '<tr>';
+					html += '<tr class="topic-row">';
 					html += '<td><strong>' + escapeHtml(topic.name) + '</strong></td>';
 					html += '<td>' + (topic.scraper ? escapeHtml(topic.scraper) : '<em>N/A</em>') + '</td>';
 					html += '<td style="text-align: center;">' + (topic.crunchers > 0 ? '<span class="badge">' + topic.crunchers + '</span>' : '<span class="badge disabled">—</span>') + '</td>';
@@ -88,6 +88,23 @@
 					html += '<td style="text-align: center;">' + (topic.view ? '<span class="badge">✓</span>' : '<span class="badge disabled">—</span>') + '</td>';
 					html += '<td><a class="action-link" onclick="showDaymap(\'' + escapeHtml(topic.name) + '\')">daymap</a></td>';
 					html += '</tr>';
+					
+					// Add sub-rows for each cruncher
+					if (topic.crunchers_list && topic.crunchers_list.length > 0) {
+						$.each(topic.crunchers_list, function(idx, cruncher) {
+							html += '<tr class="cruncher-sub-row">';
+							html += '<td class="cruncher-indent">↳ Cruncher ' + cruncher.index + '</td>';
+							html += '<td><code>' + escapeHtml(cruncher.eventtype) + '</code></td>';
+							html += '<td colspan="4">';
+							if (cruncher.table) {
+								html += '<code class="table-name">' + escapeHtml(cruncher.table) + '</code>';
+							} else {
+								html += '<em>N/A</em>';
+							}
+							html += '</td>';
+							html += '</tr>';
+						});
+					}
 				});
 			}
 			
@@ -102,7 +119,6 @@
 			html += '<tr>';
 			html += '<th>Source</th>';
 			html += '<th>Description</th>';
-			html += '<th>Class</th>';
 			html += '<th>Topics</th>';
 			html += '<th>Status</th>';
 			html += '</tr>';
@@ -110,26 +126,43 @@
 			html += '<tbody>';
 			
 			if (Object.keys(sources).length === 0) {
-				html += '<tr><td colspan="5" style="text-align: center;">No sources available</td></tr>';
+				html += '<tr><td colspan="4" style="text-align: center;">No sources available</td></tr>';
 			} else {
 				$.each(sources, function(key, source) {
 					var statusBadge = '<span class="badge';
+					var statusContent = '';
+					
 					if (source.status === 'configured') {
 						statusBadge += '">✓ Configured</span>';
+						// Show source paths for configured sources
+						if (source.source_paths && source.source_paths.length > 0) {
+							statusContent = source.source_paths.map(function(p) { return escapeHtml(p); }).join('<br>');
+						}
 					} else if (source.status === 'not-configured') {
 						statusBadge += ' disabled">⚠ Not Configured</span>';
 					} else if (source.status.indexOf('error') === 0) {
 						statusBadge += ' error">✗ Error</span>';
+						statusContent = '<code>' + escapeHtml(source.status) + '</code>';
 					} else {
 						statusBadge += '">? Unknown</span>';
+					}
+					
+					// Build topics tooltip
+					var topicsTooltip = '';
+					if (source.topics_list && source.topics_list.length > 0) {
+						topicsTooltip = ' title="' + escapeHtml(source.topics_list.join(', ')) + '"';
 					}
 					
 					html += '<tr>';
 					html += '<td><strong>' + escapeHtml(source.label) + '</strong></td>';
 					html += '<td>' + escapeHtml(source.description) + '</td>';
-					html += '<td><code>' + escapeHtml(source.class) + '</code></td>';
-					html += '<td style="text-align: center;"><span class="badge">' + source.topics + '</span></td>';
-					html += '<td style="text-align: center;">' + statusBadge + '</td>';
+					html += '<td style="text-align: center;"><span class="badge"' + topicsTooltip + '>' + source.topics + '</span></td>';
+					html += '<td style="text-align: center; vertical-align: middle;">';
+					html += statusBadge;
+					if (statusContent) {
+						html += '<div class="status-paths"><code>' + statusContent + '</code></div>';
+					}
+					html += '</td>';
 					html += '</tr>';
 				});
 			}

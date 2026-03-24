@@ -53,6 +53,15 @@ class TelemetryScrape extends Telemetry {
 		return $subclasses;
 	}
 
+	/**
+	 * Get a summary of configured paths for this scraper source
+	 * Subclasses should override this method to return their specific paths
+	 * @return array Array of configured paths, or empty array if not configured
+	 */
+	static function getConfiguredPaths() {
+		return [];
+	}
+
 	static function filter_younger_files($files, $days_old) {
 		$time_limit = time() - ($days_old * DAY);
 		return array_values(array_filter($files, function($f) use ($time_limit) {
