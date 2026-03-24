@@ -22,6 +22,10 @@ class TelemetryEndpoint extends Telemetry {
 			return self::serveListSources();
 		}
 
+		if ($do === 'get_status') {
+			return self::serveGetStatus();
+		}
+
 		if (isset($_REQUEST['topic'])) {
 			return self::serveDataRequest($_REQUEST['topic']);
 		}
@@ -131,6 +135,51 @@ class TelemetryEndpoint extends Telemetry {
 			}
 		}
 		return true;
+	}
+
+	static function serveGetStatus() {
+		try {
+			self::db_connect();
+		} catch (Exception $e) {
+			self::response([
+				"success" => false,
+				"code" => 500,
+				"error" => "Database connection error: " . $e->getMessage(),
+				"errcode" => "DB_ERROR",
+			]);
+		}
+
+		try {
+			// Fetch all status records from the database
+			$query = self::db_qesc("SELECT tag, status, updated_at FROM status ORDER BY tag ASC");
+			$result = $query->fetch_all(MYSQLI_ASSOC);
+
+			$statuses = [];
+			foreach ($result as $row) {
+				$status_data = json_decode($row['status'], true);
+				if (!is_array($status_data)) {
+					$status_data = [];
+				}
+				
+				$statuses[] = [
+					'tag' => $row['tag'],
+					'updated_at' => $row['updated_at'],
+					'data' => $status_data
+				];
+			}
+
+			self::response([
+				"success" => true,
+				"code" => 200,
+				"statuses" => $statuses,
+			]);
+		} catch (Exception $e) {
+			self::response([
+				"success" => false,
+				"code" => 500,
+				"error" => "Exception while fetching status records: " . $e->getMessage(),
+			]);
+		}
 	}
 
 	static function serveDataRequest($topic) {

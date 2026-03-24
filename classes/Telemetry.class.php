@@ -373,7 +373,7 @@ class Telemetry {
 	
 	static function db_set_status($tag, $status) {
 		$status_json = json_encode($status);
-		self::db_qesc("INSERT INTO status (tag, status) VALUES ({s}, {s}) ON DUPLICATE KEY UPDATE status={s}", $tag, $status_json, $status_json);
+		self::db_qesc("INSERT INTO status (tag, status, updated_at) VALUES ({s}, {s}, CURRENT_TIMESTAMP) ON DUPLICATE KEY UPDATE status={s}, updated_at=CURRENT_TIMESTAMP", $tag, $status_json, $status_json);
 	}
 
 	static function db_delete_status($tag) {
@@ -437,6 +437,7 @@ class Telemetry {
 			$schema_sql = "CREATE TABLE `status` (
 					`tag` char(20) NOT NULL,
 					`status` varchar(200) DEFAULT NULL,
+					`updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 					UNIQUE KEY `tag` (`tag`)
 				)
 				ENGINE=InnoDB

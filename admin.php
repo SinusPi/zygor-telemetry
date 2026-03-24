@@ -16,13 +16,37 @@
 
 		<h2>Available Sources</h2>
 		<div id="sources-container" class="loading">Loading sources...</div>
+
+		<h2>Process Status</h2>
+		<div id="status-container" class="loading">Loading status...</div>
+
 	</div>
 
 	<script>
 		$(function() {
+			loadStatus();
 			loadTopics();
 			loadSources();
 		});
+
+		function loadStatus() {
+			$.ajax({
+				url: 'telemetry_endpoint.php',
+				type: 'GET',
+				data: { do: 'get_status' },
+				dataType: 'json',
+				success: function(response) {
+					if (response.success) {
+						displayStatus(response.statuses);
+					} else {
+						showError('Failed to load status: ' + response.error, 'status-container');
+					}
+				},
+				error: function(xhr, status, error) {
+					showError('Error loading status: ' + error, 'status-container');
+				}
+			});
+		}
 
 		function loadTopics() {
 			$.ajax({
@@ -60,6 +84,81 @@
 					showError('Error loading sources: ' + error, 'sources-container');
 				}
 			});
+		}
+
+		function displayStatus(statuses) {
+			var html = '<table>';
+			html += '<thead>';
+			html += '<tr>';
+			html += '<th>Process Tag</th>';
+			html += '<th>Updated At</th>';
+			html += '<th>Component</th>';
+			html += '<th>Value</th>';
+			html += '</tr>';
+			html += '</thead>';
+			html += '<tbody>';
+			
+			if (statuses.length === 0) {
+				html += '<tr><td colspan="4" style="text-align: center;">No status records available</td></tr>';
+			} else {
+				$.each(statuses, function(idx, status) {
+					var data = status.data || {};
+					var keys = Object.keys(data);
+					
+					if (keys.length === 0) {
+						// No data, just show the tag and timestamp
+						html += '<tr class="status-row">';
+						html += '<td><strong>' + escapeHtml(status.tag) + '</strong></td>';
+						html += '<td><code>' + escapeHtml(status.updated_at || 'N/A') + '</code></td>';
+						html += '<td colspan="2" style="color: #999;"><em>No data</em></td>';
+						html += '</tr>';
+					} else {
+						// Show first row with tag and timestamp
+						var firstKey = keys[0];
+						var firstValue = formatStatusValue(data[firstKey]);
+						html += '<tr class="status-row">';
+						html += '<td rowspan="' + keys.length + '"><strong>' + escapeHtml(status.tag) + '</strong></td>';
+						html += '<td rowspan="' + keys.length + '"><code>' + escapeHtml(status.updated_at || 'N/A') + '</code></td>';
+						html += '<td><strong>' + escapeHtml(firstKey) + '</strong></td>';
+						html += '<td>' + firstValue + '</td>';
+						html += '</tr>';
+						
+						// Show remaining keys as separate rows
+						for (var i = 1; i < keys.length; i++) {
+							var key = keys[i];
+							var value = formatStatusValue(data[key]);
+							html += '<tr class="status-row-data">';
+							html += '<td><strong>' + escapeHtml(key) + '</strong></td>';
+							html += '<td>' + value + '</td>';
+							html += '</tr>';
+						}
+					}
+				});
+			}
+			
+			html += '</tbody>';
+			html += '</table>';
+			$('#status-container').html(html);
+		}
+
+		function formatStatusValue(value) {
+			if (value === null || value === undefined) {
+				return '<em>null</em>';
+			}
+			if (typeof value === 'object') {
+				return '<code>' + escapeHtml(JSON.stringify(value, null, 2)) + '</code>';
+			}
+			if (typeof value === 'boolean') {
+				return '<strong>' + (value ? '✓ true' : '✗ false') + '</strong>';
+			}
+			if (typeof value === 'string') {
+				// Check if it looks like a number
+				if (!isNaN(value) && value !== '') {
+					return '<code>' + escapeHtml(value) + '</code>';
+				}
+				return escapeHtml(value);
+			}
+			return escapeHtml(String(value));
 		}
 
 		function displayTopics(topics) {
