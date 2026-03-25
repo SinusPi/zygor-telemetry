@@ -563,10 +563,6 @@ ENDLUA;
 		}
 	}
 
-	static function db_create() {
-		self::$db->create_tables();
-	}
-
 	/** Convert full file path to flavour/account/filename slug. */
 	static function file_path_to_slug($path) {
 		$svstorage_path = self::$CFG['PACKAGERLOG_PATH'];

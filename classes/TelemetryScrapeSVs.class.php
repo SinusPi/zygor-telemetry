@@ -714,18 +714,18 @@ ENDLUA;
 
 	static function test_paths() {
 		self::vlog("Testing paths:");
-		
-		if (!is_dir(self::$CFG['SV_STORAGE_ROOT'])) die("Missing SV storage root: ".self::$CFG['SV_STORAGE_ROOT']."\n");
+
+		if (!is_dir(self::$CFG['SV_STORAGE_ROOT'])) throw new ErrorException("Missing SV storage root: ".self::$CFG['SV_STORAGE_ROOT']."\n");
 		self::vlog(" - Will read SVs in root of: \x1b[33m".self::$CFG['SV_STORAGE_ROOT']."\x1b[0m");
 
-		if (!is_dir(self::$CFG['SV_STORAGE_DATA_PATH'])) die("Missing SV storage folder: ".self::$CFG['SV_STORAGE_DATA_PATH']."\n");
+		if (!is_dir(self::$CFG['SV_STORAGE_DATA_PATH'])) throw new ErrorException("Missing SV storage folder: ".self::$CFG['SV_STORAGE_DATA_PATH']."\n");
 		self::vlog(" - Specifically SV Sync config says: \x1b[33m".self::$CFG['SV_STORAGE_DATA_PATH']."\x1b[0m");
 
 		foreach (self::$CFG['f'] as $flav) {
 			self::vlog("   - Flavour: \x1b[38;5;78m$flav\x1b[0m");
 
 			$svpath = self::cfgstr('SV_STORAGE_FLAVOUR_PATH',['FLAVOUR'=>$flav]);
-			if (!is_dir($svpath)) die("Missing SV storage flavour folder: ".$svpath."\n");
+			if (!is_dir($svpath)) throw new ErrorException("Missing SV storage flavour folder: ".$svpath."\n");
 			self::vlog("     - Reading SVs from: \x1b[33m$svpath\x1b[0m");
 
 			/*
@@ -737,6 +737,12 @@ ENDLUA;
 			self::vlog("     - Saving telemetry data into: \x1b[33m$telepath\x1b[0m");
 			*/
 		}
+
+		$count=0;
+		foreach (FileTools::rglob_gen("mock_storage","*.lua*",10) as $i=>$f)
+			$count++;
+		if ($count<50) throw new ErrorException("rglob_gen self-test failed, found only $count files in mock_storage, expected at least 50.");
+
 		return true;
 	}
 
@@ -768,10 +774,6 @@ ENDLUA;
 		if ($output !== $expected) {
 			die("FAILED testing group_ranges:\n".print_r($output,1)."\n");
 		}
-	}
-
-	static function db_create() {
-		self::$db->create_tables();
 	}
 
 	/** Convert full file path to flavour/account/filename slug. */

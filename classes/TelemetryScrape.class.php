@@ -273,7 +273,7 @@ class TelemetryScrape extends Telemetry {
 	// Tests, DB schemas
 
 	/**
-	 * Create generic scraping-related tables. None so far.
+	 * Create generic scraping-related tables.
 	 */
 	static function db_create() {
 		self::$db->create_tables();
@@ -311,11 +311,6 @@ class TelemetryScrape extends Telemetry {
 
 	static function self_tests() {
 		parent::self_tests();
-
-		$count=0;
-		foreach (FileTools::rglob_gen("mock_storage","*.lua*",10) as $i=>$f)
-			$count++;
-		if ($count<50) throw new ErrorException("rglob_gen self-test failed, found only $count files in mock_storage, expected at least 50.");
 	}
 
 }
