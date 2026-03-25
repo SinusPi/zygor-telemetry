@@ -84,8 +84,9 @@ class TelemetryCrunch extends Telemetry {
 		}
 		*/
 		
+		$lockname = "telemetry_crunch_day_{$flavour}_{$day}";
 		try {
-			$locked = self::$db->query_one("SELECT GET_LOCK('telemetry_crunch_day_{$flavour}_{$day}', 0)");
+			$locked = self::$db->lock($lockname, 0);
 			if (!$locked) {
 				self::vlog(C_MTHD."Skipping day \x1b[38;5;82m$day\x1b[0m, already being processed".C_R);
 				return false;									// #f00
@@ -240,7 +241,7 @@ class TelemetryCrunch extends Telemetry {
 			return $written;
 
 		} finally {
-			$unlocked = self::$db->query_one("SELECT RELEASE_LOCK('telemetry_render_day_{$flavour}_{$day}', 0)");
+			$unlocked = self::$db->unlock($lockname);
 		}
 	}
 
