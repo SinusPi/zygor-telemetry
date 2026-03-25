@@ -188,7 +188,7 @@ class TelemetryScrape extends Telemetry {
 			// filenames in batch are full; need to shorten for DB
 			// add prefix to batch items, e.g. "flavour/filename"
 			$batch_slugs = array_map($cb_slugger,$batch);
-			$files = parent::db_get_files($batch_slugs,$filetype,true); // same order maintained
+			$files = self::$db->get_files($batch_slugs,$filetype,true); // same order maintained
 			$ids = array_map(function($f) { return $f->id ?: null; }, $files);
 			$batch_scrapetimes = self::get_file_scrapetimes_batch($topics,$ids);
 			
@@ -225,8 +225,8 @@ class TelemetryScrape extends Telemetry {
 	 * @return array [ file_id => [ 'topics' => [ topic:string => scrape_time:int ], 'newest_scrape_time' => int ] ]
 	 */
 	static function get_file_scrapetimes_batch($topics, $ids) {
-		$r = self::db_qesc($_q="SELECT * FROM `topic_scrapetimes` WHERE `topic` IN ({sa}) AND `file_id` IN ({sa})", $topics, $ids);
-		if (!$r) throw new ErrorException("DB error in $_q: ".self::$db->error);
+		$r = self::$db->query($_q="SELECT * FROM `topic_scrapetimes` WHERE `topic` IN ({sa}) AND `file_id` IN ({sa})", $topics, $ids);
+		if (!$r) throw new ErrorException("DB error in $_q: ".self::$db->error());
 
 		// aggregate by file_id
 		$files = [];
@@ -253,11 +253,11 @@ class TelemetryScrape extends Telemetry {
 	 */
 	static function db_set_file_scrapetimes($topics, $file_id, $last_events_per_topic=[], $scrape_time=null) {
 		$values = join(", ", array_map(function($topic) use ($file_id, $scrape_time, $last_events_per_topic) {
-			return self::qesc("({s}, {d}, {d}, {d})", $topic, $file_id, $scrape_time ?: time(), $last_events_per_topic[$topic] ?: null);
+			return self::$db->query("({s}, {d}, {d}, {d})", $topic, $file_id, $scrape_time ?: time(), $last_events_per_topic[$topic] ?: null);
 		}, $topics));
-		$q = self::qesc($_q="INSERT INTO `topic_scrapetimes` (topic, file_id, scrape_time, last_event_time) VALUES $values ON DUPLICATE KEY UPDATE scrape_time=VALUES(scrape_time), last_event_time=VALUES(last_event_time)");
+		$q = self::$db->qesc($_q="INSERT INTO `topic_scrapetimes` (topic, file_id, scrape_time, last_event_time) VALUES $values ON DUPLICATE KEY UPDATE scrape_time=VALUES(scrape_time), last_event_time=VALUES(last_event_time)");
 		$r = self::$db->query($q);
-		if (!$r) throw new ErrorException("DB error, query $_q: ".self::$db->error);
+		if (!$r) throw new ErrorException("DB error, query $_q: ".self::$db->error());
 		self::vlog("Updated scrape times for file_id $file_id and topics: scrape time $scrape_time, ".join(", ",array_map(function($t) use ($last_events_per_topic) { return $t."=".$last_events_per_topic[$t] ?: 0; }, $topics)));
 	}
 
@@ -265,9 +265,9 @@ class TelemetryScrape extends Telemetry {
 	 * Update one topic scrape time for a file
 	 */
 	static function db_set_file_scrapetime($topic, $file_id, $scrape_time=null, $last_event_time=null) {
-		$q = self::qesc($_q="INSERT INTO `topic_scrapetimes` (topic, file_id, scrape_time, last_event_time) VALUES ({s}, {d}, {d}, {d}) ON DUPLICATE KEY UPDATE scrape_time=VALUES(scrape_time), last_event_time=VALUES(last_event_time)", $topic, $file_id, $scrape_time ?: time(), $last_event_time ?: null);
+		$q = self::$db->qesc($_q="INSERT INTO `topic_scrapetimes` (topic, file_id, scrape_time, last_event_time) VALUES ({s}, {d}, {d}, {d}) ON DUPLICATE KEY UPDATE scrape_time=VALUES(scrape_time), last_event_time=VALUES(last_event_time)", $topic, $file_id, $scrape_time ?: time(), $last_event_time ?: null);
 		$r = self::$db->query($q);
-		if (!$r) throw new ErrorException("DB error, query $_q: ".self::$db->error);
+		if (!$r) throw new ErrorException("DB error, query $_q: ".self::$db->error());
 	}
 
 	// Tests, DB schemas
@@ -276,7 +276,7 @@ class TelemetryScrape extends Telemetry {
 	 * Create generic scraping-related tables. None so far.
 	 */
 	static function db_create() {
-		parent::db_create();
+		self::$db->create_tables();
 
 		self::db_create_topic_scrapetimes();
 	}
@@ -288,7 +288,7 @@ class TelemetryScrape extends Telemetry {
 
 	static function db_create_topic_scrapetimes() {
 		self::$db->query("SHOW CREATE TABLE topic_scrapetimes;");
-		if (self::$db->error) {
+		if (self::$db->error()) {
 			$schema_sql =
 				"CREATE TABLE `topic_scrapetimes` (
 					`topic` char(10) NOT NULL,
@@ -303,8 +303,8 @@ class TelemetryScrape extends Telemetry {
 				COMMENT='used to mark which files have been processed and when';
 			";
 			self::$db->query($schema_sql);
-			if (self::$db->error)
-				throw new ErrorException("Failed to create table `topic_scrapetimes`: ".self::$db->error);
+			if (self::$db->error())
+				throw new ErrorException("Failed to create table `topic_scrapetimes`: ".self::$db->error());
 			self::vlog("DB table `topic_scrapetimes` created.");
 		}
 	}

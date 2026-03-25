@@ -28,7 +28,7 @@ class TelemetryView extends Telemetry {
 		return;
 		//self::test_paths();
 		try {
-			self::db_create();
+			self::$db->create_tables();
 			self::test_status();
 			self::vlog("Database: connected and present.");
 		} catch (Exception $e) {

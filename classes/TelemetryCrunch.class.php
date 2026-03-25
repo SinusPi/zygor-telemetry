@@ -85,7 +85,7 @@ class TelemetryCrunch extends Telemetry {
 		*/
 		
 		try {
-			$locked = self::db_query_one("SELECT GET_LOCK('telemetry_crunch_day_{$flavour}_{$day}', 0)");
+			$locked = self::$db->query_one("SELECT GET_LOCK('telemetry_crunch_day_{$flavour}_{$day}', 0)");
 			if (!$locked) {
 				self::vlog(C_MTHD."Skipping day \x1b[38;5;82m$day\x1b[0m, already being processed".C_R);
 				return false;									// #f00
@@ -240,7 +240,7 @@ class TelemetryCrunch extends Telemetry {
 			return $written;
 
 		} finally {
-			$unlocked = self::db_query_one("SELECT RELEASE_LOCK('telemetry_render_day_{$flavour}_{$day}', 0)");
+			$unlocked = self::$db->query_one("SELECT RELEASE_LOCK('telemetry_render_day_{$flavour}_{$day}', 0)");
 		}
 	}
 
@@ -258,14 +258,14 @@ class TelemetryCrunch extends Telemetry {
 				// create if needed
 				if (isset($cruncher['table_schema'],$cruncher['table'])) {
 					$table = $cruncher['table'];
-					self::db_qesc("SHOW CREATE TABLE {$table}");
-					if (self::$db->error) {
+					self::$db->query("SHOW CREATE TABLE {$table}");
+					if (self::$db->error()) {
 						self::vlog("\x1b[31;1mTable '{$table}' for cruncher '{$subname}' does not exist, creating...\x1b[0m");
 						$schema_sql = $cruncher['table_schema'];
 						$schema_sql = str_replace("<TABLE>",$table,$schema_sql);
 						self::$db->query($schema_sql);
-						if (self::$db->error) 
-							throw new Exception("Failed to create table `{$table}`: ".self::$db->error);
+						if (self::$db->error()) 
+							throw new Exception("Failed to create table `{$table}`: ".self::$db->error());
 						self::vlog("Table '{$table}' created.");
 					}
 				}
@@ -276,11 +276,11 @@ class TelemetryCrunch extends Telemetry {
 				$type = $cruncher["eventtype"]?:$name;
 
 				// get starting point
-				$max_id = self::db_query_one(self::qesc("SELECT IFNULL(MAX(event_id),0) FROM {$table} WHERE flavnum={d}",$flavnum)) ?: 0;
+				$max_id = self::$db->query_one(self::$db->qesc("SELECT IFNULL(MAX(event_id),0) FROM {$table} WHERE flavnum={d}",$flavnum)) ?: 0;
 				self::vlog("Processing {$type} events, starting with index {$max_id}...");
 
 				// get new events
-				$getquery = self::qesc("SELECT * FROM events WHERE flavnum={d} AND type={s} AND id>{d}",$flavnum,$type,$max_id);
+				$getquery = self::$db->qesc("SELECT * FROM events WHERE flavnum={d} AND type={s} AND id>{d}",$flavnum,$type,$max_id);
 				//self::vlog("DEBUG: getquery: $getquery");
 				$getrequest = self::$db->query($getquery);
 
@@ -301,10 +301,10 @@ class TelemetryCrunch extends Telemetry {
 
 					if ($cruncher['action']=="insert" && isset($cruncher['table'])) {
 						$table = $cruncher['table'];
-						$insertquery = self::qarrayesc("INSERT INTO {$table} ({keys}) VALUES ({values})",$fields);
+						$insertquery = self::$db->qarrayesc("INSERT INTO {$table} ({keys}) VALUES ({values})",$fields);
 						$insertrequest = self::$db->query($insertquery);
-						if (self::$db->affected_rows!=1) throw new Exception("FAILED to insert crunched event id {$event['id']} into {$table}");
-						if (self::$db->error) throw new Exception("ERROR inserting event id {$event['id']} into {$table}: ".self::$db->error);
+						if (self::$db->affected_rows()!=1) throw new Exception("FAILED to insert crunched event id {$event['id']} into {$table}");
+						if (self::$db->error()) throw new Exception("ERROR inserting event id {$event['id']} into {$table}: ".self::$db->error());
 					}
 				}
 

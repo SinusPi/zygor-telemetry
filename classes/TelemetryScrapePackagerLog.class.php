@@ -251,7 +251,7 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 				$extracted['datapoints'] = array_values(array_filter($extracted['datapoints'], function ($dp) use ($last_event_stored) {  return $dp['time'] > $last_event_stored;  })); // only new events
 				self::vlog("Datapoints after filtering out old (<= ".($last_event_stored ? date("Y-m-d H:i:s",$last_event_stored) : "never")."): ".count($extracted['datapoints']));
 
-				$inserted = self::db_store_datapoints($flavour,$sv_file_data['id'],$extracted['datapoints']);
+				$inserted = self::$db->store_datapoints($flavour,$sv_file_data['id'],$extracted['datapoints']);
 				self::vlog("Datapoints inserted into DB: $inserted");
 
 				$totals['inserted_datapoints'] += $inserted;
@@ -305,7 +305,7 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 				// unlock
 				if (isset($fl)) { flock($fl, LOCK_UN); fclose($fl); }
 				if ($got_db_lock) {
-					$unl = self::db_unlock($lock_code);
+					$unl = self::$db->unlock($lock_code);
 					//self::vlog(microtime(true)." DB lock released for $lock_code: ".($unl ? "ok" : "failed"));
 				}
 			}
@@ -500,7 +500,7 @@ ENDLUA;
 		self::test_paths();
 		//self::test_datapoints();
 		try {
-			self::db_create();
+			self::$db->create_tables();
 			self::test_status();
 			self::vlog("Database: connected and present.");
 		} catch (ErrorException $e) {
@@ -564,7 +564,7 @@ ENDLUA;
 	}
 
 	static function db_create() {
-		parent::db_create();
+		self::$db->create_tables();
 	}
 
 	/** Convert full file path to flavour/account/filename slug. */

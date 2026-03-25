@@ -126,7 +126,7 @@ class TelemetryEndpoint extends Telemetry {
 
 	static function serveGetStatus() {
 		try {
-			self::db_connect();
+			self::db_startup();
 		} catch (Exception $e) {
 			self::response([
 				"success" => false,
@@ -138,7 +138,7 @@ class TelemetryEndpoint extends Telemetry {
 
 		try {
 			// Fetch all status records from the database
-			$query = self::db_qesc("SELECT tag, status, updated_at FROM status ORDER BY tag ASC");
+			$query = self::$db->query("SELECT tag, status, updated_at FROM status ORDER BY tag ASC");
 			$result = $query->fetch_all(MYSQLI_ASSOC);
 
 			$statuses = [];
@@ -179,7 +179,7 @@ class TelemetryEndpoint extends Telemetry {
 		}
 
 		try {
-			self::db_connect();
+			self::db_startup();
 		} catch (Exception $e) {
 			self::response([
 				"success" => false,
@@ -238,13 +238,13 @@ class TelemetryEndpoint extends Telemetry {
 
 		try {
 			// Build daymap for entire range in one query
-			$query = self::db_qesc(
+			$query = self::$db->query(self::$db->qesc(
 				"SELECT FROM_UNIXTIME(`time`, '%Y-%m-%d') as day, COUNT(*) as cnt FROM `$table`
 				WHERE `flavnum`={d} AND `time`>={d} AND `time`<{d}
 				GROUP BY day
 				ORDER BY day ASC",
 				$flavnum, $from, $to
-			);
+			));
 			$result = $query->fetch_all(MYSQLI_ASSOC);
 			
 			$daymap = [];
@@ -293,7 +293,7 @@ class TelemetryEndpoint extends Telemetry {
 
 	/*
 	static function query($select,$table,$from,$to,$flavour,$where=[1],$groupby="",$order="",$limit="") {
-		$q = self::db_qesc($select." FROM `$table` WHERE `flavnum`={d} AND `time`>={d} AND `time`<={d} AND ".join(" AND ",$where)." $groupby $order", $flavour, $from, $to);
+		$q = self::$db->query(self::$db->qesc($select." FROM `$table` WHERE `flavnum`={d} AND `time`>={d} AND `time`<={d} AND ".join(" AND ",$where)." $groupby $order", $flavour, $from, $to));
 		return $results = $q->fetch_all();
 	}
 	*/

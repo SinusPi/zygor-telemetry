@@ -54,12 +54,12 @@ ENDLUA
 		'queryfunc'=>function($from,$to,$flavour) {
 			
 			$where = TelemetryEndpoint::get_where_from_to_flavour($from,$to,$flavour);
-			if ($_REQUEST['type']) $where[] = "type='".Telemetry::$db->real_escape_string($_REQUEST['type'])."'";
-			if ($_REQUEST['find']) $where[] = "guide LIKE '%".Telemetry::$db->real_escape_string($_REQUEST['find'])."%'";
+			if ($_REQUEST['type']) $where[] = "type='".Telemetry::$db->escape($_REQUEST['type'])."'";
+			if ($_REQUEST['find']) $where[] = "guide LIKE '%".Telemetry::$db->escape($_REQUEST['find'])."%'";
 			$order = ($_REQUEST['sort']=="name") ? "guide ASC" : "count DESC";
 			$limit = ($_REQUEST['limit']) ? intval($_REQUEST['limit']) : 100000;
 
-			$query = TelemetryEndpoint::db_qesc("SELECT COUNT(*) AS count, guide FROM usedguide WHERE ".join(" AND ",$where)." GROUP BY guide  ORDER BY $order  LIMIT $limit");
+			$query = Telemetry::$db->query("SELECT COUNT(*) AS count, guide FROM usedguide WHERE ".join(" AND ",$where)." GROUP BY guide  ORDER BY $order  LIMIT $limit");
 			$result = $query->fetch_all(MYSQLI_ASSOC);
 
 			return array_combine(array_column($result, 'guide'), array_column($result, 'count'));
