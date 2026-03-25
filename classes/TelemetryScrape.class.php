@@ -56,6 +56,15 @@ class TelemetryScrape extends Telemetry {
 		return [];
 	}
 
+	/**
+	 * Verify that all configured paths exist
+	 * Subclasses should override this method to implement their specific path verification logic
+	 * @return bool True if all configured paths exist and are valid, false otherwise
+	 */
+	static function verifyConfiguredPaths() {
+		return true;
+	}
+
 	static function filter_younger_files($files, $days_old) {
 		$time_limit = time() - ($days_old * DAY);
 		return array_values(array_filter($files, function($f) use ($time_limit) {

@@ -54,6 +54,24 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		}
 	}
 
+	/**
+	 * Verify that the SV storage paths are configured and accessible
+	 * @return bool True if both SV_STORAGE_ROOT and SV_STORAGE_DATA_PATH exist as directories, false otherwise
+	 */
+	static function verifyConfiguredPaths() {
+		try {
+			self::config();
+			// Both paths are required for SVs scraper
+			if (!isset(self::$CFG['SV_STORAGE_ROOT']) || !isset(self::$CFG['SV_STORAGE_DATA_PATH'])) {
+				return false;
+			}
+			// Both must be valid directories
+			return is_dir(self::$CFG['SV_STORAGE_ROOT']) && is_dir(self::$CFG['SV_STORAGE_DATA_PATH']);
+		} catch (Exception $e) {
+			return false;
+		}
+	}
+
 	static function filter_younger_files($files, $days_old) {
 		$time_limit = time() - ($days_old * DAY);
 		return array_values(array_filter($files, function($f) use ($time_limit) {

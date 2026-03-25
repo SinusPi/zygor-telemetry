@@ -90,22 +90,21 @@ class TelemetryEndpoint extends Telemetry {
 			
 			try {
 				// Load scraper config to get more details
-				if (class_exists($class)) {
-					$class::config();
-					$cfg = $class::$CFG;
-					
-					// Count topics using this scraper and collect topic names
-					$topics_list = array_keys(array_filter((array)$cfg['TOPICS'], function($t) use ($key) {
-						return isset($t['scraper']['input']) && $t['scraper']['input'] === $key;
-					}));
-					$topic_count = count($topics_list);
-					
-					// Get configured paths from the scraper class itself
-					$source_paths = $class::getConfiguredPaths();
-					
-					// Determine if scraper is configured based on whether paths exist
-					$status = (count($source_paths) > 0 && self::allPathsExist($source_paths)) ? 'configured' : 'not-configured';
-				}
+				$class::config();
+				$cfg = $class::$CFG;
+				
+				// Count topics using this scraper and collect topic names
+				$topics_list = array_keys(array_filter((array)$cfg['TOPICS'], function($t) use ($key) {
+					return isset($t['scraper']['input']) && $t['scraper']['input'] === $key;
+				}));
+				$topic_count = count($topics_list);
+				
+				// Get configured paths from the scraper class itself
+				$source_paths = $class::getConfiguredPaths();
+				
+				// Determine if scraper is configured based on whether paths exist
+				$status = (count($source_paths) > 0 && $class::verifyConfiguredPaths()) ? 'configured' : 'not-configured';
+
 			} catch (Exception $e) {
 				$status = 'error: ' . $e->getMessage();
 			}
@@ -123,18 +122,6 @@ class TelemetryEndpoint extends Telemetry {
 			"code" => 200,
 			"sources" => $sources,
 		]);
-	}
-
-	/**
-	 * Helper to check if all paths exist
-	 */
-	private static function allPathsExist($paths) {
-		foreach ($paths as $path) {
-			if (!is_dir($path)) {
-				return false;
-			}
-		}
-		return true;
 	}
 
 	static function serveGetStatus() {
@@ -156,16 +143,8 @@ class TelemetryEndpoint extends Telemetry {
 
 			$statuses = [];
 			foreach ($result as $row) {
-				$status_data = json_decode($row['status'], true);
-				if (!is_array($status_data)) {
-					$status_data = [];
-				}
-				
-				$statuses[] = [
-					'tag' => $row['tag'],
-					'updated_at' => $row['updated_at'],
-					'data' => $status_data
-				];
+				$row['data'] = (array)json_decode($row['status'], true);
+				$statuses[] = $row;
 			}
 
 			self::response([

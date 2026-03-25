@@ -44,6 +44,22 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 	}
 
 	/**
+	 * Verify that the packager log path is configured and accessible
+	 * @return bool True if path exists and is a directory, false otherwise
+	 */
+	static function verifyConfiguredPaths() {
+		try {
+			self::config();
+			if (!isset(self::$CFG['PACKAGERLOG_PATH'])) {
+				return false;
+			}
+			return is_dir(self::$CFG['PACKAGERLOG_PATH']);
+		} catch (Exception $e) {
+			return false;
+		}
+	}
+
+	/**
 	 * Grab data from SVs, store into db
 	 * @param string $flavour
 	 */
