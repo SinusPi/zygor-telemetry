@@ -199,96 +199,14 @@ class TelemetryDB {
 	// Locking methods
 	// =======================================================================
 
-	function lock($lock) {
+	function lock($lock, $timeout = 10) {
 		$lock = "'scrape/" . $this->escape($lock) . "'";
-		return $this->query_one("SELECT GET_LOCK($lock, 1);");
+		return $this->query_one("SELECT GET_LOCK($lock, {d});", $timeout);
 	}
 
 	function unlock($lock) {
 		$lock = "'scrape/" . $this->escape($lock) . "'";
 		return $this->query_one("SELECT RELEASE_LOCK($lock);");
-	}
-
-	// =======================================================================
-	// Schema creation methods
-	// =======================================================================
-
-	function create_tables() {
-		$this->create_status_table();
-		$this->create_files_table();
-		$this->create_events_table();
-	}
-
-	function create_status_table() {
-		$this->conn->query("SHOW CREATE TABLE status;");
-		if ($this->error()) {
-			$schema_sql = "CREATE TABLE `status` (
-					`tag` char(20) NOT NULL,
-					`status` varchar(200) DEFAULT NULL,
-					`updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-					UNIQUE KEY `tag` (`tag`)
-				)
-				ENGINE=InnoDB
-				DEFAULT CHARSET=latin1
-				COLLATE=latin1_swedish_ci
-				COMMENT='current status of telemetry processing jobs';
-			";
-			$this->conn->query($schema_sql);
-			if ($this->error())
-				throw new Exception("Failed to create table `status`: " . $this->error());
-			return true;
-		}
-		return false;
-	}
-
-	function create_files_table() {
-		$this->conn->query("SHOW CREATE TABLE files;");
-		if ($this->error()) {
-			$schema_sql = "CREATE TABLE `files` (
-					`id` int(11) NOT NULL AUTO_INCREMENT,
-					`slugname` varchar(255) NOT NULL, -- may not be an exact filename, may even be virtual, just unique
-					`filetype` char(2) NOT NULL, -- 'sv','pl'; will govern slug-to-fullpath logic, etc.
-					UNIQUE KEY `id` (`id`),
-					UNIQUE KEY `slugname` (`slugname`)
-				) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
-				COMMENT='list of all parsed files, for bookkeeping and reference from events';
-			";
-			$this->conn->query($schema_sql);
-			if ($this->error())
-				throw new Exception("Failed to create table `files`: " . $this->error());
-			return true;
-		}
-		return false;
-	}
-
-	function create_events_table() {
-		$this->conn->query("SHOW CREATE TABLE events;");
-		if ($this->error()) {
-			$schema_sql = "CREATE TABLE `events` (
-					`id` int(11) NOT NULL AUTO_INCREMENT,
-					`flavnum` int(1) NOT NULL,
-					`file_id` int(11),
-					`time` int(10) NOT NULL,
-					`type` char(40) NOT NULL,
-					`data` text NOT NULL,
-					UNIQUE KEY `id` (`id`,`flavnum`) USING BTREE,
-					KEY `type` (`type`) USING BTREE,
-					KEY `time` (`time`)
-				) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
-				PARTITION BY RANGE (`flavnum`) (
-					PARTITION `p_wtf` VALUES LESS THAN (1) ENGINE = InnoDB,
-					PARTITION `p_wow` VALUES LESS THAN (2) ENGINE = InnoDB,
-					PARTITION `p_wowclassic` VALUES LESS THAN (3) ENGINE = InnoDB,
-					PARTITION `p_wowclassictbc` VALUES LESS THAN (4) ENGINE = InnoDB,
-					PARTITION `p_wowclassictbcanniv` VALUES LESS THAN (5) ENGINE = InnoDB
-				)
-			"; // will need manual adjustment for more flavours :(
-			$this->conn->query($schema_sql);
-			if ($this->error())
-				throw new Exception("Failed to create table `events`: " . $this->error());
-			return true;
-		}
-		return false;
 	}
 
 	// =======================================================================

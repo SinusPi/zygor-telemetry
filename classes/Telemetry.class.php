@@ -330,10 +330,96 @@ class Telemetry {
 		try {
 			self::$db = new TelemetryDB();
 			self::$db->connect($cfg);
+
+			static::db_create_tables();
 		} catch (Exception $e) {
 			throw new ErrorException("Failed to connect to database '".$cfg['db']."' on '".$cfg['host']."': ".$e->getMessage()."\n");
 		}
 	}
+
+
+	// =======================================================================
+	// Schema creation methods
+	// =======================================================================
+
+	static function db_create_tables() {
+		self::db_create_status_table();
+		self::db_create_files_table();
+		self::db_create_events_table();
+	}
+
+	static function db_create_status_table() {
+		self::$db->query("SHOW CREATE TABLE status;");
+		if (self::$db->error()) {
+			$schema_sql = "CREATE TABLE `status` (
+					`tag` char(20) NOT NULL,
+					`status` varchar(200) DEFAULT NULL,
+					`updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+					UNIQUE KEY `tag` (`tag`)
+				)
+				ENGINE=InnoDB
+				DEFAULT CHARSET=latin1
+				COLLATE=latin1_swedish_ci
+				COMMENT='current status of telemetry processing jobs';
+			";
+			self::$db->query($schema_sql);
+			if (self::$db->error())
+				throw new Exception("Failed to create table `status`: " . self::$db->error());
+			return true;
+		}
+		return false;
+	}
+
+	static function db_create_files_table() {
+		self::$db->query("SHOW CREATE TABLE files;");
+		if (self::$db->error()) {
+			$schema_sql = "CREATE TABLE `files` (
+					`id` int(11) NOT NULL AUTO_INCREMENT,
+					`slugname` varchar(255) NOT NULL, -- may not be an exact filename, may even be virtual, just unique
+					`filetype` char(2) NOT NULL, -- 'sv','pl'; will govern slug-to-fullpath logic, etc.
+					UNIQUE KEY `id` (`id`),
+					UNIQUE KEY `slugname` (`slugname`)
+				) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+				COMMENT='list of all parsed files, for bookkeeping and reference from events';
+			";
+			self::$db->query($schema_sql);
+			if (self::$db->error())
+				throw new Exception("Failed to create table `files`: " . self::$db->error());
+			return true;
+		}
+		return false;
+	}
+
+	static function db_create_events_table() {
+		self::$db->query("SHOW CREATE TABLE events;");
+		if (self::$db->error()) {
+			$schema_sql = "CREATE TABLE `events` (
+					`id` int(11) NOT NULL AUTO_INCREMENT,
+					`flavnum` int(1) NOT NULL,
+					`file_id` int(11),
+					`time` int(10) NOT NULL,
+					`type` char(40) NOT NULL,
+					`data` text NOT NULL,
+					UNIQUE KEY `id` (`id`,`flavnum`) USING BTREE,
+					KEY `type` (`type`) USING BTREE,
+					KEY `time` (`time`)
+				) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+				PARTITION BY RANGE (`flavnum`) (
+					PARTITION `p_wtf` VALUES LESS THAN (1) ENGINE = InnoDB,
+					PARTITION `p_wow` VALUES LESS THAN (2) ENGINE = InnoDB,
+					PARTITION `p_wowclassic` VALUES LESS THAN (3) ENGINE = InnoDB,
+					PARTITION `p_wowclassictbc` VALUES LESS THAN (4) ENGINE = InnoDB,
+					PARTITION `p_wowclassictbcanniv` VALUES LESS THAN (5) ENGINE = InnoDB
+				)
+			"; // will need manual adjustment for more flavours :(
+			self::$db->query($schema_sql);
+			if (self::$db->error())
+				throw new Exception("Failed to create table `events`: " . self::$db->error());
+			return true;
+		}
+		return false;
+	}
+
 
 
 	static function call_hooks($hook,$args) {

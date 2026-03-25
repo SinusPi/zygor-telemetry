@@ -500,7 +500,6 @@ ENDLUA;
 		self::test_paths();
 		//self::test_datapoints();
 		try {
-			self::$db->create_tables();
 			self::test_status();
 			self::vlog("Database: connected and present.");
 		} catch (ErrorException $e) {
