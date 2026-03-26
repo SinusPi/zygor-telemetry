@@ -37,6 +37,7 @@ class Telemetry {
 
 	static function init() {
 		self::set_error_reporting();
+		self::load_classes();
 	}
 
 	/** Init, config, connect... */
@@ -515,7 +516,24 @@ class Telemetry {
 		}
 		return $base;
 	}
+
+	/**
+	 * Load all dependent class files from the classes directory.
+	 */
+	static function load_classes() {
+		foreach (glob(__DIR__."/*.class.php") as $classfile) {
+			if (basename($classfile)=="Telemetry.class.php") continue;
+			require_once $classfile;
+		}
+	}
 }
+
+// initialize everything
+Telemetry::startup();
+
+
+
+/// these stay here for now
 
 class FileLockedException extends Exception {
 	// Custom exception for file locking issues
@@ -523,12 +541,6 @@ class FileLockedException extends Exception {
 
 class MinorError extends Exception {
 	// Custom exception for error messages
-}
-
-// load dependent classes
-foreach (glob(__DIR__."/*.class.php") as $classfile) {
-	if (basename($classfile)=="Telemetry.class.php") continue;
-	require_once $classfile;
 }
 
 class File {
