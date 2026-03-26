@@ -327,6 +327,7 @@ class Telemetry {
 	 */
 	static function db_startup() {
 		$cfg = self::$CFG['DB'];
+		if (isset(self::$db)) return self::$db; // already connected
 		try {
 			self::$db = new TelemetryDB();
 			self::$db->connect($cfg);
@@ -335,6 +336,7 @@ class Telemetry {
 		} catch (Exception $e) {
 			throw new ErrorException("Failed to connect to database '".$cfg['db']."' on '".$cfg['host']."': ".$e->getMessage()."\n");
 		}
+		return self::$db;
 	}
 
 
