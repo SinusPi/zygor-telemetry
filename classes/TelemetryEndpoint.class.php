@@ -125,16 +125,6 @@ class TelemetryEndpoint extends Telemetry {
 	}
 
 	static function serveGetStatus() {
-		try {
-			self::db_startup();
-		} catch (Exception $e) {
-			self::response([
-				"success" => false,
-				"code" => 500,
-				"error" => "Database connection error: " . $e->getMessage(),
-				"errcode" => "DB_ERROR",
-			]);
-		}
 
 		try {
 			// Fetch all status records from the database
@@ -175,17 +165,6 @@ class TelemetryEndpoint extends Telemetry {
 				"code" => 400,
 				"error" => "Invalid date in from/to parameters: " . $e->getMessage(),
 				"errcode" => "BAD_DATE",
-			]);
-		}
-
-		try {
-			self::db_startup();
-		} catch (Exception $e) {
-			self::response([
-				"success" => false,
-				"code" => 500,
-				"error" => "Database connection error: " . $e->getMessage(),
-				"errcode" => "DB_ERROR",
 			]);
 		}
 

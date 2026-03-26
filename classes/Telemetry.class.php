@@ -48,7 +48,7 @@ class Telemetry {
 		} catch (Exception $e) {
 			die("Failed to load topics: ".$e->getMessage()."\n");
 		}
-		self::db_startup();
+		static::db_startup();
 		static::self_tests(); // overridable
 	}
 

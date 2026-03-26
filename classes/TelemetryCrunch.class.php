@@ -75,6 +75,7 @@ class TelemetryCrunch extends Telemetry {
 		self::log("Crunching of $flavour complete.");
 	}
 
+	/** @deprecated */
 	static function crunch_day($flavour,$day) {
 		/*
 		$day_path = self::cfgstr('SCRAPES_PATH',['FLAVOUR'=>$flavour,'DAY'=>$day]);
