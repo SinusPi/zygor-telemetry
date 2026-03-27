@@ -82,7 +82,7 @@ class Telemetry {
 
 		if (self::$CFG['verbose']) {
 			$dot = function($reset=false) { static $s=0; if ($reset) $s=-1; return $s++ ? ", ":" - "; };
-			Log::vlog("Loaded ".count($topics)." telemetry topics:\n".implode("\n",array_map(function($t) use ($dot) {
+			Logger::vlog("Loaded ".count($topics)." telemetry topics:\n".implode("\n",array_map(function($t) use ($dot) {
 				$cc = count($t['crunchers']);
 				$r = "* ";
 				$r .= C_MTHD.$t['name'].C_R;
@@ -223,8 +223,8 @@ class Telemetry {
 			echo "new tag $merge_tag\n";
 			if (count($merges_last)>0) { //dump
 				echo "count\n";
-				if (count($merges_last)>2) Log::log("...");
-				foreach ($merges_last as $mergelast) Log::log($mergelast);
+				if (count($merges_last)>2) Logger::log("...");
+				foreach ($merges_last as $mergelast) Logger::log($mergelast);
 				$merges_last=[];
 				return;
 			}
@@ -234,7 +234,7 @@ class Telemetry {
 			return;
 		}
 		echo "plain\n";
-		if ($s) Log::log($s);
+		if ($s) Logger::log($s);
 		$i++; if ($i>100) die();
 	}
 
@@ -382,16 +382,16 @@ class Telemetry {
 	static function call_hooks($hook,$args) {
 		//self::vlog("Hook: $hook calls starting.");
 		foreach (self::$CFG['TOPICS'] as $dp_name=>$dp_def)
-			if ($dp_def[$hook] && $dp_def['skip']!==false) { Log::vlog(" - Calling $hook for $dp_name"); call_user_func_array($dp_def[$hook], $args); }
+			if ($dp_def[$hook] && $dp_def['skip']!==false) { Logger::vlog(" - Calling $hook for $dp_name"); call_user_func_array($dp_def[$hook], $args); }
 		//self::vlog("Hook: $hook calls complete.");
 	}
 
 	static function dump_config() {
 		$cfg = self::$CFG;
 		if (!$cfg) return; // No config loaded
-		Log::log(get_called_class()." config:");
+		Logger::log(get_called_class()." config:");
 		if (isset($cfg['DB']['pass'])) $cfg['DB']['pass']="****"; // hide password
-		Log::log(join("\n",array_map(function($k,$v) { /* key=value */
+		Logger::log(join("\n",array_map(function($k,$v) { /* key=value */
 			if (is_array($v)) $v="[".join(",",$v)."]";
 			elseif ($v===TRUE) $v="Y";
 			elseif ($v===FALSE) $v="N";
@@ -547,30 +547,4 @@ class TelemetryStatus {
 		}
 	}
 
-}
-
-class Log {
-	static $last_tag = "TELEMETRY";
-
-	static function log($s,$tag=null) {
-		$tag = $tag ?: self::$last_tag;
-		self::$last_tag = $tag;
-		if (Telemetry::$CFG['LOG_FILENAME']) {
-			// log to file
-			file_put_contents(
-				Telemetry::$CFG['TELEMETRY_ROOT']."/".Telemetry::$CFG['LOG_FILENAME'],
-				date("Y-m-d H:i:s").".".sprintf("%03d",explode(" ", microtime())[0]*1000)." [$tag] ".$s."\n",
-				FILE_APPEND|LOCK_EX
-			);
-		}
-		if (function_exists('posix_isatty') ? posix_isatty(STDIN) : (php_sapi_name() === 'cli')) echo $s."\n";
-	}
-
-	static function vlog($s) {
-		if (Telemetry::$CFG['verbose']) self::log($s);
-	}
-
-	static function vflog($flag, $message) {
-		if (Telemetry::$CFG['verbose'] && in_array($flag, Telemetry::$CFG['VERBOSE_FLAGS'])) self::log("[$flag] $message");
-	}
 }

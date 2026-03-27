@@ -195,11 +195,11 @@ class TelemetryScrape {
 	 * @yield File $file
 	 */
 	static function get_fresh_files_gen($topics, $startfolder, $filemask, $cb_slugger, $filetype, $batch_size=20) {
-		Log::vlog("Finding files in $startfolder matching $filemask...");
+		Logger::vlog("Finding files in $startfolder matching $filemask...");
 		$files_gen = FileTools::rglob_gen($startfolder,$filemask,10);
 		$file_batches_gen = self::batchify($files_gen, $batch_size);
 		foreach ($file_batches_gen as $batch) {
-			Log::vlog("* Processing batch of ".count($batch)." files...");
+			Logger::vlog("* Processing batch of ".count($batch)." files...");
 			// filenames in batch are full; need to shorten for DB
 			// add prefix to batch items, e.g. "flavour/filename"
 			$batch_slugs = array_map($cb_slugger,$batch);
@@ -221,17 +221,17 @@ class TelemetryScrape {
 				}
 
 				if (!$file->any_fresh) {
-					Log::vlog("- File {$file->slug} is NOT fresh for any of the topics (mtimes: ".join(", ", array_map(function($t) use ($file) { return "$t=".($file->topics[$t]['scrape_time'] ?: 0); }, $topics))."), skipping.");
+					Logger::vlog("- File {$file->slug} is NOT fresh for any of the topics (mtimes: ".join(", ", array_map(function($t) use ($file) { return "$t=".($file->topics[$t]['scrape_time'] ?: 0); }, $topics))."), skipping.");
 				} else {
 					// list fresh topics with mtimes
 					$fresh_topics = array_filter($topics, function($t) use ($file) { return $file->topics[$t]['fresh']; });
 					$mtime = $file->mtime;
-					Log::vlog("- File {$file->slug} ($mtime) is fresh for topics: ".join(", ", array_map(function($t) use ($file) { return "$t (mtime: ".($file->topics[$t]['scrape_time'] ?: 0).")"; }, $fresh_topics)));
+					Logger::vlog("- File {$file->slug} ($mtime) is fresh for topics: ".join(", ", array_map(function($t) use ($file) { return "$t (mtime: ".($file->topics[$t]['scrape_time'] ?: 0).")"; }, $fresh_topics)));
 					
 					yield $file;
 				}
 			}
-			Log::vlog("* Batch complete.");
+			Logger::vlog("* Batch complete.");
 		}
 	}
 
@@ -273,7 +273,7 @@ class TelemetryScrape {
 		$q = Tm::$db->qesc($_q="INSERT INTO `topic_scrapetimes` (topic, file_id, scrape_time, last_event_time) VALUES $values ON DUPLICATE KEY UPDATE scrape_time=VALUES(scrape_time), last_event_time=VALUES(last_event_time)");
 		$r = Tm::$db->query($q);
 		if (!$r) throw new ErrorException("DB error, query $_q: ".Tm::$db->error());
-		Log::vlog("Updated scrape times for file_id $file_id and topics: scrape time $scrape_time, ".join(", ",array_map(function($t) use ($last_events_per_topic) { return $t."=".$last_events_per_topic[$t] ?: 0; }, $topics)));
+		Logger::vlog("Updated scrape times for file_id $file_id and topics: scrape time $scrape_time, ".join(", ",array_map(function($t) use ($last_events_per_topic) { return $t."=".$last_events_per_topic[$t] ?: 0; }, $topics)));
 	}
 
 	/**
@@ -318,7 +318,7 @@ class TelemetryScrape {
 			Tm::$db->query($schema_sql);
 			if (Tm::$db->error())
 				throw new ErrorException("Failed to create table `topic_scrapetimes`: ".Tm::$db->error());
-			Log::vlog("DB table `topic_scrapetimes` created.");
+			Logger::vlog("DB table `topic_scrapetimes` created.");
 		}
 	}
 

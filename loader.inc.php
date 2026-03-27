@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/classes/Config.class.php';
 require_once __DIR__ . '/classes/FileTools.class.php';
+require_once __DIR__ . '/classes/Logger.class.php';
 require_once __DIR__ . '/classes/Telemetry.class.php';
 require_once __DIR__ . '/classes/TelemetryCrunch.class.php';
 require_once __DIR__ . '/classes/TelemetryDB.class.php';

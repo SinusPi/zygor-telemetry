@@ -82,25 +82,25 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 		//$topics = array_filter($topics, function($t) { return ($t['scraper']['input']?:"") == "packagerlog"; });
 		//if (!count($topics)) throw new MinorError("No topics to scrape for packager logs, aborting.");
 		
-		Log::log("Starting scrape of topics: \x1b[38;5;78m".implode(", ",array_keys($topics))."\x1b[0m in packager logs.");
+		Logger::log("Starting scrape of topics: \x1b[38;5;78m".implode(", ",array_keys($topics))."\x1b[0m in packager logs.");
 
 		TmSt::stat(['status'=>"ENUMERATING",'stage'=>1,'stageof'=>2,'progress'=>[],'time_started'=>time(),'time_started_hr'=>date("Y-m-d H:i:s")]);		
-		Log::log("Enumerating files matching ".self::$CFG['PACKAGERLOG_MASK']." in ".self::$CFG['PACKAGERLOG_PATH']);
+		Logger::log("Enumerating files matching ".self::$CFG['PACKAGERLOG_MASK']." in ".self::$CFG['PACKAGERLOG_PATH']);
 		
 		$files = self::find_logs();
 		$total_filecount = count($files);
-		Log::vlog("Found $total_filecount files.");
+		Logger::vlog("Found $total_filecount files.");
 
 		$files = self::filter_by_dates($files);
 
 		TmSt::stat(['files_total'=>count($files)],true);
-		Log::log(count($files)." files to process.");
-		Log::log(join(",",$files));
+		Logger::log(count($files)." files to process.");
+		Logger::log(join(",",$files));
 
 		$freshfiles = self::db_get_unprocessed_logfiles($files,array_keys($topics));
 
 		if (!count($freshfiles)) {
-			Log::log("Nothing to do here.");
+			Logger::log("Nothing to do here.");
 			TmSt::stat(['status'=>"IDLE"]);
 			return;
 		}
@@ -113,7 +113,7 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 		
 		/*
 		$first_day_relevant = date("Ymd",time()-self::$CFG['TELEMETRY_DATA_AGE']);
-		Log::log("We check for data max \x1b[1m".round(self::$CFG['TELEMETRY_DATA_AGE']/86400)."\x1b[0m days old (>= \x1b[38;5;118m$first_day_relevant\x1b[0m)");
+		Logger::log("We check for data max \x1b[1m".round(self::$CFG['TELEMETRY_DATA_AGE']/86400)."\x1b[0m days old (>= \x1b[38;5;118m$first_day_relevant\x1b[0m)");
 		*/
 
 		// prepare list of files to actually process
@@ -148,7 +148,7 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 		*/
 		$freshfiles_to_process = $freshfiles; // for now, process all files
 	
-		Log::log(sprintf("Processing %d logs.",count($freshfiles_to_process)));
+		Logger::log(sprintf("Processing %d logs.",count($freshfiles_to_process)));
 		
 		unset($freshfiles);
 
@@ -188,7 +188,7 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 		foreach ($freshfiles_to_process as $n=>$filename) {
 			TmSt::stat(['file_last'=>$filename],true);
 
-			Log::vlog("Scraping Packager log: \x1b[38;5;110m$filename\x1b[0m");
+			Logger::vlog("Scraping Packager log: \x1b[38;5;110m$filename\x1b[0m");
 
 			$lock_code = $filename;
 			$got_db_lock = false;
@@ -203,13 +203,13 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 
 				Telemetry::$db->begin_transaction();
 
-				Log::vlog(" - :. reading logfile...");
+				Logger::vlog(" - :. reading logfile...");
 
 
 
 				$sv_file_data = self::db_get_sv_file_data($flavourfile);
 				if (!$sv_file_data) {
-					Log::log("Cannot get sv_file_data for $filename_full. Locked?");
+					Logger::log("Cannot get sv_file_data for $filename_full. Locked?");
 					throw new FileLockedException("DB locked for $flavourfile");
 				}
 
@@ -219,7 +219,7 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 
 				$sv_raw = self::read_raw_sv($filename_full);
 
-				Log::vlog(" - .: extracting datapoints...");
+				Logger::vlog(" - .: extracting datapoints...");
 
 				$extracted = self::extract_datapoints_with_lua($sv_raw,$flavour,$topics);
 
@@ -243,7 +243,7 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 
 				$counts = array_count_values(array_column($extracted['datapoints'], 'type'));
 				$times = $extracted['times'];
-				Log::vlog("Datapoints extracted by type: " . join(", ", array_map(function ($item, $key) use ($times) { return "\x1b[38;5;72m$key\x1b[0m:{$item} ({$times[$key]}s)"; }, array_values($counts), array_keys($counts))));
+				Logger::vlog("Datapoints extracted by type: " . join(", ", array_map(function ($item, $key) use ($times) { return "\x1b[38;5;72m$key\x1b[0m:{$item} ({$times[$key]}s)"; }, array_values($counts), array_keys($counts))));
 
 				/*
 					// locale
@@ -255,10 +255,10 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 				*/
 
 				$extracted['datapoints'] = array_values(array_filter($extracted['datapoints'], function ($dp) use ($last_event_stored) {  return $dp['time'] > $last_event_stored;  })); // only new events
-				Log::vlog("Datapoints after filtering out old (<= ".($last_event_stored ? date("Y-m-d H:i:s",$last_event_stored) : "never")."): ".count($extracted['datapoints']));
+				Logger::vlog("Datapoints after filtering out old (<= ".($last_event_stored ? date("Y-m-d H:i:s",$last_event_stored) : "never")."): ".count($extracted['datapoints']));
 
 				$inserted = Telemetry::$db->store_datapoints($flavour,$sv_file_data['id'],$extracted['datapoints']);
-				Log::vlog("Datapoints inserted into DB: $inserted");
+				Logger::vlog("Datapoints inserted into DB: $inserted");
 
 				$totals['inserted_datapoints'] += $inserted;
 
@@ -266,16 +266,16 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 				$datapoints_by_days = self::split_data_by_types_days($extracted['datapoints']);
 				ksort($datapoints_by_days);
 
-				//Log::vlog("Days present: ".implode(",",self::group_ranges(array_keys($datapoints_by_days))));
+				//Logger::vlog("Days present: ".implode(",",self::group_ranges(array_keys($datapoints_by_days))));
 				$all_days = array_keys($datapoints_by_days);
 				foreach ($datapoints_by_days as $day=>&$data) 
 					if ($day<$first_day_relevant) unset($datapoints_by_days[$day]);
 
-				Log::vlog(sprintf("Days present: \x1b[38;5;118m%s\x1b[0m-\x1b[38;5;118m%s\x1b[0m", current($all_days), end($all_days)));
-				Log::vlog("Days relevant: ".implode(",",array_map(function($s) { return "\x1b[38;5;118m$s\x1b[0m"; }, self::group_ranges(array_keys($datapoints_by_days)))));
+				Logger::vlog(sprintf("Days present: \x1b[38;5;118m%s\x1b[0m-\x1b[38;5;118m%s\x1b[0m", current($all_days), end($all_days)));
+				Logger::vlog("Days relevant: ".implode(",",array_map(function($s) { return "\x1b[38;5;118m$s\x1b[0m"; }, self::group_ranges(array_keys($datapoints_by_days)))));
 				
 				foreach ($datapoints_by_days as $day=>&$daydata) {
-					Log::vlog("Day $day: ".count($daydata)." events (".join(", ", array_unique(array_map(function ($item) { return $item['type']; }, $daydata))).")");
+					Logger::vlog("Day $day: ".count($daydata)." events (".join(", ", array_unique(array_map(function ($item) { return $item['type']; }, $daydata))).")");
 					self::store_day_scrape($flavour,$day,$user,$bnet, $daydata, filemtime($filename_full), $totals);
 				} unset ($daydata);
 				//self::write_intermediate_mtimes($flavour,$last_scrape_dates);
@@ -301,18 +301,18 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 				Telemetry::$db->commit();
 
 			} catch (FileLockedException $e) {
-				Log::vlog($e->getMessage()." - $filename_full");
+				Logger::vlog($e->getMessage()." - $filename_full");
 				Telemetry::$db->rollback();
 				continue;
 			} catch (Exception $e) {
-				Log::log(microtime(true)." ERROR processing $filename_full: " . $e->getMessage());
+				Logger::log(microtime(true)." ERROR processing $filename_full: " . $e->getMessage());
 				throw $e;
 			} finally {
 				// unlock
 				if (isset($fl)) { flock($fl, LOCK_UN); fclose($fl); }
 				if ($got_db_lock) {
 					$unl = Telemetry::$db->unlock($lock_code);
-					//Log::vlog(microtime(true)." DB lock released for $lock_code: ".($unl ? "ok" : "failed"));
+					//Logger::vlog(microtime(true)." DB lock released for $lock_code: ".($unl ? "ok" : "failed"));
 				}
 			}
 
@@ -326,10 +326,10 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 		//self::write_intermediate_mtimes($flavour,$last_scrape_dates,true);
 		$tot1 = array_filter($totals,function($v) { return is_numeric($v); });
 		$tots = array_map(function($k,$v) { return "$k=$v"; }, array_keys($tot1), array_values($tot1));
-		Log::log("Scrape of $flavour complete; ".implode(", ",$tots));
+		Logger::log("Scrape of $flavour complete; ".implode(", ",$tots));
 
 		if (count($totals['files_without_zgvs'])/(count($freshfiles_to_process)-$totals['files_skipped'])>0.5)
-			Log::log("Weird. Out of ".(count($freshfiles_to_process)-$totals['files_skipped'])." files read, ".count($totals['files_without_zgvs'])." had no ZGVs.");
+			Logger::log("Weird. Out of ".(count($freshfiles_to_process)-$totals['files_skipped'])." files read, ".count($totals['files_without_zgvs'])." had no ZGVs.");
 
 		TmSt::stat(['status'=>"IDLE"]);
 	}
@@ -356,7 +356,7 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 		if (file_exists($scrape_filepath))
 			return $totals['tmfiles_skipped']++;
 
-		//Log::vlog("Saving ".count($daydata)." scrapes into \x1b[33;1m$scrape_filepath\x1b[0m");
+		//Logger::vlog("Saving ".count($daydata)." scrapes into \x1b[33;1m$scrape_filepath\x1b[0m");
 
 		file_put_contents($scrape_filepath,json_encode($daydata),LOCK_EX);
 
@@ -506,23 +506,23 @@ ENDLUA;
 		self::test_paths();
 		//self::test_datapoints();
 		try {
-			Log::vlog("Database: connected and present.");
+			Logger::vlog("Database: connected and present.");
 		} catch (ErrorException $e) {
 			die("DB Connection to ".self::$CFG['DB']['host']." FAILED - ".$e->getMessage());
 		}
-		Log::vlog("Self-tests: \x1b[48;5;70;30mPASS\x1b[0m");
+		Logger::vlog("Self-tests: \x1b[48;5;70;30mPASS\x1b[0m");
 	}
 
 	static function test_paths() {
-		Log::vlog("Testing paths:");
+		Logger::vlog("Testing paths:");
 
 		if (!is_dir(self::$CFG['PACKAGERLOG_PATH'])) die("Missing Packager Log path: ".self::$CFG['PACKAGERLOG_PATH']."\n");
-		Log::vlog(" - Will read Packager Logs from: \x1b[33m".self::$CFG['PACKAGERLOG_PATH']."\x1b[0m");
+		Logger::vlog(" - Will read Packager Logs from: \x1b[33m".self::$CFG['PACKAGERLOG_PATH']."\x1b[0m");
 
 		$mask = str_replace(["<Y>","<M>","<D>"],["*","*","*"],self::$CFG['PACKAGERLOG_MASK']);
 		$g = glob(self::$CFG['PACKAGERLOG_PATH']."/".$mask,GLOB_NOSORT);
 		if (!$g || !count($g)) die("No Packager Log files found matching mask: ".$mask."\n");
-		Log::vlog(" - Found ".count($g)." Packager Log files matching mask '".$mask."', we're good.");
+		Logger::vlog(" - Found ".count($g)." Packager Log files matching mask '".$mask."', we're good.");
 
 		return true;
 	}

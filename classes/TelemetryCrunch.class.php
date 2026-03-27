@@ -12,7 +12,7 @@ class TelemetryCrunch {
 	 * @deprecated Use TelemetryCrunch::crunch_flavour() instead.
 	 */
 	static function crunch($flavour) {
-		if (!in_array($flavour,array_keys(self::$CFG['WOW_FLAVOUR_DATA']))) throw new Exception("Unsupported flavour '{$flavour}' (supported: ".join(", ",array_keys(self::$CFG['WOW_FLAVOUR_DATA'])).")");
+		if (!in_array($flavour,array_keys(Telemetry::$CFG['WOW_FLAVOUR_DATA']))) throw new Exception("Unsupported flavour '{$flavour}' (supported: ".join(", ",array_keys(self::$CFG['WOW_FLAVOUR_DATA'])).")");
 
 		$tag = "CRUNCH-".strtoupper(str_replace("-","_", $flavour));
 
@@ -26,9 +26,9 @@ class TelemetryCrunch {
 
 		/*
 		$scrape_path_root = dirname(self::cfgstr('SCRAPES_PATH',['FLAVOUR'=>$flavour,'DAY'=>'0']));
-		Log::log("Starting rendering from \x1b[38;5;118m".str_replace("/$flavour/","/\x1b[38;5;190m$flavour\x1b[38;5;118m"."/",$scrape_path_root)."\x1b[0m");
+		Logger::log("Starting rendering from \x1b[38;5;118m".str_replace("/$flavour/","/\x1b[38;5;190m$flavour\x1b[38;5;118m"."/",$scrape_path_root)."\x1b[0m");
 		if (!is_dir($scrape_path_root)) {
-			Log::log("Scrape path root does not exist: $scrape_path_root");
+			Logger::log("Scrape path root does not exist: $scrape_path_root");
 			return;																				// #f00
 		}
 
@@ -69,13 +69,13 @@ class TelemetryCrunch {
 			TmSt::update_progress($tag,$i,$totaldays);
 
 			if ($ndays>=self::$CFG['MAX_CRUNCH_DAYS']) {
-				Log::log("\x1b[41;37;1m STOP \x1b[0m : Reached max crunch days (".self::$CFG['MAX_CRUNCH_DAYS'].").");
+				Logger::log("\x1b[41;37;1m STOP \x1b[0m : Reached max crunch days (".self::$CFG['MAX_CRUNCH_DAYS'].").");
 				break;	// #f80
 			}
 			//die("BOOOO $ndays");
 		}
 
-		Log::log("Crunching of $flavour complete.");
+		Logger::log("Crunching of $flavour complete.");
 	}
 
 	/** @deprecated */
@@ -83,7 +83,7 @@ class TelemetryCrunch {
 		/*
 		$day_path = self::cfgstr('SCRAPES_PATH',['FLAVOUR'=>$flavour,'DAY'=>$day]);
 		if (!is_dir($day_path)) {
-			Log::log("Scrape path does not exist: $day_path");
+			Logger::log("Scrape path does not exist: $day_path");
 			return;												// #f00
 		}
 		*/
@@ -92,21 +92,21 @@ class TelemetryCrunch {
 		try {
 			$locked = Tm::$db->lock($lockname, 0);
 			if (!$locked) {
-				Log::vlog(C_MTHD."Skipping day \x1b[38;5;82m$day\x1b[0m, already being processed".C_R);
+				Logger::vlog(C_MTHD."Skipping day \x1b[38;5;82m$day\x1b[0m, already being processed".C_R);
 				return false;									// #f00
 			}
 			// flock directory
 			/*
 			$fp = fopen($day_path, "r");
 			if (!$fp || !flock($fp, LOCK_EX | LOCK_NB)) {
-				Log::vlog(C_MTHD."Skipping day \x1b[38;5;82m$day\x1b[0m, already being processed".C_R);
+				Logger::vlog(C_MTHD."Skipping day \x1b[38;5;82m$day\x1b[0m, already being processed".C_R);
 				return false;									// #f00
 			}
 			*/
 
-			Log::log("Crunching day \x1b[38;5;118m$day\x1b[0m:");
+			Logger::log("Crunching day \x1b[38;5;118m$day\x1b[0m:");
 
-			//Log::vlog("+ Input path: $day_path/*.json");
+			//Logger::vlog("+ Input path: $day_path/*.json");
 
 			$userfiles = TelemetryScrape::find_files($day_path, self::$CFG['MAX_CRUNCH_HISTORY'], '*.json', true);
 
@@ -120,8 +120,8 @@ class TelemetryCrunch {
 
 			$DEFS = self::$CFG['TOPICS'];
 
-			Log::vlog("+ Newest input file mtime: ".date("Y-m-d H:i:s",$newest_userfile_date));
-			Log::vlog(".- Verifying output file mtimes for freshness...");
+			Logger::vlog("+ Newest input file mtime: ".date("Y-m-d H:i:s",$newest_userfile_date));
+			Logger::vlog(".- Verifying output file mtimes for freshness...");
 
 			// get maxmtime of each output file type
 			foreach ($DEFS as $dp_name=>&$dp_def) {
@@ -142,14 +142,14 @@ class TelemetryCrunch {
 				}
 
 				$dp_def['skip'] = $newest_userfile_date <= $dp_def['max_out_mtime'];
-				Log::vlog(sprintf("| Datapoint %-10s (mode: %-8s) - last modified %s%s\x1b[0m - %s", $dp_name, $mode, ($dp_def['skip'] ? "\x1b[38;5;104m": "\x1b[38;5;174m"), $dp_def['max_out_mtime']?date("Y-m-d H:i:s",$dp_def['max_out_mtime']):"never",($dp_def['skip'] ? "\x1b[38;5;103mUP-TO-DATE\x1b[0m" : "\x1b[32mUPDATE NEEDED\x1b[0m")));
+				Logger::vlog(sprintf("| Datapoint %-10s (mode: %-8s) - last modified %s%s\x1b[0m - %s", $dp_name, $mode, ($dp_def['skip'] ? "\x1b[38;5;104m": "\x1b[38;5;174m"), $dp_def['max_out_mtime']?date("Y-m-d H:i:s",$dp_def['max_out_mtime']):"never",($dp_def['skip'] ? "\x1b[38;5;103mUP-TO-DATE\x1b[0m" : "\x1b[32mUPDATE NEEDED\x1b[0m")));
 				/*
 				if ($newest_userfile_date < $oldest_outfile_date) {
-					if (count($nonew_streak)==0) Log::log("No new userfiles for $day.");
+					if (count($nonew_streak)==0) Logger::log("No new userfiles for $day.");
 					$nonew_streak[]=$day;
 					continue; // next day!
 				}
-				if (count($nonew_streak)>1) Log::log("... ".($nonew_streak[count($nonew_streak)-1]));
+				if (count($nonew_streak)>1) Logger::log("... ".($nonew_streak[count($nonew_streak)-1]));
 				$nonew_streak=[];
 				*/
 			}
@@ -158,7 +158,7 @@ class TelemetryCrunch {
 			// count all $DEFS elements that have 'skip' field using array_column
 			$skips = array_sum(array_column($DEFS, 'skip'));
 			$nonskips = count($DEFS) - $skips;
-			Log::vlog("'- Verifying out file mtimes for freshness: done. ".($nonskips ? "\x1b[32m{$nonskips} datapoint(s) to render.\x1b[0m" : "\x1b[31mNothing to do.\x1b[0m"));
+			Logger::vlog("'- Verifying out file mtimes for freshness: done. ".($nonskips ? "\x1b[32m{$nonskips} datapoint(s) to render.\x1b[0m" : "\x1b[31mNothing to do.\x1b[0m"));
 
 			if (!$nonskips) return; // #f80
 
@@ -195,7 +195,7 @@ class TelemetryCrunch {
 			self::call_hooks("post_dayfiles", [$DATA]);
 
 			$datacount = array_sum(array_map(function($v) { return count($v); }, $DATA));
-			Log::vlog("Data crunched. $num_read read, $num_crunched crunched: ".join(", ", array_map(function($k,$v) { return "$k=".count($v); }, array_keys($DATA), $DATA)));
+			Logger::vlog("Data crunched. $num_read read, $num_crunched crunched: ".join(", ", array_map(function($k,$v) { return "$k=".count($v); }, array_keys($DATA), $DATA)));
 
 			//if ($OPTS['verbose']) print_r($DATA);
 			$written=0;
@@ -240,7 +240,7 @@ class TelemetryCrunch {
 			unset($dp_data);
 
 			$progs=[]; foreach ($DEFS as $dp_name=>$dp_def) { $progs[]=$dp_name.'='.$status[$dp_name.'_days_written']; }
-			Log::log("Rendering of day $day complete; ".implode(", ",$progs));
+			Logger::log("Rendering of day $day complete; ".implode(", ",$progs));
 
 			return $written;
 
@@ -252,26 +252,26 @@ class TelemetryCrunch {
 	static function crunch_flavour($flavour) {
 		$topics = self::$CFG['TOPICS'];
 
-		Log::vlog("Running crunchers for flavour \x1b[38;5;78m{$flavour}\x1b[0m...");
+		Logger::vlog("Running crunchers for flavour \x1b[38;5;78m{$flavour}\x1b[0m...");
 		foreach($topics as $name=>$topic) {
 			foreach($topic['crunchers'] as $num=>$cruncher) {
 				$subname = ($cruncher['name'] ?: "#".($num+1));
 				$colorname = "\x1b[38;5;148m{$name}\x1b[0m";
 				$colordashsubname = "-\x1b[38;5;118m".$subname."\x1b[0m";
-				Log::vlog("Running cruncher {$colorname}{$colordashsubname}...");
+				Logger::vlog("Running cruncher {$colorname}{$colordashsubname}...");
 
 				// create if needed
 				if (isset($cruncher['table_schema'],$cruncher['table'])) {
 					$table = $cruncher['table'];
 					Tm::$db->query("SHOW CREATE TABLE {$table}");
 					if (Tm::$db->error()) {
-						Log::vlog("\x1b[31;1mTable '{$table}' for cruncher '{$subname}' does not exist, creating...\x1b[0m");
+						Logger::vlog("\x1b[31;1mTable '{$table}' for cruncher '{$subname}' does not exist, creating...\x1b[0m");
 						$schema_sql = $cruncher['table_schema'];
 						$schema_sql = str_replace("<TABLE>",$table,$schema_sql);
 						Tm::$db->query($schema_sql);
 						if (Tm::$db->error()) 
 							throw new Exception("Failed to create table `{$table}`: ".Tm::$db->error());
-						Log::vlog("Table '{$table}' created.");
+						Logger::vlog("Table '{$table}' created.");
 					}
 				}
 
@@ -282,23 +282,23 @@ class TelemetryCrunch {
 
 				// get starting point
 				$max_id = Tm::$db->query_one(Tm::$db->qesc("SELECT IFNULL(MAX(event_id),0) FROM {$table} WHERE flavnum={d}",$flavnum)) ?: 0;
-				Log::vlog("Processing {$type} events, starting with index {$max_id}...");
+				Logger::vlog("Processing {$type} events, starting with index {$max_id}...");
 
 				// get new events
 				$getquery = Tm::$db->qesc("SELECT * FROM events WHERE flavnum={d} AND type={s} AND id>{d}",$flavnum,$type,$max_id);
-				//Log::vlog("DEBUG: getquery: $getquery");
+				//Logger::vlog("DEBUG: getquery: $getquery");
 				$getrequest = Tm::$db->query($getquery);
 
 				if ($getrequest->num_rows==0) {
-					Log::vlog("No new {$name}-{$subname} events to process.");
+					Logger::vlog("No new {$name}-{$subname} events to process.");
 					continue;
 				}
-				Log::vlog("Found ".strval($getrequest->num_rows)." records, processing...");
+				Logger::vlog("Found ".strval($getrequest->num_rows)." records, processing...");
 				
 				$count = 0;
 				while ($event = $getrequest->fetch_assoc()) {
 					$count++;
-					//Log::vlog("Processing ".strval($count)."/".strval($getrequest->num_rows));
+					//Logger::vlog("Processing ".strval($count)."/".strval($getrequest->num_rows));
 
 					$func = $cruncher['crunch_function'] ?: $cruncher['function'];
 
@@ -314,11 +314,11 @@ class TelemetryCrunch {
 				}
 
 				if ($cruncher['action']=="insert") {
-					Log::vlog("Added ".strval($count)." new {$name}-{$subname} records.");
+					Logger::vlog("Added ".strval($count)." new {$name}-{$subname} records.");
 				}
 			}
 		}
-		Log::vlog("Crunchers for flavour \x1b[38;5;78m{$flavour}\x1b[0m complete.");
+		Logger::vlog("Crunchers for flavour \x1b[38;5;78m{$flavour}\x1b[0m complete.");
 	}
 
 }
