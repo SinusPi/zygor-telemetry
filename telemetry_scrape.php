@@ -10,21 +10,20 @@ ini_set("max_execution_time",3600);
  * [--rendermask <mask>] [--debug] [--today-too] [--verbose]
  */
 
+/* Initialize Telemetry, add command-line options, run scrapers for specified sources (SVs, Packager Logs, etc.) */
+
 define("DAY",86400);
- 
-require_once "classes/Telemetry.class.php";
 
-require_once "includes/VerboseException.class.php";
+require_once __DIR__ . "/loader.inc.php";
+
 require_once "includes/shell.class.php";
-require_once "includes/zygor.class.inc.php";
-
 \Zygor\Shell::run_only_in_shell();
 
 //pcntl_signal(SIGINT,function() { write_error_to_status(E_ERROR,"Terminated",__FILE__,__LINE__); die(); return true; });
 
-Telemetry::config();
+Telemetry::startup();
 
-$OPTS = \Zygor\Shell::better_getopt([
+$OPTS = (array)\Zygor\Shell::better_getopt([
 	['f:','flavour:',      array_keys(Telemetry::$CFG['WOW_FLAVOUR_DATA'])],
 	['',  'maxdays:',      999999], // use to limit how far back to scrape, for debugging only
 	['',  'ignore-mtimes', false], // that is: limit by maxdays... or even not at all
@@ -35,31 +34,33 @@ $OPTS = \Zygor\Shell::better_getopt([
 	['',  'filemask:',     "*.lua*"], // use to maybe process very specific files only
 	['',  'today-too',     false],
 	['v', 'verbose',       false],
-	['i:','input:',        $valid_inputs=["sv","packagerlog"]],
+	['i:','input:',        $valid_inputs=array_keys(TelemetryScrape::$SOURCES)],
 	['',  'verboseflags:', []],
 ]);
 $FLAVOURS = $OPTS['f'];
 if (substr($OPTS['start-day'],0,1)=="-") $OPTS['start-day']=date("Ymd",strtotime($OPTS['start-day']." days"));
 $OPTS["MAX_DAYS"]=$OPTS['maxdays'];
 
+Telemetry::$CFG->add($OPTS);
+
+$inputs = $OPTS['input'];
+
 try {
-	if (array_diff($OPTS['input'],$valid_inputs)) {
-		throw new ErrorException("Invalid input type specified (".implode(",",$OPTS['input'])."). Valid types are: ".implode(", ",$valid_inputs));
+	if (array_diff($inputs,$valid_inputs)) {
+		throw new ErrorException("Invalid input type specified (".implode(",",$inputs)."). Valid types are: ".implode(", ",$valid_inputs));
 	}
-	if (in_array("sv",$OPTS['input'])) {
+	if (in_array("sv",$inputs)) {
 		try	{
 			echo "*** Scraping source: SVs\n";
-			TelemetryScrapeSVs::startup($OPTS);
 			foreach ($FLAVOURS as $flav) TelemetryScrapeSVs::scrape($flav);
 			echo "*** Done scraping SVs.\n";
 		} catch (MinorError $e) {
 			echo "Failed: ".$e->getMessage()."\n";
 		}
 	}
-	if (in_array("packagerlog",$OPTS['input'])) {
+	if (in_array("packagerlog",$inputs)) {
 		try {
 			echo "*** Scraping source: Packager Logs\n";
-			TelemetryScrapePackagerLog::startup($OPTS);
 			TelemetryScrapePackagerLog::scrape();
 		} catch (MinorError $e) {
 			echo "Failed: ".$e->getMessage()."\n";

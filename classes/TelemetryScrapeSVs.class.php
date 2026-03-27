@@ -1,5 +1,8 @@
 <?php
 
+use Telemetry as Tm;
+use TelemetryStatus as TmSt;
+
 /**
  * Set of utilities to comb through user-supplied SV files for telemetry data.
  * Each datapoint is extracted by a Lua script, has a "type" and "time" field.
@@ -14,16 +17,19 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 	}
 
 	static function config($cfg=[]) {
-		parent::config($cfg);
-
+		self::$CFG = &Telemetry::$CFG; // reference main config for easy access
+		
+		parent::config();
+		
 		$configfile = (array)(@include "config-scrape-sv.inc.php"); // load defaults
-		self::$CFG = self::merge_configs(self::$CFG, $configfile);
+		self::$CFG->add($configfile,12,"scrape sv config");
+
 		if (!self::$CFG['SV_STORAGE_ROOT']) throw new ErrorException("SV_STORAGE_ROOT not defined in config, config-scrape-sv.inc.php not loaded?");
 
 		// load sync's config
 		@include self::$CFG['SV_STORAGE_ROOT']."/config.inc.php"; // defines SYNC_CFG
 		if (!$SYNC_CFG) throw new ErrorException("Failed to load sync config from ".self::$CFG['SV_STORAGE_ROOT']."/config.inc.php");
-		self::$CFG['SV_STORAGE_DATA_PATH'] = self::cfgstr('SV_STORAGE_DATA_PATH',['SYNC_FOLDER'=>$SYNC_CFG['folder']]);
+		self::$CFG->add(['SV_STORAGE_DATA_PATH'=>Telemetry::cfgstr('SV_STORAGE_DATA_PATH',['SYNC_FOLDER'=>$SYNC_CFG['folder']])],13,"scrape sv: storage path");
 	}
 
 	static function registerSelf() {
@@ -90,44 +96,44 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 
 		if (!in_array($flavour,array_keys(self::$CFG['WOW_FLAVOUR_DATA']))) throw new ErrorException("Unsupported flavour '{$flavour}' (supported: ".join(", ",array_keys(self::$CFG['WOW_FLAVOUR_DATA'])).")");
 
-		self::$tag = "SCRAPE-".strtoupper(str_replace("-","_", $flavour));
-		$status = self::get_status(self::$tag, true);
+		self::$logtag = "SCRAPE-".strtoupper(str_replace("-","_", $flavour));
+		$status = TmSt::get_status(self::$logtag, true);
 		if ($status['status']=="SCRAPING") {
-			self::log("Another scrape for flavour '\x1b[38;5;78m{$flavour}\x1b[0m' is already in progress, aborting.");
+			Log::log("Another scrape for flavour '\x1b[38;5;78m{$flavour}\x1b[0m' is already in progress, aborting.");
 			return;
 		}
 
-		$topics = self::$CFG['TOPICS'];
+		$topics = Telemetry::$TOPICS;
 		$topics = array_filter($topics, function($t) { return ($t['scraper']['input']?:"") == "sv"; });
-		$sync_path = self::cfgstr('SV_STORAGE_FLAVOUR_PATH',["FLAVOUR"=>$flavour]);
+		$sync_path = Tm::cfgstr('SV_STORAGE_FLAVOUR_PATH',["FLAVOUR"=>$flavour]);
 
-		self::log("Starting scrape of flavour '\x1b[38;5;78m{$flavour}\x1b[0m' in \x1b[33;1m{$sync_path}\x1b[0m.");
+		Log::log("Starting scrape of flavour '\x1b[38;5;78m{$flavour}\x1b[0m' in \x1b[33;1m{$sync_path}\x1b[0m.");
 
-		self::stat(['status'=>"ENUMERATING",'stage'=>1,'stageof'=>2,'flavour'=>$flavour,'progress'=>[],'time_started'=>time(),'time_started_hr'=>date("Y-m-d H:i:s")]);		
+		TmSt::stat(['status'=>"ENUMERATING",'stage'=>1,'stageof'=>2,'flavour'=>$flavour,'progress'=>[],'time_started'=>time(),'time_started_hr'=>date("Y-m-d H:i:s")]);		
 
-		self::log("Enumerating files matching ".self::$CFG['filemask']);
+		Log::log("Enumerating files matching ".self::$CFG['filemask']);
 		
 		$t1 = microtime(true);
 		$files = self::find_files($sync_path, self::$CFG['filemask'], true); // FINDING FILES. TAKES LONG. We're not expecting filecount to exceed memory... yet...
 		$total_filecount = count($files);
-		self::vlog("Found $total_filecount files [".round(microtime(true)-$t1,2)."s]");
+		Log::vlog("Found $total_filecount files [".round(microtime(true)-$t1,2)."s]");
 
 		if (isset(self::$CFG['TELEMETRY_FILE_AGE'])) {
 			$days_old = intval(self::$CFG['TELEMETRY_FILE_AGE']/DAY)+1; // old way of detecting file age
 			$files = self::filter_younger_files($files, $days_old);
 			$t1 = microtime(true);
-			self::vlog("Filtered out files older than $days_old days: {$total_filecount} -> ".count($files)." files [".round(microtime(true)-$t1,2)."s]");
+			Log::vlog("Filtered out files older than $days_old days: {$total_filecount} -> ".count($files)." files [".round(microtime(true)-$t1,2)."s]");
 		}
 
 		while ($files[0]==="") array_shift($files);
 		//$files = str_replace($sync_path."/","",$files);
 
-		self::stat(['files_total'=>count($files)],true);
-		self::log(count($files)." files to process.");
+		TmSt::stat(['files_total'=>count($files)],true);
+		Log::log(count($files)." files to process.");
 
 		if (!count($files)) {
-			self::log("Nothing to do here.");
-			self::stat(['status'=>"IDLE"]);
+			Log::log("Nothing to do here.");
+			TmSt::stat(['status'=>"IDLE"]);
 			return;
 		}
 
@@ -137,24 +143,24 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		$counts = array_count_values($freshhashes);
 		$dupes = array_filter($counts,function($c) { return $c>1; });
 		if (count($dupes)) {
-			self::stat(['status'=>"ERROR",'error'=>"Duplicate files found, see log."]);
+			TmSt::stat(['status'=>"ERROR",'error'=>"Duplicate files found, see log."]);
 			throw new ErrorException(count($dupes)." duplicate files found (same name in different folders): ".join(", ",array_keys($dupes)).". They will be processed only once.");
 		}
 
-		self::stat(['status'=>"EXTRACTING",'files_fresh'=>count($freshfiles),'files_skipped'=>0,'tmfiles_skipped'=>0,'tmfiles_written'=>0,'tmfiles_last'=>"",'file_last'=>"",'not_files'=>0,'broken_lua'=>0]);
+		TmSt::stat(['status'=>"EXTRACTING",'files_fresh'=>count($freshfiles),'files_skipped'=>0,'tmfiles_skipped'=>0,'tmfiles_written'=>0,'tmfiles_last'=>"",'file_last'=>"",'not_files'=>0,'broken_lua'=>0]);
 
-		//self::log(count($freshfiles)." of them are fresh enough (".intval(TELEMETRY_INTERVAL/DAY)." days).");
+		//Log::log(count($freshfiles)." of them are fresh enough (".intval(TELEMETRY_INTERVAL/DAY)." days).");
 
-		//$telefolder = self::cfgstr('FLAVOUR_PATH',['FLAVOUR'=>$flavour]);
+		//$telefolder = Tm::cfgstr('FLAVOUR_PATH',['FLAVOUR'=>$flavour]);
 		//$last_scrape_dates = (array)@json_decode(@file_get_contents($telefolder."/".self::$CFG['MTIMES_CACHE_FILENAME'])); // names relative to sync folder
 		$t1 = microtime(true);
 		$last_mtimes = self::fetch_last_mtimes($flavour, $freshfiles);
 		$t2 = microtime(true);
-		self::vlog("Loaded ".count($last_mtimes)." last scrape dates from DB in ".self::$DBG['mtime_queries']." queries [".round($t2-$t1,2)."s]");
+		Log::vlog("Loaded ".count($last_mtimes)." last scrape dates from DB in ".Telemetry::$DBG['mtime_queries']." queries [".round($t2-$t1,2)."s]");
 		
 		$totals=[];
 		$first_day_relevant = date("Ymd",time()-self::$CFG['TELEMETRY_DATA_AGE']);
-		self::log("We check for data max \x1b[1m".round(self::$CFG['TELEMETRY_DATA_AGE']/86400)."\x1b[0m days old (>= \x1b[38;5;118m$first_day_relevant\x1b[0m)");
+		Log::log("We check for data max \x1b[1m".round(self::$CFG['TELEMETRY_DATA_AGE']/86400)."\x1b[0m days old (>= \x1b[38;5;118m$first_day_relevant\x1b[0m)");
 
 		
 		// prepare list of files to actually process
@@ -170,12 +176,12 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			}
 
 			// $filename_full is a full path, chop it
-			list ($filename_userfile, $filename_slug) = self::split_filename($filename_full);
+			list ($filename_userfile, $filename_slug) = Telemetry::split_filename($filename_full);
 			$flavourslug = $flavour."/".$filename_slug; // flavour/user/bnet
 
 			if (self::$CFG['filematch'] && strpos($filename_userfile,self::$CFG['filematch'])!==FALSE) continue; //skip
 
-			self::stat(['file_last'=>$filename_userfile],true);
+			TmSt::stat(['file_last'=>$filename_userfile],true);
 
 			if (!self::$CFG['ignore-mtimes'] && isset($last_mtimes[$flavourslug]) && filemtime($filename_full) <= $last_mtimes[$flavourslug]) {  // do not re-scrape if the file hasn't been updated
 				$totals['files_skipped']++;
@@ -186,7 +192,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			$freshfiles_to_process[]=$filename_full;
 		}
 	
-		self::log(sprintf(
+		Log::log(sprintf(
 			"Processing %d files (%s%s%d not changed since scrape).",
 			count($freshfiles_to_process),
 			$totals['files_skipped'] ? $totals['files_skipped'] . " skipped, " : "",
@@ -234,24 +240,24 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 
 			// obey limit
 			if (isset(self::$CFG['limit']) && $n>=self::$CFG['limit']-1) {
-				self::$db->commit();
+				Telemetry::$db->commit();
 				throw new ErrorException("Limit ".self::$CFG['limit']." hit, aborting.\n");
 			}
 
 			// update progress
-			self::update_progress(self::$tag,$n,count($freshfiles_to_process),['totals'=>$totals],self::$CFG['verbose']);
+			TmSt::update_progress(self::$logtag,$n,count($freshfiles_to_process),['totals'=>$totals],self::$CFG['verbose']);
 
 		}
 
 		//self::write_intermediate_mtimes($flavour,$last_scrape_dates,true);
 		$tot1 = array_filter($totals,function($v) { return is_numeric($v); });
 		$tots = array_map(function($k,$v) { return "$k=$v"; }, array_keys($tot1), array_values($tot1));
-		self::log("Scrape of $flavour complete; ".implode(", ",$tots));
+		Log::log("Scrape of $flavour complete; ".implode(", ",$tots));
 
 		if (count($totals['files_without_zgvs'])/(count($freshfiles_to_process)-$totals['files_skipped'])>0.5)
-			self::log("Weird. Out of ".(count($freshfiles_to_process)-$totals['files_skipped'])." files read, ".count($totals['files_without_zgvs'])." had no ZGVs.");
+			Log::log("Weird. Out of ".(count($freshfiles_to_process)-$totals['files_skipped'])." files read, ".count($totals['files_without_zgvs'])." had no ZGVs.");
 
-		self::stat(['status'=>"IDLE"]);
+		TmSt::stat(['status'=>"IDLE"]);
 	}
 
 	/**
@@ -261,29 +267,29 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 	static function scrape2($flavour) {
 		if (!in_array($flavour,array_keys(self::$CFG['WOW_FLAVOUR_DATA']))) throw new ErrorException("Unsupported flavour '{$flavour}' (supported: ".join(", ",array_keys(self::$CFG['WOW_FLAVOUR_DATA'])).")");
 
-		self::$tag = "SCRAPE-".strtoupper(str_replace("-","_", $flavour));
-		$status = self::get_status(self::$tag, true);
+		self::$logtag = "SCRAPE-".strtoupper(str_replace("-","_", $flavour));
+		$status = TmSt::get_status(self::$logtag, true);
 		if ($status['status']=="SCRAPING") {
-			self::log("Another scrape for flavour '\x1b[38;5;78m{$flavour}\x1b[0m' is already in progress, aborting.");
+			Log::log("Another scrape for flavour '\x1b[38;5;78m{$flavour}\x1b[0m' is already in progress, aborting.");
 			return;
 		}
 
-		$topics = self::$CFG['TOPICS'];
+		$topics = Telemetry::$TOPICS;
 		$topics_sv = array_filter($topics, function($t) { return ($t['scraper']['input']?:"") == "sv"; });
-		$sync_path = self::cfgstr('SV_STORAGE_FLAVOUR_PATH',["FLAVOUR"=>$flavour]);
+		$sync_path = Tm::cfgstr('SV_STORAGE_FLAVOUR_PATH',["FLAVOUR"=>$flavour]);
 
-		self::log("Starting scrape of flavour '\x1b[38;5;78m{$flavour}\x1b[0m' in \x1b[33;1m{$sync_path}\x1b[0m.");
+		Log::log("Starting scrape of flavour '\x1b[38;5;78m{$flavour}\x1b[0m' in \x1b[33;1m{$sync_path}\x1b[0m.");
 
 		// get svfiles that may have fresh data for the topics listed
 		$gen_fresh_svfiles = self::get_fresh_files_gen(array_keys($topics_sv), $sync_path, self::$CFG['filemask'], __CLASS__.'::file_path_to_slug', "sv", self::$CFG['BATCH_SIZE']);
 
 		// narrow down per configuration
-		$gen_narrowed_svfiles_1 = self::filter_gen($gen_fresh_svfiles, function($file) {
+		$gen_narrowed_svfiles_1 = Telemetry::filter_gen($gen_fresh_svfiles, function($file) {
 			return (isset(self::$CFG['TELEMETRY_FILE_AGE']) && (time() - $file->mtime > self::$CFG['TELEMETRY_FILE_AGE']*DAY) ? false : true);
 		});
 
 		// skip today's files if not explicitly included
-		$gen_narrowed_svfiles_2	= self::filter_gen($gen_narrowed_svfiles_1, function($file) {
+		$gen_narrowed_svfiles_2	= Telemetry::filter_gen($gen_narrowed_svfiles_1, function($file) {
 			return (!self::$CFG['today-too'] || date("Ymd", $file->mtime) != date("Ymd", time()));
 		});
 
@@ -293,12 +299,12 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 
 			// obey limit
 			if (isset(self::$CFG['limit']) && $n>=self::$CFG['limit']-1) {
-				self::$db->commit();
+				Telemetry::$db->commit();
 				throw new ErrorException("Limit ".self::$CFG['limit']." hit, aborting.\n");
 			}
 
 			// update progress
-			//self::update_progress(self::$tag,$n,count($gen_narrowed_svfiles_2),['totals'=>$totals],self::$CFG['verbose']);
+			//self::update_progress(self::$logtag,$n,count($gen_narrowed_svfiles_2),['totals'=>$totals],self::$CFG['verbose']);
 		}
 
 		//self::write_intermediate_mtimes($flavour,$last_scrape_dates,true);
@@ -306,13 +312,13 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		/*
 		$tot1 = array_filter($totals,function($v) { return is_numeric($v); });
 		$tots = array_map(function($k,$v) { return "$k=$v"; }, array_keys($tot1), array_values($tot1));
-		self::log("Scrape of $flavour complete; ".implode(", ",$tots));
+		Log::log("Scrape of $flavour complete; ".implode(", ",$tots));
 
 		if (count($totals['files_without_zgvs'])/(count($freshfiles_to_process)-$totals['files_skipped'])>0.5)
-			self::log("Weird. Out of ".(count($freshfiles_to_process)-$totals['files_skipped'])." files read, ".count($totals['files_without_zgvs'])." had no ZGVs.");
+			Log::log("Weird. Out of ".(count($freshfiles_to_process)-$totals['files_skipped'])." files read, ".count($totals['files_without_zgvs'])." had no ZGVs.");
 		*/
 
-		self::stat(['status'=>"IDLE"]);
+		TmSt::stat(['status'=>"IDLE"]);
 	}
 
 	/** Run all SV-sourced topic scrapers on a single file
@@ -320,13 +326,13 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 	 */
 	static function process_single_sv_file($flavour, $file, $topics, &$totals) {
 		$filename_full = $file->fullpath;
-		self::stat(['file_last'=>$filename_full],true);
-		list ($filename_userfile, $filename_slug) = self::split_filename($filename_full);
+		TmSt::stat(['file_last'=>$filename_full],true);
+		list ($filename_userfile, $filename_slug) = Telemetry::split_filename($filename_full);
 		$bnet = basename($filename_slug);
 		$user = basename(dirname($filename_slug));
 		$userfolder = dirname($filename_full);
 
-		self::vlog("Scraping SV: \x1b[38;5;110m$user\x1b[0m/\x1b[38;5;116m$bnet\x1b[0m\x1b[30;1m--SavedVariables\x1b[0m for topics: ".join(", ", array_keys($topics)));
+		Log::vlog("Scraping SV: \x1b[38;5;110m$user\x1b[0m/\x1b[38;5;116m$bnet\x1b[0m\x1b[30;1m--SavedVariables\x1b[0m for topics: ".join(", ", array_keys($topics)));
 
 		$is_windows = (strpos(PHP_OS, 'WIN') === 0); $is_linux = !$is_windows;
 		$lock_code = $flavour."/".$filename_slug;
@@ -342,17 +348,17 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 				}
 			} else {
 				// Windows: use DB locks
-				$got_db_lock = self::$db->lock($lock_code);
+				$got_db_lock = Telemetry::$db->lock($lock_code);
 				if (!$got_db_lock) {
 					throw new FileLockedException("Input folder locked (DB): $lock_code");
 				} else {
-					//self::vlog(microtime(true)." DB lock acquired for $lock_code");
+					//Log::vlog(microtime(true)." DB lock acquired for $lock_code");
 				}
 			}
 
-			self::vlog(" - :. reading SV file...");
+			Log::vlog(" - :. reading SV file...");
 
-			self::$db->begin_transaction(); // need to start here to lock the DB record for this file
+			Telemetry::$db->begin_transaction(); // need to start here to lock the DB record for this file
 
 			$flavourfile = $file->slug; // $flavour."/".$filename_slug; // flavour/user/bnet
 
@@ -362,7 +368,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 
 			$sv_raw = self::read_raw_sv($filename_full);
 
-			self::vlog(" - .: extracting datapoints...");
+			Log::vlog(" - .: extracting datapoints...");
 
 			$extracted = self::extract_datapoints_with_lua($sv_raw,$flavour,$topics);
 
@@ -387,7 +393,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 
 			$counts = array_count_values(array_column($extracted['datapoints'], 'type'));
 			$times = $extracted['times'];
-			self::vlog("Datapoints extracted by type: " . join(", ", array_map(function ($item, $key) use ($times) { return "\x1b[38;5;72m$key\x1b[0m:{$item} ({$times[$key]}s)"; }, array_values($counts), array_keys($counts))));
+			Log::vlog("Datapoints extracted by type: " . join(", ", array_map(function ($item, $key) use ($times) { return "\x1b[38;5;72m$key\x1b[0m:{$item} ({$times[$key]}s)"; }, array_values($counts), array_keys($counts))));
 
 			$extracted['datapoints'] = array_values(array_filter($extracted['datapoints'], function ($dp) use ($file) {  return $dp['time'] > $file->topics[$dp['type']]['last_event_time'];  })); // only new events
 			$newest_per_topic = array_reduce($extracted['datapoints'], function($carry, $dp) {
@@ -397,12 +403,12 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 				return $carry;
 			}, array_map(function($topic) { return $topic['last_event_time'] ?: 0; }, $file->topics));
 			$last_event_time = max(array_column($extracted['datapoints'],'time')) ?: 0;
-			self::vlog("Datapoints after filtering out old: ".count($extracted['datapoints']));
+			Log::vlog("Datapoints after filtering out old: ".count($extracted['datapoints']));
 
 			// DB STORE TIME!
 
-			$inserted = self::$db->store_datapoints($flavour,$file->id,$extracted['datapoints']);
-			self::vlog("Datapoints inserted into DB: $inserted");
+			$inserted = Telemetry::$db->store_datapoints($flavour,$file->id,$extracted['datapoints']);
+			Log::vlog("Datapoints inserted into DB: $inserted");
 
 			$totals['inserted_datapoints'] += $inserted;
 
@@ -414,21 +420,21 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			
 			self::db_set_file_scrapetimes(array_keys($topics), $file->id, $newest_per_topic, $file->mtime);
 
-			self::$db->commit();
+			Telemetry::$db->commit();
 
 		} catch (FileLockedException $e) {
-			self::vlog($e->getMessage()." - $filename_full");
-			self::$db->rollback();
+			Log::vlog($e->getMessage()." - $filename_full");
+			Telemetry::$db->rollback();
 			return;
 		} catch (Exception $e) {
-			self::log(microtime(true)." ERROR processing $filename_full: " . $e->getMessage());
+			Log::log(microtime(true)." ERROR processing $filename_full: " . $e->getMessage());
 			throw $e;
 		} finally {
 			// unlock
 			if (isset($fl)) { flock($fl, LOCK_UN); fclose($fl); }
 			if ($got_db_lock) {
-				$unl = self::$db->unlock($lock_code);
-				//self::vlog(microtime(true)." DB lock released for $lock_code: ".($unl ? "ok" : "failed"));
+				$unl = Telemetry::$db->unlock($lock_code);
+				//Log::vlog(microtime(true)." DB lock released for $lock_code: ".($unl ? "ok" : "failed"));
 			}
 		}
 	}
@@ -444,7 +450,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			$qs++;
 			if ($last_mtimes_batch) $last_mtimes += $last_mtimes_batch;
 		}
-		self::$DBG['mtime_queries'] = $qs;
+		Telemetry::$DBG['mtime_queries'] = $qs;
 		return $last_mtimes;
 	}
 	*/
@@ -456,7 +462,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 	static function __save_day_scrape($flavour,$day,$user,$acct, $daydata, &$totals) {
 		if (!$daydata) 
 			return ++$totals['tmfiles_empty'];
-		$scrape_folder = self::cfgstr('SCRAPES_PATH',['FLAVOUR'=>$flavour,'DAY'=>$day]);
+		$scrape_folder = Tm::cfgstr('SCRAPES_PATH',['FLAVOUR'=>$flavour,'DAY'=>$day]);
 		mkdir($scrape_folder,0777,true);
 		if (!is_dir($scrape_folder)) throw new ErrorException("Failed to create/access scrape folder at $scrape_folder");
 		$scrape_file = "{$user}@{$acct}.json";
@@ -464,7 +470,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		if (file_exists($scrape_filepath))
 			return $totals['tmfiles_skipped']++;
 
-		//self::vlog("Saving ".count($daydata)." scrapes into \x1b[33;1m$scrape_filepath\x1b[0m");
+		//Log::vlog("Saving ".count($daydata)." scrapes into \x1b[33;1m$scrape_filepath\x1b[0m");
 
 		file_put_contents($scrape_filepath,json_encode($daydata),LOCK_EX);
 
@@ -478,7 +484,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 	static function __write_intermediate_mtimes($flavour,$last_scrape_dates,$force=false) {
 		static $time_last_mtimes=0;
 		if ($force || time()-$time_last_mtimes >= self::$CFG['MTIMES_WRITE_INTERVAL']) {
-			$mtimes_cache_filename = self::cfgstr('FLAVOUR_PATH',['FLAVOUR'=>$flavour])."/".self::$CFG['MTIMES_CACHE_FILENAME'];
+			$mtimes_cache_filename = Tm::cfgstr('FLAVOUR_PATH',['FLAVOUR'=>$flavour])."/".self::$CFG['MTIMES_CACHE_FILENAME'];
 			$f=file_put_contents($mtimes_cache_filename,json_encode($last_scrape_dates),LOCK_EX);
 			if (!$f) throw new ErrorException("Cannot write mtimes cache");
 			$time_last_mtimes = time();
@@ -678,16 +684,16 @@ ENDLUA;
 
 	static function db_update_sv_file_times($sv_file_id,$mtime,$scrape_time,$last_event_time) {
 		$q = self::qesc($_q="UPDATE sv_files SET mtime={d}, scrape_time={d}, last_event_time={d} WHERE id={d}", $mtime, $scrape_time, $last_event_time, $sv_file_id);
-		$r = self::$db->query($q);
-		if (!$r) throw new ErrorException("DB error, query $_q: ".self::$db->error);
+		$r = Telemetry::$db->query($q);
+		if (!$r) throw new ErrorException("DB error, query $_q: ".Telemetry::$db->error);
 		return $r;
 	}
 
 	static function db_get_svfile_mtimes($flavourfiles) {
 		if (!count($flavourfiles)) return [];
 		$q = self::qesc($_q="SELECT file,mtime FROM sv_files WHERE file IN ({sa})", $flavourfiles);
-		$r = self::$db->query($q);
-		if (!$r) throw new ErrorException("DB error, query $_q: ".self::$db->error);
+		$r = Telemetry::$db->query($q);
+		if (!$r) throw new ErrorException("DB error, query $_q: ".Telemetry::$db->error);
 		$res = [];
 		while ($row = $r->fetch_assoc()) $res[$row['file']] = $row['mtime'];
 		return $res;
@@ -704,36 +710,36 @@ ENDLUA;
 		self::test_datapoints();
 		try {
 			self::test_status();
-			self::vlog("Database: connected and present.");
+			Log::vlog("Database: connected and present.");
 		} catch (ErrorException $e) {
 			die("DB Connection to ".self::$CFG['DB']['host']." FAILED - ".$e->getMessage());
 		}
-		self::vlog("Self-tests: \x1b[48;5;72;30mPASS\x1b[0m");
+		Log::vlog("Self-tests: \x1b[48;5;72;30mPASS\x1b[0m");
 	}
 
 	static function test_paths() {
-		self::vlog("Testing paths:");
+		Log::vlog("Testing paths:");
 
 		if (!is_dir(self::$CFG['SV_STORAGE_ROOT'])) throw new ErrorException("Missing SV storage root: ".self::$CFG['SV_STORAGE_ROOT']."\n");
-		self::vlog(" - Will read SVs in root of: \x1b[33m".self::$CFG['SV_STORAGE_ROOT']."\x1b[0m");
+		Log::vlog(" - Will read SVs in root of: \x1b[33m".self::$CFG['SV_STORAGE_ROOT']."\x1b[0m");
 
 		if (!is_dir(self::$CFG['SV_STORAGE_DATA_PATH'])) throw new ErrorException("Missing SV storage folder: ".self::$CFG['SV_STORAGE_DATA_PATH']."\n");
-		self::vlog(" - Specifically SV Sync config says: \x1b[33m".self::$CFG['SV_STORAGE_DATA_PATH']."\x1b[0m");
+		Log::vlog(" - Specifically SV Sync config says: \x1b[33m".self::$CFG['SV_STORAGE_DATA_PATH']."\x1b[0m");
 
 		foreach (self::$CFG['f'] as $flav) {
-			self::vlog("   - Flavour: \x1b[38;5;78m$flav\x1b[0m");
+			Log::vlog("   - Flavour: \x1b[38;5;78m$flav\x1b[0m");
 
-			$svpath = self::cfgstr('SV_STORAGE_FLAVOUR_PATH',['FLAVOUR'=>$flav]);
+			$svpath = Tm::cfgstr('SV_STORAGE_FLAVOUR_PATH',['FLAVOUR'=>$flav]);
 			if (!is_dir($svpath)) throw new ErrorException("Missing SV storage flavour folder: ".$svpath."\n");
-			self::vlog("     - Reading SVs from: \x1b[33m$svpath\x1b[0m");
+			Log::vlog("     - Reading SVs from: \x1b[33m$svpath\x1b[0m");
 
 			/*
-			$scrapepath = self::cfgstr('SCRAPES_PATH',['FLAVOUR'=>$flav,'DAY'=>"YYYYMMDD"]);
-			self::vlog("     - Temporary scrape folder: \x1b[33m$scrapepath\x1b[0m");
+			$scrapepath = Tm::cfgstr('SCRAPES_PATH',['FLAVOUR'=>$flav,'DAY'=>"YYYYMMDD"]);
+			Log::vlog("     - Temporary scrape folder: \x1b[33m$scrapepath\x1b[0m");
 
-			$telepath = self::cfgstr('FLAVOUR_PATH',['FLAVOUR'=>$flav]);
+			$telepath = Tm::cfgstr('FLAVOUR_PATH',['FLAVOUR'=>$flav]);
 			if (!is_dir($telepath)) die("Missing Telemetry output flavour folder: ".$telepath."\n");
-			self::vlog("     - Saving telemetry data into: \x1b[33m$telepath\x1b[0m");
+			Log::vlog("     - Saving telemetry data into: \x1b[33m$telepath\x1b[0m");
 			*/
 		}
 
@@ -746,7 +752,7 @@ ENDLUA;
 	}
 
 	static function test_datapoints() {
-		$test_dataps = self::extract_datapoints_with_lua("ZygorGuidesViewerSettings={char={bar={guidestephistory={foo={lasttime=12345}}}}}","wow",self::$CFG['TOPICS']);
+		$test_dataps = self::extract_datapoints_with_lua("ZygorGuidesViewerSettings={char={bar={guidestephistory={foo={lasttime=12345}}}}}","wow",Telemetry::$TOPICS);
 		if (!($test_dataps['status']=="ok" && $test_dataps['datapoints'][0]['type']=="usedguide" && $test_dataps['datapoints'][0]['time']==12345)) die("FAILED testing datapoint defs:\n".print_r($test_dataps,1)."\n");
 	}
 
@@ -789,7 +795,7 @@ ENDLUA;
 	/** Convert file slug (flavour/account/filename) to full file path. */
 	static function file_slug_to_path($slug) {
 		list($flavour, $acctfile) = explode("/", $slug, 2);
-		return self::cfgstr('SV_STORAGE_FLAVOUR_PATH',['FLAVOUR'=>$flavour])."/".$acctfile."--SavedVariables--ZygorGuidesViewer.lua.gz";
+		return Tm::cfgstr('SV_STORAGE_FLAVOUR_PATH',['FLAVOUR'=>$flavour])."/".$acctfile."--SavedVariables--ZygorGuidesViewer.lua.gz";
 	}
 }
 

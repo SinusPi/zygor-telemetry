@@ -1,14 +1,18 @@
 <?php
 
+use Telemetry as Tm;
+
 /**
  * Query the database for telemetry metrics and produce them in JSON form
  */
-class TelemetryEndpoint extends Telemetry {
-	static function config($cfg=[]) {
-		parent::config($cfg);
+class TelemetryEndpoint {
+	static $CFG = [];
 
+	static function config($cfg=[]) {
+		self::$CFG = &Telemetry::$CFG; // reference main config for easy access
+		
 		$configfile = (array)(@include "config-endpoint.inc.php"); // load defaults
-		self::$CFG = self::merge_configs(self::$CFG, $configfile, $cfg);
+		self::$CFG = Tm::merge_configs(self::$CFG, $configfile, $cfg);
 	}
 
 	static function serveRequest() {
@@ -79,7 +83,7 @@ class TelemetryEndpoint extends Telemetry {
 		$sources = [];
 		
 		// Get registered sources from TelemetryScrape
-		$registered = TelemetryScrape::getRegisteredSources();
+		$registered = TelemetryScrape::getRegisteredScrapers();
 		
 		foreach ($registered as $key => $source_info) {
 			$class = $source_info['class'];
@@ -128,7 +132,7 @@ class TelemetryEndpoint extends Telemetry {
 
 		try {
 			// Fetch all status records from the database
-			$query = self::$db->query("SELECT tag, status, updated_at FROM status ORDER BY tag ASC");
+			$query = Telemetry::$db->query("SELECT tag, status, updated_at FROM status ORDER BY tag ASC");
 			$result = $query->fetch_all(MYSQLI_ASSOC);
 
 			$statuses = [];
@@ -157,8 +161,8 @@ class TelemetryEndpoint extends Telemetry {
 		if (!$flavnum) self::response(["success" => false, "error" => "Invalid flavour specified", "errcode" => "BAD_FLAVOUR"]);
 
 		try {
-			$from = parent::parse_date($_REQUEST['from']);
-			$to = parent::parse_date($_REQUEST['to']);
+			$from = Tm::parse_date($_REQUEST['from']);
+			$to = Tm::parse_date($_REQUEST['to']);
 		} catch (Exception $e) {
 			self::response([
 				"success" => false,
@@ -191,7 +195,7 @@ class TelemetryEndpoint extends Telemetry {
 				"code" => 200,
 				"id" => intval(isset($_REQUEST['id']) ? $_REQUEST['id'] : 0),
 				"data" => $data,
-				"query" => self::$LAST_QUERY,
+				"query" => Tm::$db->LAST_QUERY,
 			]);
 		} catch (Exception $e) {
 			self::response([
@@ -217,7 +221,7 @@ class TelemetryEndpoint extends Telemetry {
 
 		try {
 			// Build daymap for entire range in one query
-			$query = self::$db->query(self::$db->qesc(
+			$query = Telemetry::$db->query(Telemetry::$db->qesc(
 				"SELECT FROM_UNIXTIME(`time`, '%Y-%m-%d') as day, COUNT(*) as cnt FROM `$table`
 				WHERE `flavnum`={d} AND `time`>={d} AND `time`<{d}
 				GROUP BY day
@@ -246,7 +250,7 @@ class TelemetryEndpoint extends Telemetry {
 				"code" => 200,
 				"id" => intval(isset($_REQUEST['id']) ? $_REQUEST['id'] : 0),
 				"data" => $daymap,
-				"query" => self::$LAST_QUERY,
+				"query" => Tm::$db->LAST_QUERY,
 			]);
 		} catch (Exception $e) {
 			self::response([
@@ -272,7 +276,7 @@ class TelemetryEndpoint extends Telemetry {
 
 	/*
 	static function query($select,$table,$from,$to,$flavour,$where=[1],$groupby="",$order="",$limit="") {
-		$q = self::$db->query(self::$db->qesc($select." FROM `$table` WHERE `flavnum`={d} AND `time`>={d} AND `time`<={d} AND ".join(" AND ",$where)." $groupby $order", $flavour, $from, $to));
+		$q = Telemetry::$db->query(Telemetry::$db->qesc($select." FROM `$table` WHERE `flavnum`={d} AND `time`>={d} AND `time`<={d} AND ".join(" AND ",$where)." $groupby $order", $flavour, $from, $to));
 		return $results = $q->fetch_all();
 	}
 	*/

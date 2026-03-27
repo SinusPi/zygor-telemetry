@@ -7,48 +7,56 @@ if (!defined("C_MTHD")) define("C_MTHD","\x1b[38;5;134m");
 if (!defined("C_R")) define("C_R","\x1b[0m");
 
 class Telemetry {
-	static $CFG = [
+	static $CFG_defaults = [
 		'TELEMETRY_ROOT' => "telemetry",
 		'LOG_FILENAME' => "telemetry.log",
 		'MAX_DAYS' => false,
 		'VERBOSE_FLAGS' => [],
 		'STATUS_INTERVAL' => 2,
 	];
+	/** @var Config */
+	static $CFG;
+	
 	static $tag = "";
-	static $last_statuses = [];
+
+	static $TOPICS = []; // loaded from topic-*.inc.php files, see load_topics()
 
 	/** @var TelemetryDB */
 	static $db = null;
 
 	static $DBG = [];
-	static $LAST_QUERY = null;
+	
+	static function config($opts=[]) {
+		self::$CFG = new Config();
+		self::$CFG->add(self::$CFG_defaults,0,"base default");
 
-	static function config($cfg=[]) {
 		$configfile = (array)(require "config.inc.php");
-		self::$CFG = self::merge_configs(self::$CFG, $configfile, $cfg);
+		self::$CFG->add($configfile,1,"config file");
 
-		if (!self::$CFG['DB']) {
-			throw new Exception("No DB configuration found in Telemetry config.");
-		}
-		if (self::$CFG['verbose']) {
-			self::dump_config();
-		}
+		if (is_array($opts)) self::$CFG->add($opts,100,"runtime options");
 	}
 
 	static function init() {
 		self::set_error_reporting();
-		self::load_classes();
 	}
 
-	/** Init, config, connect... */
-	static function startup($cfg=[]) {
+	/* Init, config, connect..
+	 * This is called at the start of all telemetry scripts, and will load all topic definitions and connect to the database.
+	 * After this, self::$CFG and self::$db are available for use in all scripts.
+	 * This should only fail in totally unrecoverable scenarios. All scraper- or cruncher-related errors should be handled
+	 * within the respective scraper/cruncher and not cause the whole script to fail, so that other scrapers/crunchers can
+	 * continue working and partial data can still be collected.
+	 */
+
+
+	static function startup() {
 		static::init(); // overridable
-		static::config($cfg); // overridable
-		try {
-			self::$CFG['TOPICS'] = self::load_topics();
-		} catch (Exception $e) {
-			die("Failed to load topics: ".$e->getMessage()."\n");
-		}
+		static::init_scrapers();
+
+		static::config(); // overridable
+		
+		self::load_topics();
+
 		static::db_startup();
 		static::self_tests(); // overridable
 	}
@@ -72,13 +80,9 @@ class Telemetry {
 
 		}
 
-		if (!count($topics)) {
-			throw new Exception("No telemetry topics found in topic-*.inc.php files!");
-		}
-
 		if (self::$CFG['verbose']) {
 			$dot = function($reset=false) { static $s=0; if ($reset) $s=-1; return $s++ ? ", ":" - "; };
-			self::vlog("Loaded ".count($topics)." telemetry topics:\n".implode("\n",array_map(function($t) use ($dot) {
+			Log::vlog("Loaded ".count($topics)." telemetry topics:\n".implode("\n",array_map(function($t) use ($dot) {
 				$cc = count($t['crunchers']);
 				$r = "* ";
 				$r .= C_MTHD.$t['name'].C_R;
@@ -90,6 +94,8 @@ class Telemetry {
 				return $r;
 			}, $topics)));
 		}
+
+		self::$TOPICS = $topics;
 
 		return $topics;
 	}
@@ -133,7 +139,7 @@ class Telemetry {
 			//echo "$errno $errline:$errstr\n";
 			return false;
 		}
-		self::status(self::$tag,['status'=>"ERROR",'error'=>['errno'=>$errno,'errstr'=>$errstr,'errfile'=>$errfile,'errline'=>$errline],'times'=>$times]);
+		TelemetryStatus::status(self::$tag,['status'=>"ERROR",'error'=>['errno'=>$errno,'errstr'=>$errstr,'errfile'=>$errfile,'errline'=>$errline],'times'=>$times]);
 		die("$errno $errfile:$errline $errstr\n");
 	}
 
@@ -141,39 +147,6 @@ class Telemetry {
 		$err=error_get_last();
 		if ($err)
 			self::write_error_to_status($err['type'],$err['message'],$err['file'],$err['line']);
-	}
-
-	static function &get_status($tag,$force=false) {
-		if ($force || !isset(self::$last_statuses[$tag]) && $last = self::$db->get_status($tag))
-			self::$last_statuses[$tag] = $last;
-		if (!isset(self::$last_statuses[$tag]))
-			self::$last_statuses[$tag] = [];
-		return self::$last_statuses[$tag];
-	}
-	static function status($tag,$data,$keep=false) {
-		if (!self::$db) return; // DB not connected, no status
-		$last_status = $keep ? self::get_status($tag) : [];
-		$last_status = array_replace_recursive($last_status,$data);
-
-		self::$last_statuses[$tag] = $last_status;
-
-		self::$db->set_status($tag, $last_status);
-	}
-	static function test_status() {
-		$testtag="TEST";
-		self::status($testtag,['status'=>"TESTING1", 'foo'=>"bar"]);
-		$status = self::get_status($testtag);
-		if ($status['status']!="TESTING1" || $status['foo']!="bar") throw new Exception("Status test failed 1: ".print_r($status,true));
-
-		self::status($testtag,['status'=>"TESTING2"], true);
-		$status = self::get_status($testtag);
-		if ($status['status']!="TESTING2" || $status['foo']!="bar") throw new Exception("Status test failed 2: ".print_r($status,true));
-
-		self::$db->delete_status($testtag);
-	}
-
-	static function stat($data,$keep=false) {
-		return self::status(self::$tag,$data,$keep);
 	}
 
 	/**
@@ -250,8 +223,8 @@ class Telemetry {
 			echo "new tag $merge_tag\n";
 			if (count($merges_last)>0) { //dump
 				echo "count\n";
-				if (count($merges_last)>2) self::log("...");
-				foreach ($merges_last as $mergelast) self::log($mergelast);
+				if (count($merges_last)>2) Log::log("...");
+				foreach ($merges_last as $mergelast) Log::log($mergelast);
 				$merges_last=[];
 				return;
 			}
@@ -261,32 +234,11 @@ class Telemetry {
 			return;
 		}
 		echo "plain\n";
-		if ($s) self::log($s);
+		if ($s) Log::log($s);
 		$i++; if ($i>100) die();
 	}
 
 	// utility functions
-
-	static function log($s,$tag=null) {
-		$tag = $tag ?: (self::$tag ?: "TELEMETRY");
-		if (self::$CFG['LOG_FILENAME']) {
-			// log to file
-			file_put_contents(
-				self::$CFG['TELEMETRY_ROOT']."/".self::$CFG['LOG_FILENAME'],
-				date("Y-m-d H:i:s").".".sprintf("%03d",explode(" ", microtime())[0]*1000)." [$tag] ".$s."\n",
-				FILE_APPEND|LOCK_EX
-			);
-		}
-		if (function_exists('posix_isatty') ? posix_isatty(STDIN) : (php_sapi_name() === 'cli')) echo $s."\n";
-	}
-
-	static function vlog($s) {
-		if (self::$CFG['verbose']) self::log($s);
-	}
-
-	static function vflog($flag, $message) {
-		if (self::$CFG['verbose'] && in_array($flag, self::$CFG['VERBOSE_FLAGS'])) self::log("[$flag] $message");
-	}
 
 	static function repstr($str,$data=[]) {
 		return str_replace(array_map(function($k) { return "<$k>"; },array_keys($data)),array_values($data),$str);
@@ -327,8 +279,10 @@ class Telemetry {
 	 * After this, self::$db is available for all database operations.
 	 */
 	static function db_startup() {
-		$cfg = self::$CFG['DB'];
 		if (isset(self::$db)) return self::$db; // already connected
+		$cfg = self::$CFG['DB']?:null;
+		if (!$cfg) throw new ErrorException("No DB configuration found in Telemetry config.");
+
 		try {
 			self::$db = new TelemetryDB();
 			self::$db->connect($cfg);
@@ -428,8 +382,114 @@ class Telemetry {
 	static function call_hooks($hook,$args) {
 		//self::vlog("Hook: $hook calls starting.");
 		foreach (self::$CFG['TOPICS'] as $dp_name=>$dp_def)
-			if ($dp_def[$hook] && $dp_def['skip']!==false) { self::vlog(" - Calling $hook for $dp_name"); call_user_func_array($dp_def[$hook], $args); }
+			if ($dp_def[$hook] && $dp_def['skip']!==false) { Log::vlog(" - Calling $hook for $dp_name"); call_user_func_array($dp_def[$hook], $args); }
 		//self::vlog("Hook: $hook calls complete.");
+	}
+
+	static function dump_config() {
+		$cfg = self::$CFG;
+		if (!$cfg) return; // No config loaded
+		Log::log(get_called_class()." config:");
+		if (isset($cfg['DB']['pass'])) $cfg['DB']['pass']="****"; // hide password
+		Log::log(join("\n",array_map(function($k,$v) { /* key=value */
+			if (is_array($v)) $v="[".join(",",$v)."]";
+			elseif ($v===TRUE) $v="Y";
+			elseif ($v===FALSE) $v="N";
+			return "\x1b[32m{$k}\x1b[0m=\x1b[33m{$v}\x1b[0m";
+		},
+		array_keys($cfg),
+		array_map(function($s) { /* colorize <placeholders> */
+			return is_string($s) ? preg_replace("/(<.*?>)/","\x1b[35m$1\x1b[33m",$s) : $s;
+		}, $cfg))));
+	}
+
+	static function merge_configs($base,...$overrides) {
+		foreach ($overrides as $override) {
+			foreach ($override as $k=>$v) {
+				if (is_array($v) && isset($base[$k]) && is_array($base[$k])) {
+					$base[$k] = self::merge_configs($base[$k], $v);
+				} else {
+					$base[$k] = $v;
+				}
+			}
+		}
+		return $base;
+	}
+
+	/**
+	 * Load all dependent class files from the classes directory.
+	 */
+	static function init_scrapers() {
+		TelemetryScrape::init_scrapers();
+	}
+
+}
+
+
+
+/// these stay here for now
+
+class FileLockedException extends Exception {
+	// Custom exception for file locking issues
+}
+
+class MinorError extends Exception {
+	// Custom exception for error messages
+}
+
+class File {
+	public $id;
+	public $fullpath;
+	public $slug;
+	public $topics;
+	public $newest_scrape_time;
+	public $any_fresh;
+
+	public $mtime; // not stored
+	
+	public function __construct($id, $fileslug) {
+		$this->id = $id;
+		$this->slug = $fileslug;
+	}
+
+}
+
+class TelemetryStatus {
+	static $last_statuses = [];
+	static $last_tag = "";
+
+	static function &get_status($tag,$force=false) {
+		if ($force || !isset(self::$last_statuses[$tag]) && $last = Telemetry::$db->get_status($tag))
+			self::$last_statuses[$tag] = $last;
+		if (!isset(self::$last_statuses[$tag]))
+			self::$last_statuses[$tag] = [];
+		return self::$last_statuses[$tag];
+	}
+	static function status($tag,$data,$keep=false) {
+		if (!Telemetry::$db) return; // DB not connected, no status
+		$last_status = $keep ? self::get_status($tag) : [];
+		$last_status = array_replace_recursive($last_status,$data);
+
+		self::$last_tag = $tag;
+		self::$last_statuses[$tag] = $last_status;
+
+		Telemetry::$db->set_status($tag, $last_status);
+	}
+	static function test_status() {
+		$testtag="TEST";
+		self::status($testtag,['status'=>"TESTING1", 'foo'=>"bar"]);
+		$status = self::get_status($testtag);
+		if ($status['status']!="TESTING1" || $status['foo']!="bar") throw new Exception("Status test failed 1: ".print_r($status,true));
+
+		self::status($testtag,['status'=>"TESTING2"], true);
+		$status = self::get_status($testtag);
+		if ($status['status']!="TESTING2" || $status['foo']!="bar") throw new Exception("Status test failed 2: ".print_r($status,true));
+
+		Telemetry::$db->delete_status($testtag);
+	}
+
+	static function stat($data,$keep=false) {
+		return self::status(self::$last_tag,$data,$keep);
 	}
 
 	static function update_progress($tag,$n,$total,$extra=[],$force=false) {
@@ -440,9 +500,9 @@ class Telemetry {
 
 		if (!self::get_status($tag)['time_started']) self::status($tag,['time_started'=>time()],true);
 
-		if ((time()-$time_last_status >= self::$CFG['STATUS_INTERVAL']) || $force) {
+		if ((time()-$time_last_status >= Telemetry::$CFG['STATUS_INTERVAL']) || $force) {
 			$mitime = microtime(true);
-			$time_elapsed = $mitime-self::get_status($tag)['time_started'];
+			$time_elapsed = $mitime-TelemetryStatus::get_status($tag)['time_started'];
 			$last_time = $mitime-$time_last_status;
 			$last_progress = $n-$n_last;
 			$speed = $last_progress/$last_time;
@@ -487,75 +547,30 @@ class Telemetry {
 		}
 	}
 
-	static function dump_config() {
-		$cfg = self::$CFG;
-		if (!$cfg) return; // No config loaded
-		self::log(get_called_class()." config:");
-		if (isset($cfg['DB']['pass'])) $cfg['DB']['pass']="****"; // hide password
-		self::log(join("\n",array_map(function($k,$v) { /* key=value */
-			if (is_array($v)) $v="[".join(",",$v)."]";
-			elseif ($v===TRUE) $v="Y";
-			elseif ($v===FALSE) $v="N";
-			return "\x1b[32m{$k}\x1b[0m=\x1b[33m{$v}\x1b[0m";
-		},
-		array_keys($cfg),
-		array_map(function($s) { /* colorize <placeholders> */
-			return is_string($s) ? preg_replace("/(<.*?>)/","\x1b[35m$1\x1b[33m",$s) : $s;
-		}, $cfg))));
-	}
+}
 
-	static function merge_configs($base,...$overrides) {
-		foreach ($overrides as $override) {
-			foreach ($override as $k=>$v) {
-				if (is_array($v) && isset($base[$k]) && is_array($base[$k])) {
-					$base[$k] = self::merge_configs($base[$k], $v);
-				} else {
-					$base[$k] = $v;
-				}
-			}
+class Log {
+	static $last_tag = "TELEMETRY";
+
+	static function log($s,$tag=null) {
+		$tag = $tag ?: self::$last_tag;
+		self::$last_tag = $tag;
+		if (Telemetry::$CFG['LOG_FILENAME']) {
+			// log to file
+			file_put_contents(
+				Telemetry::$CFG['TELEMETRY_ROOT']."/".Telemetry::$CFG['LOG_FILENAME'],
+				date("Y-m-d H:i:s").".".sprintf("%03d",explode(" ", microtime())[0]*1000)." [$tag] ".$s."\n",
+				FILE_APPEND|LOCK_EX
+			);
 		}
-		return $base;
+		if (function_exists('posix_isatty') ? posix_isatty(STDIN) : (php_sapi_name() === 'cli')) echo $s."\n";
 	}
 
-	/**
-	 * Load all dependent class files from the classes directory.
-	 */
-	static function load_classes() {
-		foreach (glob(__DIR__."/*.class.php") as $classfile) {
-			if (basename($classfile)=="Telemetry.class.php") continue;
-			require_once $classfile;
-		}
-	}
-}
-
-// initialize everything
-Telemetry::startup();
-
-
-
-/// these stay here for now
-
-class FileLockedException extends Exception {
-	// Custom exception for file locking issues
-}
-
-class MinorError extends Exception {
-	// Custom exception for error messages
-}
-
-class File {
-	public $id;
-	public $fullpath;
-	public $slug;
-	public $topics;
-	public $newest_scrape_time;
-	public $any_fresh;
-
-	public $mtime; // not stored
-	
-	public function __construct($id, $fileslug) {
-		$this->id = $id;
-		$this->slug = $fileslug;
+	static function vlog($s) {
+		if (Telemetry::$CFG['verbose']) self::log($s);
 	}
 
+	static function vflog($flag, $message) {
+		if (Telemetry::$CFG['verbose'] && in_array($flag, Telemetry::$CFG['VERBOSE_FLAGS'])) self::log("[$flag] $message");
+	}
 }
