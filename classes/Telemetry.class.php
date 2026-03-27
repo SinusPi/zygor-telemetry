@@ -50,18 +50,19 @@ class Telemetry {
 
 
 	static function startup() {
-		static::init(); // overridable
-		static::init_scrapers();
-
-		static::config(); // overridable
-		
+		self::init(); // overridable
+		self::config(); // overridable
 		self::load_topics();
 
-		static::db_startup();
-		static::self_tests(); // overridable
+		self::db_startup();
+
+		self::init_scrapers(); // may need db
+
+		self::self_tests(); // overridable
 	}
 
 	static function self_tests() {
+		// run generic system self-tests
 	}
 
 	static function load_topics() {
