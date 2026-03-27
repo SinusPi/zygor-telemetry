@@ -2,6 +2,17 @@
 // One-time test script for Config class
 require_once __DIR__ . '/../classes/Config.class.php';
 
+// ANSI color codes
+define('ANSI_GREEN', "\033[32m");
+define('ANSI_RED', "\033[31m");
+define('ANSI_YELLOW', "\033[33m");
+define('ANSI_RESET', "\033[0m");
+define('ANSI_BOLD', "\033[1m");
+
+// Icons with colors
+define('PASS_ICON', ANSI_GREEN . '✓' . ANSI_RESET);
+define('FAIL_ICON', ANSI_RED . 'X' . ANSI_RESET);
+
 // Run tests inline
 $tests = [];
 $expect = function($name, $actual, $expected) use (&$tests) {
@@ -56,7 +67,42 @@ $c->add(['key' => 'value2'], 1);
 $r2 = $c->get()['key'];
 $expect('Cache invalidation on add', [$r1, $r2], ['value1', 'value2']);
 
-$passed = count(array_filter($tests, fn($t) => $t['status'] === 'PASS'));
+// Test 8: ArrayAccess offsetExists
+$c = new Config();
+$c->add(['database' => ['host' => 'localhost']]);
+$expect('ArrayAccess offsetExists', isset($c['database']), true);
+
+// Test 9: ArrayAccess offsetGet
+$c = new Config();
+$c->add(['database' => ['host' => 'localhost']]);
+$expect('ArrayAccess offsetGet', $c['database']['host'], 'localhost');
+
+// Test 10: ArrayAccess offsetGet with non-existent key
+$c = new Config();
+$c->add(['key' => 'value']);
+$expect('ArrayAccess offsetGet non-existent', $c['nonexistent'], null);
+
+// Test 11: ArrayAccess offsetSet throws exception
+$c = new Config();
+$c->add(['key' => 'value']);
+try {
+	$c['key'] = 'new_value';
+	$expect('ArrayAccess offsetSet throws', false, true);
+} catch (Exception $e) {
+	$expect('ArrayAccess offsetSet throws', true, true);
+}
+
+// Test 12: ArrayAccess offsetUnset throws exception
+$c = new Config();
+$c->add(['key' => 'value']);
+try {
+	unset($c['key']);
+	$expect('ArrayAccess offsetUnset throws', false, true);
+} catch (Exception $e) {
+	$expect('ArrayAccess offsetUnset throws', true, true);
+}
+
+$passed = count(array_filter($tests, function($t) { return $t['status'] === 'PASS'; }));
 $failed = count($tests) - $passed;
 $results = [
 	'passed' => $passed,
@@ -68,15 +114,15 @@ $results = [
 // Display results
 echo "=== Config Self-Test Results ===\n\n";
 echo "Total Tests: " . $results['total'] . "\n";
-echo "Passed: " . $results['passed'] . " ✓\n";
-echo "Failed: " . $results['failed'] . " ✗\n\n";
+echo "Passed: " . $results['passed'] . " " . PASS_ICON . "\n";
+echo "Failed: " . $results['failed'] . " " . FAIL_ICON . "\n\n";
 
 if ($results['total'] > 0) {
 	echo "Test Details:\n";
 	echo str_repeat("-", 60) . "\n";
 	foreach ($results['tests'] as $test) {
-		$status_icon = ($test['status'] === 'PASS') ? '✓' : '✗';
-		echo "[$status_icon] {$test['name']}\n";
+		$icon = ($test['status'] === 'PASS') ? PASS_ICON : FAIL_ICON;
+		echo "[" . $icon . "] " . $test['name'] . "\n";
 		if ($test['status'] === 'FAIL') {
 			echo "    Expected: " . var_export($test['expected'], true) . "\n";
 			echo "    Actual:   " . var_export($test['actual'], true) . "\n";
@@ -85,4 +131,5 @@ if ($results['total'] > 0) {
 	echo str_repeat("-", 60) . "\n";
 }
 
-echo "\nResult: " . ($results['failed'] === 0 ? "ALL TESTS PASSED ✓" : "SOME TESTS FAILED ✗") . "\n";
+$result_icon = ($results['failed'] === 0) ? PASS_ICON : FAIL_ICON;
+echo "\nResult: " . ($results['failed'] === 0 ? "ALL TESTS PASSED " : "SOME TESTS FAILED ") . $result_icon . "\n";

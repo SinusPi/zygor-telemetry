@@ -2,7 +2,7 @@
 /**
  * Config class for managing hierarchical configuration with priorities.
  */
-class Config {
+class Config implements ArrayAccess {
 	private $configs = [];
 	private $priorities = [];
 	private $merged = null;
@@ -91,5 +91,47 @@ class Config {
 		}
 
 		return $current;
+	}
+
+	/**
+	 * ArrayAccess: Check if offset exists in merged config.
+	 *
+	 * @param mixed $offset
+	 * @return bool
+	 */
+	public function offsetExists($offset) {
+		return isset($this->get()[$offset]);
+	}
+
+	/**
+	 * ArrayAccess: Get value by offset from merged config.
+	 *
+	 * @param mixed $offset
+	 * @return mixed
+	 */
+	public function offsetGet($offset) {
+		$merged = $this->get();
+		return isset($merged[$offset]) ? $merged[$offset] : null;
+	}
+
+	/**
+	 * ArrayAccess: Set value by offset (not supported for merged config).
+	 *
+	 * @param mixed $offset
+	 * @param mixed $value
+	 * @throws Exception
+	 */
+	public function offsetSet($offset, $value) {
+		throw new Exception("Cannot modify merged config directly. Use add() method.");
+	}
+
+	/**
+	 * ArrayAccess: Unset offset (not supported for merged config).
+	 *
+	 * @param mixed $offset
+	 * @throws Exception
+	 */
+	public function offsetUnset($offset) {
+		throw new Exception("Cannot modify merged config directly. Use add() method.");
 	}
 }
