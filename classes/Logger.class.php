@@ -5,15 +5,26 @@
  * Handles logging to file and console output with optional tagging.
  */
 class Logger {
-	static $last_tag = "TELEMETRY";
+	static $tag = "TELEMETRY";
+
+	static $verbose = false;
+	static $verbose_flags = [];
+	static $log_path = null;
+
+	static function init($cfg) {
+		self::$verbose = $cfg['verbose'] ?: false;
+		self::$tag = $cfg['tag'] ?: "TELEMETRY";
+		self::$verbose_flags = $cfg['verbose_flags'] ?: [];
+		self::$log_path = $cfg['log_path'] ?: null;
+	}
 
 	static function log($s,$tag=null) {
-		$tag = $tag ?: self::$last_tag;
-		self::$last_tag = $tag;
-		if (Telemetry::$CFG['LOG_FILENAME']) {
+		$tag = $tag ?: self::$tag;
+		self::$tag = $tag;
+		if (self::$log_path) {
 			// log to file
 			file_put_contents(
-				Telemetry::$CFG['TELEMETRY_ROOT']."/".Telemetry::$CFG['LOG_FILENAME'],
+				self::$log_path,
 				date("Y-m-d H:i:s").".".sprintf("%03d",explode(" ", microtime())[0]*1000)." [$tag] ".$s."\n",
 				FILE_APPEND|LOCK_EX
 			);
@@ -22,10 +33,10 @@ class Logger {
 	}
 
 	static function vlog($s) {
-		if (Telemetry::$CFG['verbose']) self::log($s);
+		if (self::$verbose) self::log($s);
 	}
 
 	static function vflog($flag, $message) {
-		if (Telemetry::$CFG['verbose'] && in_array($flag, Telemetry::$CFG['VERBOSE_FLAGS'])) self::log("[$flag] $message");
+		if (self::$verbose && in_array($flag, self::$verbose_flags)) self::log("[$flag] $message");
 	}
 }

@@ -53,19 +53,26 @@ class Telemetry {
 
 
 	static function startup() {
-		self::init(); // overridable
-		self::config(); // overridable
+		self::init();
+		self::config();
+
+		Logger::init([
+			'path'=>self::$CFG['TELEMETRY_ROOT']."/".self::$CFG['LOG_FILENAME'],
+			'verbose'=>self::$CFG['verbose'],
+			'verbose_flags'=>self::$CFG['verbose_flags']]
+		);
+
 		self::load_topics();
 
 		self::db_startup();
 
 		self::init_classes(); // may need db
 
-		self::self_tests(); // overridable
+		self::self_tests();
 	}
 
 	static function self_tests() {
-		// run generic system self-tests
+		TelemetryScrape::self_tests();
 	}
 
 	static function load_topics() {
