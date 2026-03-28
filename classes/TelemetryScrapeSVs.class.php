@@ -17,6 +17,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 	}
 
 	static function config($cfg=[]) {
+		self::$CFG = &TelemetryScrape::$CFG; // reference parent's CFG slot (self:: would be a separate null slot)
 		$configfile = (array)(@include "config-scrape-sv.inc.php"); // load defaults
 		self::$CFG->add($configfile,12,"scrape sv config");
 
