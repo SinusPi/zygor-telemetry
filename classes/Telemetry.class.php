@@ -19,6 +19,8 @@ class Telemetry {
 	
 	static $tag = "";
 
+	static $json = false;
+
 	static $TOPICS = []; // loaded from topic-*.inc.php files, see load_topics()
 
 	/** @var TelemetryDB */
@@ -33,11 +35,12 @@ class Telemetry {
 		$configfile = (array)(require "config.inc.php");
 		self::$CFG->add($configfile,1,"config file");
 
-		if (is_array($opts)) self::$CFG->add($opts,100,"runtime options");
+		if ($opts) self::$CFG->add($opts,100,"runtime options");
 	}
 
 	static function init() {
 		self::set_error_reporting();
+		self::$json = (php_sapi_name() !== 'cli');
 	}
 
 	/* Init, config, connect..
@@ -128,13 +131,20 @@ class Telemetry {
 		}
 	}
 
+	// error handling
+
 	static function set_error_reporting() {
 		error_reporting(E_ALL^E_WARNING^E_NOTICE);
-		set_error_handler([__CLASS__,'write_error_to_status']);
+		set_error_handler([__CLASS__,'error_handler']);
+		set_exception_handler([__CLASS__,'exception_handler']);
 		register_shutdown_function([__CLASS__,'on_shutdown']);
 	}
 
-	static function write_error_to_status($errno, $errstr, $errfile, $errline) {
+	static function exception_handler($e) {
+		TelemetryStatus::status(self::$tag,['status'=>"EXCEPTION",'error'=>['type'=>get_class($e),'message'=>$e->getMessage(),'file'=>$e->getFile(),'line'=>$e->getLine(),'trace'=>$e->getTraceAsString()]]);
+	}
+
+	static function error_handler($errno, $errstr, $errfile, $errline) {
 		global $times;
 		if (!($errno & error_reporting())) {
 			//echo "$errno $errline:$errstr\n";
@@ -147,7 +157,7 @@ class Telemetry {
 	static function on_shutdown() {
 		$err=error_get_last();
 		if ($err)
-			self::write_error_to_status($err['type'],$err['message'],$err['file'],$err['line']);
+			self::error_handler($err['type'],$err['message'],$err['file'],$err['line']);
 	}
 
 	/**
@@ -388,7 +398,7 @@ class Telemetry {
 	}
 
 	static function dump_config() {
-		$cfg = self::$CFG;
+		$cfg = self::$CFG->get();
 		if (!$cfg) return; // No config loaded
 		Logger::log(get_called_class()." config:");
 		if (isset($cfg['DB']['pass'])) $cfg['DB']['pass']="****"; // hide password
@@ -421,7 +431,7 @@ class Telemetry {
 	 * Load all dependent class files from the classes directory.
 	 */
 	static function init_scrapers() {
-		TelemetryScrape::init_scrapers();
+		TelemetryScrape::init();
 	}
 
 }

@@ -17,7 +17,9 @@ class TelemetryScrape {
 
 	static function init() {
 		// any local inits?
+		self::config();		
 		self::db_create(); // create generic scraping-related tables if not exist
+		self::init_scrapers();
 	}
 
 	static function config($cfg=[]) {
@@ -56,6 +58,12 @@ class TelemetryScrape {
 
 	static function init_scrapers() {
 		foreach (self::getSubclasses() as $subclass) {
+			if (method_exists($subclass, 'identifySelf')) {
+				$info = $subclass::identifySelf();
+				if (is_array($info)) {
+					self::registerSource($info['key'], $info);
+				}
+			}
 			if (method_exists($subclass, 'init')) {
 				$subclass::init();
 			}

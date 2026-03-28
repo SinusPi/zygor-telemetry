@@ -42,6 +42,7 @@ if (substr($OPTS['start-day'],0,1)=="-") $OPTS['start-day']=date("Ymd",strtotime
 $OPTS["MAX_DAYS"]=$OPTS['maxdays'];
 
 Telemetry::$CFG->add($OPTS);
+Telemetry::dump_config();
 
 $inputs = $OPTS['input'];
 

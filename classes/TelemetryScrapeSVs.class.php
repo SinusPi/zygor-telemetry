@@ -12,14 +12,11 @@ use TelemetryStatus as TmSt;
  */
 class TelemetryScrapeSVs extends TelemetryScrape {
 	static function init() {
-		parent::init();
 		// Register this scraper source
 	}
 
 	static function config($cfg=[]) {
 		self::$CFG = &Telemetry::$CFG; // reference main config for easy access
-		
-		parent::config();
 		
 		$configfile = (array)(@include "config-scrape-sv.inc.php"); // load defaults
 		self::$CFG->add($configfile,12,"scrape sv config");
@@ -32,12 +29,13 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		self::$CFG->add(['SV_STORAGE_DATA_PATH'=>Telemetry::cfgstr('SV_STORAGE_DATA_PATH',['SYNC_FOLDER'=>$SYNC_CFG['folder']])],13,"scrape sv: storage path");
 	}
 
-	static function registerSelf() {
-		parent::registerSource('sv', [
+	static function identifySelf() {
+		return [
+			'key' => 'sv',
 			'class' => self::class,
 			'label' => 'Saved Variables',
-			'description' => 'User-submitted game client saved variables'
-		]);
+			'description' => 'User-submitted game client saved variables',
+		];
 	}
 
 	/**
@@ -797,5 +795,3 @@ ENDLUA;
 		return Tm::cfgstr('SV_STORAGE_FLAVOUR_PATH',['FLAVOUR'=>$flavour])."/".$acctfile."--SavedVariables--ZygorGuidesViewer.lua.gz";
 	}
 }
-
-TelemetryScrapeSVs::registerSelf();

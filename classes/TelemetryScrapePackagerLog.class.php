@@ -23,12 +23,13 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 		if (!self::$CFG['PACKAGERLOG_PATH']) throw new ErrorException("PACKAGERLOG_PATH not defined in config, config-scrape-packagerlog.inc.php not loaded?");
 	}
 
-	static function registerSelf() {
-		parent::registerSource('packagerlog', [
+	static function identifySelf() {
+		return [
+			'key' => 'packagerlog',
 			'class' => self::class,
 			'label' => 'Packager Logs',
-			'description' => 'Packager build and deployment logs'
-		]);
+			'description' => 'Packager build and deployment logs',
+		];
 	}
 
 	/**
@@ -580,5 +581,3 @@ ENDLUA;
 		return self::$CFG['PACKAGERLOG_PATH']."/".$slug;
 	}
 }
-
-TelemetryScrapePackagerLog::registerSelf();
