@@ -68,4 +68,19 @@ class FileTools {
 		}
 		return $files;
 	}
+
+	/**
+	 * Safely load a PHP file that is expected to return an array.
+	 * Returns the array, or null if the file does not return an array or fails to parse.
+	 */
+	static function safely_load_php($filename) {
+		try {
+			$parse = token_get_all(file_get_contents($filename));
+			$file = include $filename;
+			if (!is_array($file)) return null;
+			return $file;
+		} catch (Exception $e) {
+			throw new Exception("Failed to parse file $filename: ".$e->getMessage()."\n");
+		}
+	}
 }
