@@ -10,23 +10,19 @@ use TelemetryStatus as TmSt;
  */
 class TelemetryScrapePackagerLog extends TelemetryScrape {
 	static function init() {
-		parent::init();
+		self::config();
 	}
 
 	static function config($cfg=[]) {
-		self::$CFG = &Telemetry::$CFG; // reference main config for easy access
-		
-		parent::config($cfg);
-
 		$configfile = (array)(@include "config-scrape-packagerlog.inc.php"); // load defaults
-		self::$CFG = Tm::merge_configs(self::$CFG, $configfile);
+		self::$CFG->add($configfile, 13, "scrape packagerlog config");
+		
 		if (!self::$CFG['PACKAGERLOG_PATH']) throw new ErrorException("PACKAGERLOG_PATH not defined in config, config-scrape-packagerlog.inc.php not loaded?");
 	}
 
 	static function identifySelf() {
 		return [
 			'key' => 'packagerlog',
-			'class' => self::class,
 			'label' => 'Packager Logs',
 			'description' => 'Packager build and deployment logs',
 		];

@@ -13,11 +13,10 @@ use TelemetryStatus as TmSt;
 class TelemetryScrapeSVs extends TelemetryScrape {
 	static function init() {
 		// Register this scraper source
+		self::config();
 	}
 
 	static function config($cfg=[]) {
-		self::$CFG = &Telemetry::$CFG; // reference main config for easy access
-		
 		$configfile = (array)(@include "config-scrape-sv.inc.php"); // load defaults
 		self::$CFG->add($configfile,12,"scrape sv config");
 
@@ -32,7 +31,6 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 	static function identifySelf() {
 		return [
 			'key' => 'sv',
-			'class' => self::class,
 			'label' => 'Saved Variables',
 			'description' => 'User-submitted game client saved variables',
 		];
@@ -701,12 +699,9 @@ ENDLUA;
 	// Tests, DB schemas
 
 	static function self_tests() {
-		parent::self_tests();
-		
 		self::test_paths();
 		self::test_datapoints();
 		try {
-			self::test_status();
 			Logger::vlog("Database: connected and present.");
 		} catch (ErrorException $e) {
 			die("DB Connection to ".self::$CFG['DB']['host']." FAILED - ".$e->getMessage());

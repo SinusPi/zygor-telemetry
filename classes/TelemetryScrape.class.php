@@ -17,7 +17,7 @@ class TelemetryScrape {
 
 	static function init() {
 		// any local inits?
-		self::config();		
+		self::config();
 		self::db_create(); // create generic scraping-related tables if not exist
 		self::init_scrapers();
 	}
@@ -27,7 +27,6 @@ class TelemetryScrape {
 
 		$configfile = (array)(@include "config-scrape.inc.php"); // load scraping defaults
 		self::$CFG->add($configfile,10,"scrape base config");
-
 	}
 
 	/**
@@ -61,6 +60,7 @@ class TelemetryScrape {
 			if (method_exists($subclass, 'identifySelf')) {
 				$info = $subclass::identifySelf();
 				if (is_array($info)) {
+					$info['class'] = $subclass;
 					self::registerSource($info['key'], $info);
 				}
 			}

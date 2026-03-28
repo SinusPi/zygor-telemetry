@@ -59,7 +59,7 @@ class Telemetry {
 
 		self::db_startup();
 
-		self::init_scrapers(); // may need db
+		self::init_classes(); // may need db
 
 		self::self_tests(); // overridable
 	}
@@ -430,7 +430,7 @@ class Telemetry {
 	/**
 	 * Load all dependent class files from the classes directory.
 	 */
-	static function init_scrapers() {
+	static function init_classes() {
 		TelemetryScrape::init();
 	}
 
