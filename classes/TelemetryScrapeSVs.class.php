@@ -46,7 +46,6 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 	 */
 	static function getConfiguredPaths() {
 		try {
-			self::config();
 			$paths = [];
 			if (isset(self::$CFG['SV_STORAGE_ROOT'])) {
 				$paths[] = self::$CFG['SV_STORAGE_ROOT'];

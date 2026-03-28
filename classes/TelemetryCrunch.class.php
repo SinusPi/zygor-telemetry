@@ -118,7 +118,7 @@ class TelemetryCrunch {
 			$userfile_mtimes = array_map("filemtime", $userfiles);
 			$newest_userfile_date = max($userfile_mtimes);
 
-			$DEFS = self::$CFG['TOPICS'];
+			$DEFS = Telemetry::$TOPICS;
 
 			Logger::vlog("+ Newest input file mtime: ".date("Y-m-d H:i:s",$newest_userfile_date));
 			Logger::vlog(".- Verifying output file mtimes for freshness...");
@@ -250,7 +250,7 @@ class TelemetryCrunch {
 	}
 
 	static function crunch_flavour($flavour) {
-		$topics = self::$CFG['TOPICS'];
+		$topics = Telemetry::$TOPICS;
 
 		Logger::vlog("Running crunchers for flavour \x1b[38;5;78m{$flavour}\x1b[0m...");
 		foreach($topics as $name=>$topic) {

@@ -166,7 +166,7 @@ class Telemetry {
 	}
 
 	static function get_counts($flavour,$topic) {
-		$def = self::$CFG['TOPICS'][$topic] ?: null;
+		$def = self::$TOPICS[$topic] ?: null;
 		if (!$def) return ['total'=>0,'matching'=>0];
 		if ($def['output_mode']=="day") {
 			$file_glob = self::cfgstr('DATA_PATH_DPMODE_DAY',['FLAVOUR'=>$flavour,'TOPIC'=>$topic,'DAY'=>"*"]);
@@ -246,7 +246,7 @@ class Telemetry {
 	}
 
 	static function cfgstr($str,$data=[]) {
-		return self::repstr(self::$CFG[$str], $data + self::$CFG);
+		return self::repstr(self::$CFG[$str], $data + self::$CFG->get());
 	}
 
 	/**
@@ -382,7 +382,7 @@ class Telemetry {
 
 	static function call_hooks($hook,$args) {
 		//self::vlog("Hook: $hook calls starting.");
-		foreach (self::$CFG['TOPICS'] as $dp_name=>$dp_def)
+		foreach (self::$TOPICS as $dp_name=>$dp_def)
 			if ($dp_def[$hook] && $dp_def['skip']!==false) { Logger::vlog(" - Calling $hook for $dp_name"); call_user_func_array($dp_def[$hook], $args); }
 		//self::vlog("Hook: $hook calls complete.");
 	}

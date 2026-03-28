@@ -10,7 +10,7 @@ class TelemetryEndpoint {
 
 	static function config($cfg=[]) {
 		self::$CFG = &Telemetry::$CFG; // reference main config for easy access
-		
+
 		$configfile = (array)(@include "config-endpoint.inc.php"); // load defaults
 		self::$CFG = Tm::merge_configs(self::$CFG, $configfile, $cfg);
 	}
@@ -44,7 +44,7 @@ class TelemetryEndpoint {
 
 	static function serveListTopics() {
 		$topics = [];
-		foreach (self::$CFG['TOPICS'] as $name => $config) {
+		foreach (Telemetry::$TOPICS as $name => $config) {
 			$scraper = isset($config['scraper']['input']) ? $config['scraper']['input'] : null;
 			$has_crunchers = isset($config['crunchers']) && is_array($config['crunchers']) && count($config['crunchers']) > 0;
 			$has_endpoint = isset($config['endpoint']);
@@ -93,12 +93,8 @@ class TelemetryEndpoint {
 			$source_paths = [];
 			
 			try {
-				// Load scraper config to get more details
-				$class::config();
-				$cfg = $class::$CFG;
-				
 				// Count topics using this scraper and collect topic names
-				$topics_list = array_keys(array_filter((array)$cfg['TOPICS'], function($t) use ($key) {
+				$topics_list = array_keys(array_filter((array)Telemetry::$TOPICS, function($t) use ($key) {
 					return isset($t['scraper']['input']) && $t['scraper']['input'] === $key;
 				}));
 				$topic_count = count($topics_list);
@@ -172,7 +168,7 @@ class TelemetryEndpoint {
 			]);
 		}
 
-		$topicendpoint = isset(self::$CFG['TOPICS'][$topic]['endpoint']) ? self::$CFG['TOPICS'][$topic]['endpoint'] : null;
+		$topicendpoint = isset(Telemetry::$TOPICS[$topic]['endpoint']) ? Telemetry::$TOPICS[$topic]['endpoint'] : null;
 		if (!$topicendpoint || !is_callable($topicendpoint['queryfunc'])) {
 			self::response([
 				"success" => false,
@@ -207,9 +203,9 @@ class TelemetryEndpoint {
 	}
 
 	static function serveDataRequestDaymap($topic, $from, $to, $flavnum) {
-		$topicendpoint = isset(self::$CFG['TOPICS'][$topic]['endpoint']) ? self::$CFG['TOPICS'][$topic]['endpoint'] : null;
-		$table = isset(self::$CFG['TOPICS'][$topic]['crunchers'][0]['table']) ? self::$CFG['TOPICS'][$topic]['crunchers'][0]['table'] : null;
-		
+		$topicendpoint = isset(Telemetry::$TOPICS[$topic]['endpoint']) ? Telemetry::$TOPICS[$topic]['endpoint'] : null;
+		$table = isset(Telemetry::$TOPICS[$topic]['crunchers'][0]['table']) ? Telemetry::$TOPICS[$topic]['crunchers'][0]['table'] : null;
+
 		if (!$table) {
 			self::response([
 				"success" => false,

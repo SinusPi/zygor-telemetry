@@ -3,16 +3,14 @@
 /**
  * Set of utilities to display metrics' HTML forms and charts.
  */
-class TelemetryView extends Telemetry {
+class TelemetryView {
 	static function config($cfg=[]) {
-		parent::config($cfg);
-
 		$configfile = (array)(@include "config-view.inc.php"); // load defaults
-		self::$CFG = self::merge_configs(self::$CFG, $configfile, $cfg);
+		Telemetry::$CFG->add($configfile, 30, $cfg);
 	}
 
 	static function renderMetrics() {
-		foreach (self::$CFG['TOPICS'] as $topicname => &$topicdata) {
+		foreach (Telemetry::$TOPICS as $topicname => &$topicdata) {
 			$view = &$topicdata['view'] ?: null;
 			if (is_callable($view['printer'])) {
 				?><div id="topic-<?=$topicname?>" class="telemetry-topic telemetry-topic-<?=$topicname?> <?=($view['class'] ?: '')?>"><?php

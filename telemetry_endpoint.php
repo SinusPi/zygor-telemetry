@@ -1,10 +1,9 @@
 <?php
 if (!defined('WEBHOME')) define("WEBHOME","/home/zygordata/www");
 
-require_once("classes/Telemetry.class.php");
-require_once("includes/Zygor.class.inc.php");
+require_once __DIR__ . "/loader.inc.php";
 
-TelemetryEndpoint::startup();
+Telemetry::startup();
 
 header("Content-type: application/json");
 
@@ -15,7 +14,7 @@ $result['metric']=$metric;
 // Parts still use old format, parts will connect to db...
 
 if (isset($_REQUEST['list'])) {
-	$topics = Telemetry::$CFG['TOPICS'];
+	$topics = Telemetry::$TOPICS;
 	$list = array_map(function($t) {
 		$r=[];
 		$r['endpoint'] = !!$t['endpoint'];
