@@ -295,6 +295,14 @@ class TelemetryScrape {
 
 	// Tests, DB schemas
 
+	static function self_tests() {
+		foreach (self::getSubclasses() as $subclass) {
+			if (method_exists($subclass, 'self_test')) {
+				$subclass::self_test();
+			}
+		}
+	}
+
 	/**
 	 * Create generic scraping-related tables.
 	 */
