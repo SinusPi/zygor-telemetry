@@ -70,6 +70,23 @@ class FileTools {
 	}
 
 	/**
+	 * Helper generator to yield batches of items from an iterable.
+	 */
+	static function batchify($iterable, $batch_size) {
+		$batch = [];
+		foreach ($iterable as $item) {
+			$batch[] = $item;
+			if (count($batch) >= $batch_size) {
+				yield $batch;
+				$batch = [];
+			}
+		}
+		if (!empty($batch)) {
+			yield $batch;
+		}
+	}
+
+	/**
 	 * Safely load a PHP file that is expected to return an array.
 	 * Returns the array, or null if the file does not return an array or fails to parse.
 	 */

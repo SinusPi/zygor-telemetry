@@ -178,23 +178,6 @@ class TelemetryScrape {
 	}
 
 	/**
-	 * Helper generator to yield batches of items from an iterable.
-	 */
-	static function batchify($iterable, $batch_size) {
-		$batch = [];
-		foreach ($iterable as $item) {
-			$batch[] = $item;
-			if (count($batch) >= $batch_size) {
-				yield $batch;
-				$batch = [];
-			}
-		}
-		if (!empty($batch)) {
-			yield $batch;
-		}
-	}
-
-	/**
 	 * Generator that yields only files "fresh" for given topic(s) (with mtimes newer than the last recorded scrape time for that topic)
 	 * @param string[] $topics list of topic names to check freshness
 	 * @param string $startfolder folder to start searching in
@@ -205,7 +188,7 @@ class TelemetryScrape {
 	static function get_fresh_files_gen($topics, $startfolder, $filemask, $cb_slugger, $filetype, $batch_size=20) {
 		Logger::vlog("Finding files in $startfolder matching $filemask...");
 		$files_gen = FileTools::rglob_gen($startfolder,$filemask,10);
-		$file_batches_gen = self::batchify($files_gen, $batch_size);
+		$file_batches_gen = FileTools::batchify($files_gen, $batch_size);
 		foreach ($file_batches_gen as $batch) {
 			Logger::vlog("* Processing batch of ".count($batch)." files...");
 			// filenames in batch are full; need to shorten for DB
