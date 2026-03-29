@@ -38,6 +38,14 @@ class Telemetry {
 		if ($opts) self::$CFG->add($opts,100,"runtime options");
 	}
 
+	static function update_config($opts) {
+		self::$CFG->add($opts,100,"runtime options");
+		Logger::init([
+			'verbose'=>self::$CFG['verbose'],
+			'verbose_flags'=>self::$CFG['verbose_flags']]
+		);
+	}
+
 	static function init() {
 		self::set_error_reporting();
 		self::$json = (php_sapi_name() !== 'cli');
@@ -57,12 +65,13 @@ class Telemetry {
 		self::config();
 
 		Logger::init([
-			'path'=>self::$CFG['TELEMETRY_ROOT']."/".self::$CFG['LOG_FILENAME'],
+			'log_path'=>self::$CFG['TELEMETRY_ROOT']."/".self::$CFG['LOG_FILENAME'],
 			'verbose'=>self::$CFG['verbose'],
 			'verbose_flags'=>self::$CFG['verbose_flags']]
 		);
 
 		self::load_topics();
+		self::dump_topics();
 
 		self::db_startup();
 
@@ -91,24 +100,26 @@ class Telemetry {
 
 		}
 
-		if (self::$CFG['verbose']) {
-			$dot = function($reset=false) { static $s=0; if ($reset) $s=-1; return $s++ ? ", ":" - "; };
-			Logger::vlog("Loaded ".count($topics)." telemetry topics:\n".implode("\n",array_map(function($t) use ($dot) {
-				$cc = count($t['crunchers']);
-				$r = "* ";
-				$r .= C_MTHD.$t['name'].C_R;
-				$dot(true);
-				if ($t['scraper']) $r .= $dot()."scraping: ".($t['scraper']['input'] ?: "???");
-				if ($cc==0) $r .= $dot()."not crunched";
-				elseif ($cc==1) $r .= $dot()."crunched";
-				else $r .= $dot()."$cc crunchers: ".($c=count($t['crunchers']))." (".implode(", ",array_column($t['crunchers'],'name')).")";
-				return $r;
-			}, $topics)));
-		}
-
 		self::$TOPICS = $topics;
 
 		return $topics;
+	}
+
+	static function dump_topics() {
+		if (!self::$CFG['verbose']) return;
+		
+		$dot = function($reset=false) { static $s=0; if ($reset) $s=-1; return $s++ ? ", ":" - "; };
+		Logger::vlog("Loaded ".count(self::$TOPICS)." telemetry topics:\n".implode("\n",array_map(function($t) use ($dot) {
+			$cc = count($t['crunchers']);
+			$r = "* ";
+			$r .= C_MTHD.$t['name'].C_R;
+			$dot(true);
+			if ($t['scraper']) $r .= $dot()."scraping: ".($t['scraper']['input'] ?: "???");
+			if ($cc==0) $r .= $dot()."not crunched";
+			elseif ($cc==1) $r .= $dot()."crunched";
+			else $r .= $dot()."$cc crunchers: ".($c=count($t['crunchers']))." (".implode(", ",array_column($t['crunchers'],'name')).")";
+			return $r;
+		}, self::$TOPICS)));
 	}
 
 	static function load_topic_crunchers($topic_name) {
