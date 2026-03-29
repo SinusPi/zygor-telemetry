@@ -11,13 +11,10 @@ ini_set("max_execution_time",3600);
  */
 
 define("DAY",86400);
- 
-require_once "classes/Telemetry.class.php";
 
-require_once "includes/VerboseException.class.php";
+require_once __DIR__ . "/loader.inc.php";
+
 require_once "includes/shell.class.php";
-require_once "includes/zygor.class.inc.php";
-
 \Zygor\Shell::run_only_in_shell();
 
 //pcntl_signal(SIGINT,function() { write_error_to_status(E_ERROR,"Terminated",__FILE__,__LINE__); die(); return true; });
@@ -39,7 +36,8 @@ $FLAVOURS = $OPTS['f'];
 if (substr($OPTS['start-day'],0,1)=="-") $OPTS['start-day']=date("Ymd",strtotime($OPTS['start-day']." days"));
 $OPTS["MAX_DAYS"]=$OPTS['maxdays'];
 
-TelemetryCrunch::startup($OPTS);
+Telemetry::startup($OPTS);
+Telemetry::dump_config();
 
 foreach ($FLAVOURS as $flav) TelemetryCrunch::crunch_flavour($flav);
 

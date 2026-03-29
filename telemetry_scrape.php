@@ -21,7 +21,8 @@ require_once "includes/shell.class.php";
 
 //pcntl_signal(SIGINT,function() { write_error_to_status(E_ERROR,"Terminated",__FILE__,__LINE__); die(); return true; });
 
-Telemetry::startup();
+Telemetry::config();
+TelemetryScrape::init_scrapers(false); // don't really init scrapers yet
 
 $OPTS = (array)\Zygor\Shell::better_getopt([
 	['f:','flavour:',      array_keys(Telemetry::$CFG['WOW_FLAVOUR_DATA'])],
@@ -41,7 +42,7 @@ $FLAVOURS = $OPTS['f'];
 if (substr($OPTS['start-day'],0,1)=="-") $OPTS['start-day']=date("Ymd",strtotime($OPTS['start-day']." days"));
 $OPTS["MAX_DAYS"]=$OPTS['maxdays'];
 
-Telemetry::$CFG->add($OPTS);
+Telemetry::startup($OPTS);
 Telemetry::dump_config();
 
 $inputs = $OPTS['input'];

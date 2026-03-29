@@ -60,9 +60,9 @@ class Telemetry {
 	 */
 
 
-	static function startup() {
+	static function startup($opts=[]) {
 		self::init();
-		self::config();
+		self::config($opts);
 
 		Logger::init([
 			'log_path'=>self::$CFG['TELEMETRY_ROOT']."/".self::$CFG['LOG_FILENAME'],

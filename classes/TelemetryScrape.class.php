@@ -55,7 +55,7 @@ class TelemetryScrape {
 		});
 	}
 
-	static function init_scrapers() {
+	static function init_scrapers($do_init=true) {
 		foreach (self::getSubclasses() as $subclass) {
 			if (method_exists($subclass, 'identifySelf')) {
 				$info = $subclass::identifySelf();
@@ -64,7 +64,7 @@ class TelemetryScrape {
 					self::registerSource($info['key'], $info);
 				}
 			}
-			if (method_exists($subclass, 'init')) {
+			if ($do_init && method_exists($subclass, 'init')) {
 				$subclass::init();
 			}
 		}
