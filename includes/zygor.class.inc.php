@@ -220,13 +220,13 @@ class Zygor {
 				$vals = array_map(function($v) use ($type,$null,$db) {
 					if ($type=="f") return ($null && !is_numeric($v)) ? "NULL" : floatval($v);
 					elseif ($type=="d") return ($null && !is_numeric($v)) ? "NULL": intval($v);
-					elseif ($type=="s") return sprintf('"%s"',$db->real_escape_string($v));
+					elseif ($type=="s") return ($null && $v === null) ? "NULL" : sprintf('"%s"',$db->real_escape_string($v));
 				},$val);
 				return join(",",$vals);
 			} else {
 				if ($type=="f") return ($null && !is_numeric($val)) ? "NULL" : floatval($val);
 				elseif ($type=="d") return ($null && !is_numeric($val)) ? "NULL": intval($val);
-				elseif ($type=="s") return ($null ? "NULL" : sprintf('"%s"',$db->real_escape_string($val)));
+				elseif ($type=="s") return ($null && $val === null) ? "NULL" : sprintf('"%s"',$db->real_escape_string($val));
 			}
         },$query);
         //error_log("QESC: ".$s);
@@ -265,13 +265,39 @@ class Zygor {
 	{
 		$mockDb = self::setUp();
 
+		// Basic escaping
 		self::assertEquals( 'SELECT * FROM users WHERE name="John Doe"',	Zygor::qesc($mockDb, "SELECT * FROM users WHERE name={s}", "John Doe")    		);
 		self::assertEquals( 'SELECT * FROM users WHERE age=25',         	Zygor::qesc($mockDb, "SELECT * FROM users WHERE age={d}", 25)             		);
 		self::assertEquals( 'SELECT * FROM products WHERE price=19.99', 	Zygor::qesc($mockDb, "SELECT * FROM products WHERE price={f}", 19.99)     		);
+		
+		// SQL injection prevention
+		self::assertEquals( 'SELECT * FROM users WHERE name="O\\\'Reilly"',	Zygor::qesc($mockDb, "SELECT * FROM users WHERE name={s}", "O'Reilly")	);
+		self::assertEquals( 'SELECT * FROM users WHERE name="He said \\"Hello\\""',	Zygor::qesc($mockDb, "SELECT * FROM users WHERE name={s}", 'He said "Hello"')	);
+		
+		// Invalid type handling
+		self::assertEquals( 'SELECT * FROM users WHERE age=0',         	Zygor::qesc($mockDb, "SELECT * FROM users WHERE age={d}", "not_a_number")	);
+		
+		// Nullable types
 		self::assertEquals( 'SELECT * FROM users WHERE name=NULL',      	Zygor::qesc($mockDb, "SELECT * FROM users WHERE name={sn}", null)         		);
+		self::assertEquals( 'SELECT * FROM users WHERE name="John"',    	Zygor::qesc($mockDb, "SELECT * FROM users WHERE name={sn}", "John")       		);
+		self::assertEquals( 'SELECT * FROM users WHERE name=""',        	Zygor::qesc($mockDb, "SELECT * FROM users WHERE name={sn}", "")           		);
 		self::assertEquals( 'SELECT * FROM users WHERE age=NULL',       	Zygor::qesc($mockDb, "SELECT * FROM users WHERE age={dn}", null)          		);
+		self::assertEquals( 'SELECT * FROM users WHERE age=NULL',       	Zygor::qesc($mockDb, "SELECT * FROM users WHERE age={dn}", "invalid")     		);
+		self::assertEquals( 'SELECT * FROM users WHERE price=NULL',     	Zygor::qesc($mockDb, "SELECT * FROM users WHERE price={fn}", "not_a_number")	);
+		
+		// Array escaping
 		self::assertEquals( 'SELECT * FROM users WHERE id IN (1,2,3)',  	Zygor::qesc($mockDb, "SELECT * FROM users WHERE id IN ({da})", [1, 2, 3]) 		);
 		self::assertEquals( 'SELECT * FROM users WHERE names IN ("John Doe","Mary Sue")',	Zygor::qesc($mockDb, "SELECT * FROM users WHERE names IN ({sa})", ["John Doe", "Mary Sue"])	);
+		self::assertEquals( 'SELECT * FROM users WHERE name IN ("O\\\'Brien","He said \\"Hi\\"")',	Zygor::qesc($mockDb, "SELECT * FROM users WHERE name IN ({sa})", ["O'Brien", 'He said "Hi"'])	);
+		self::assertEquals( 'SELECT * FROM users WHERE id IN ()',       	Zygor::qesc($mockDb, "SELECT * FROM users WHERE id IN ({da})", [])         		);
+		
+		// Multiple parameters
+		self::assertEquals( 'SELECT * FROM users WHERE name="John" AND age=25 AND active="yes"',	Zygor::qesc($mockDb, "SELECT * FROM users WHERE name={s} AND age={d} AND active={s}", "John", 25, "yes")	);
+		
+		// Nullable string arrays
+		self::assertEquals( 'SELECT * FROM users WHERE names IN ("John","Mary")',	Zygor::qesc($mockDb, "SELECT * FROM users WHERE names IN ({sna})", ["John", "Mary"])	);
+		self::assertEquals( 'SELECT * FROM users WHERE names IN ("John",NULL,"Mary")',	Zygor::qesc($mockDb, "SELECT * FROM users WHERE names IN ({sna})", ["John", null, "Mary"])	);
+		self::assertEquals( 'SELECT * FROM users WHERE names IN ("John","","Mary")',	Zygor::qesc($mockDb, "SELECT * FROM users WHERE names IN ({sna})", ["John", "", "Mary"])	);
 	}
 
 	public static function testQescInvalidCases()
