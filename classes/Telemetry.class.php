@@ -282,6 +282,9 @@ class Telemetry {
 		return $flavnum;
 	}
 
+	static function is_linux() {
+		return stripos(php_uname(), 'linux') !== false;
+	}
 
 	static function filter_gen($iterable, $callback) {
 		foreach ($iterable as $key => $value) {

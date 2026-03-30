@@ -330,12 +330,11 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 
 		Logger::vlog("Scraping SV: \x1b[38;5;110m$user\x1b[0m/\x1b[38;5;116m$bnet\x1b[0m\x1b[30;1m--SavedVariables\x1b[0m for topics: ".join(", ", array_keys($topics)));
 
-		$is_windows = (strpos(PHP_OS, 'WIN') === 0); $is_linux = !$is_windows;
 		$lock_code = $flavour."/".$filename_slug;
 		$got_db_lock = false;
 
 		try { // flock block
-			if ($is_linux) {
+			if (Telemetry::is_linux()) {
 				$fl = fopen($userfolder, 'rb');
 				if (!$fl) throw new FileLockedException("Cannot open input folder for locking: $userfolder");
 				if (!flock($fl, LOCK_EX | LOCK_NB)) {
@@ -355,12 +354,6 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			Logger::vlog(" - :. reading SV file...");
 
 			Telemetry::$db->begin_transaction(); // need to start here to lock the DB record for this file
-
-			$flavourfile = $file->slug; // $flavour."/".$filename_slug; // flavour/user/bnet
-
-			//
-			// TODO: lock file
-			//
 
 			$sv_raw = self::read_raw_sv($filename_full);
 
@@ -423,7 +416,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			Telemetry::$db->rollback();
 			return;
 		} catch (Exception $e) {
-			Logger::log(microtime(true)." ERROR processing $filename_full: " . $e->getMessage());
+			Logger::log(microtime(true)." ERROR processing $filename_full: " . $e->getMessage() . " at stack trace: " . $e->getTraceAsString());
 			throw $e;
 		} finally {
 			// unlock
@@ -540,14 +533,14 @@ ENDLUA;
 		$lua = $lua_head . $lua_extractors . $lua_foot;
 
 		$lua = preg_replace_callback("/%([A-Z_]+)%/",function($s) use ($flavour) { return self::$CFG['WOW_FLAVOUR_DATA'][$flavour][$s[1]]; },$lua);
-		if (self::$CFG['debug_lua']) echo $lua;
-		unset(self::$CFG['debug_lua']);
+		if (self::$CFG['debug_lua']) {
+			echo $lua;
+			file_put_contents("last_lua.lua",$sv_raw);
+			file_put_contents("last_lua.lua",$lua,FILE_APPEND);
+			self::$CFG->add(['debug_lua'=>false],999,"disable debug_lua after one use");
+		}
 
-		file_put_contents("last_lua.lua",$sv_raw);
-		file_put_contents("last_lua.lua",$lua,FILE_APPEND);
-
-		$is_linux = (strpos(PHP_OS, 'WIN') === 0) ? false : true;
-		if ($is_linux) {
+		if (Telemetry::is_linux()) {
 			// cleaner, no temp files
 			list ($errcode, $datapoints, $stderr) = self::execute_lua_procopen($sv_raw, $lua);
 		} else {
