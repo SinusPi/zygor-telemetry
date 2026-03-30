@@ -148,7 +148,8 @@ class Telemetry {
 	}
 
 	static function exception_handler($e) {
-		TelemetryStatus::status(self::$tag,['status'=>"EXCEPTION",'error'=>['type'=>get_class($e),'message'=>$e->getMessage(),'file'=>$e->getFile(),'line'=>$e->getLine(),'trace'=>$e->getTraceAsString()]]);
+		$error_data = ['success'=>false,'status'=>"EXCEPTION",'type'=>get_class($e),'message'=>$e->getMessage(),'file'=>$e->getFile(),'line'=>$e->getLine(),'trace'=>$e->getTraceAsString()];
+		self::graceful_die($error_data);
 	}
 
 	static function error_handler($errno, $errstr, $errfile, $errline) {
@@ -157,8 +158,24 @@ class Telemetry {
 			//echo "$errno $errline:$errstr\n";
 			return false;
 		}
-		TelemetryStatus::status(self::$tag,['status'=>"ERROR",'error'=>['errno'=>$errno,'errstr'=>$errstr,'errfile'=>$errfile,'errline'=>$errline],'times'=>$times]);
-		die("$errno $errfile:$errline $errstr\n");
+		$error_data = ['success'=>false,'status'=>"ERROR",'errno'=>$errno,'errstr'=>$errstr,'errfile'=>$errfile,'errline'=>$errline,'times'=>$times];
+		self::graceful_die($error_data);
+	}
+
+	static function graceful_die($data) {
+		TelemetryStatus::status(self::$tag,$data);
+		Logger::log("Terminating with status: ".json_encode($data));
+		self::die_json($data);
+	}
+
+	static function die_json($data) {
+		if (isset($data['httpcode'])) http_response_code($data['httpcode']);
+		if (self::$json) {
+			header('Content-Type: application/json');
+			die(json_encode($data));
+		} else {
+			die(print_r($data,true));
+		}
 	}
 
 	static function on_shutdown() {
