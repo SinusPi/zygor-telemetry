@@ -196,7 +196,13 @@ class TelemetryScrape {
 			$batch_slugs = array_map($cb_slugger,$batch);
 			$files = Tm::$db->get_files($batch_slugs,$filetype,true); // same order maintained
 			$ids = array_map(function($f) { return $f->id ?: null; }, $files);
-			$batch_scrapetimes = self::get_file_scrapetimes_batch($topics,$ids);
+			if (self::$CFG['ignore-mtimes']) {
+				Logger::vlog("- Ignoring mtimes for freshness check (config ignore-mtimes=true)");
+				// fill array: [$ids]=>-1
+				$batch_scrapetimes = array_map(function($id) { return ['topics' => [], 'newest_scrape_time' => -1]; }, $ids);
+			} else {
+				$batch_scrapetimes = self::get_file_scrapetimes_batch($topics,$ids);
+			}
 			
 			foreach ($files as $i=>$file) {
 				// add full file names and mtimes to results for easier filtering below
