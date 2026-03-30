@@ -264,11 +264,10 @@ class TelemetryScrape {
 	 * Update scrape times for multiple topics on a file
 	 */
 	static function db_set_file_scrapetimes($topics, $file_id, $last_events_per_topic=[], $scrape_time=null) {
-		$values = join(", ", array_map(function($topic) use ($file_id, $scrape_time, $last_events_per_topic) {
-			return Tm::$db->query("({s}, {d}, {d}, {d})", $topic, $file_id, $scrape_time ?: time(), $last_events_per_topic[$topic] ?: null);
+		$values_sql = join(", ", array_map(function($topic) use ($file_id, $scrape_time, $last_events_per_topic) {
+			return Tm::$db->qesc("({s},{d},{d},{d})", $topic, $file_id, $scrape_time ?: time(), $last_events_per_topic[$topic] ?: null);
 		}, $topics));
-		$q = Tm::$db->qesc($_q="INSERT INTO `topic_scrapetimes` (topic, file_id, scrape_time, last_event_time) VALUES $values ON DUPLICATE KEY UPDATE scrape_time=VALUES(scrape_time), last_event_time=VALUES(last_event_time)");
-		$r = Tm::$db->query($q);
+		$r = Tm::$db->query($_q="INSERT INTO `topic_scrapetimes` (topic, file_id, scrape_time, last_event_time) VALUES $values_sql ON DUPLICATE KEY UPDATE scrape_time=VALUES(scrape_time), last_event_time=VALUES(last_event_time)");
 		if (!$r) throw new ErrorException("DB error, query $_q: ".Tm::$db->error());
 		Logger::vlog("Updated scrape times for file_id $file_id and topics: scrape time $scrape_time, ".join(", ",array_map(function($t) use ($last_events_per_topic) { return $t."=".$last_events_per_topic[$t] ?: 0; }, $topics)));
 	}
