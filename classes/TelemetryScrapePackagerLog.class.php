@@ -374,3 +374,4 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 			$time_last_mtimes = time();
 		}
 	}
+}
