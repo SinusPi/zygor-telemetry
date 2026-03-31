@@ -24,7 +24,7 @@ try {
 
 	// Execute git log command to get recent commits
 	$cmd = sprintf(
-		"cd %s && git log --pretty=format:%%H%%n%%an%%n%%ae%%n%%aI%%n%%s%%n%%b%%n--- -n %d",
+		"cd %s && git log --pretty=format:%%H%%n%%an%%n%%ae%%n%%ai%%n%%s%%n%%b%%n--- -n %d",
 		escapeshellarg($repoDir),
 		$limit
 	);
