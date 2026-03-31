@@ -11,6 +11,11 @@ try {
 		$limit = 10;
 	}
 
+	$offset = isset($_REQUEST['offset']) ? intval($_REQUEST['offset']) : 0;
+	if ($offset < 0) {
+		$offset = 0;
+	}
+
 	// Get the directory where this script is located (the repo root)
 	$repoDir = __DIR__;
 
@@ -22,10 +27,11 @@ try {
 		], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT));
 	}
 
-	// Execute git log command to get recent commits
+	// Execute git log command to get recent commits with offset
 	$cmd = sprintf(
-		"cd %s && git log --pretty=format:%%H%%n%%an%%n%%ae%%n%%ai%%n%%s%%n%%b%%n--- -n %d",
+		"cd %s && git log --pretty=format:%%H%%n%%an%%n%%ae%%n%%ai%%n%%s%%n%%b%%n--- --skip %d -n %d",
 		escapeshellarg($repoDir),
+		$offset,
 		$limit
 	);
 
@@ -94,6 +100,7 @@ try {
 	die(json_encode([
 		"success" => true,
 		"limit" => $limit,
+		"offset" => $offset,
 		"count" => count($commits),
 		"commits" => $commits
 	], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT));

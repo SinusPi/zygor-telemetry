@@ -26,6 +26,8 @@
 	</div>
 
 	<script>
+		window.gitLogsOffset = 0;
+
 		$(function() {
 			loadStatus();
 			loadTopics();
@@ -68,20 +70,42 @@
 		}
 
 		function loadGitLogs() {
+			window.gitLogsOffset = 0;
 			$.ajax({
 				url: 'git_logs.php',
 				type: 'GET',
-				data: { limit: 15 },
+				data: { limit: 15, offset: 0 },
 				dataType: 'json',
 				success: function(response) {
 					if (response.success) {
-						displayGitLogs(response.commits);
+						displayGitLogs(response.commits, true);
+						window.gitLogsOffset = response.offset + response.count;
 					} else {
 						showError('Failed to load commits: ' + response.error, 'git-logs-container');
 					}
 				},
 				error: function(xhr, status, error) {
 					showError('Error loading commits: ' + error, 'git-logs-container');
+				}
+			});
+		}
+
+		function loadMoreGitLogs() {
+			$.ajax({
+				url: 'git_logs.php',
+				type: 'GET',
+				data: { limit: 20, offset: window.gitLogsOffset },
+				dataType: 'json',
+				success: function(response) {
+					if (response.success) {
+						displayGitLogs(response.commits, false);
+						window.gitLogsOffset = response.offset + response.count;
+					} else {
+						alert('Failed to load more commits: ' + response.error);
+					}
+				},
+				error: function(xhr, status, error) {
+					alert('Error loading more commits: ' + error);
 				}
 			});
 		}
@@ -271,41 +295,66 @@
 			$('#sources-container').html(html);
 		}
 
-		function displayGitLogs(commits) {
-			var html = '<table>';
-			html += '<thead>';
-			html += '<tr>';
-			html += '<th>Hash</th>';
-			html += '<th>Author</th>';
-			html += '<th>Date</th>';
-			html += '<th>Message</th>';
-			html += '</tr>';
-			html += '</thead>';
-			html += '<tbody>';
+		function buildCommitRows(commits) {
+			var rows = '';
+			$.each(commits, function(idx, commit) {
+				rows += '<tr class="commit-row">';
+				rows += '<td><span class="commit-hash">' + escapeHtml(commit.hash.substring(0, 7)) + '</span></td>';
+				rows += '<td>';
+				rows += '<span title="' + escapeHtml(commit.email) + '">' + escapeHtml(commit.author) + '</span><br>';
+				rows += '</td>';
+				rows += '<td>' + formatDateISO(commit.date) + '</td>';
+				var fullMsg = commit.message;
+				if (commit.message_body) {
+					fullMsg += '\n' + commit.message_body;
+				}
+				rows += '<td>';
+				rows += '<strong title="' + escapeHtml(fullMsg) + '">' + escapeHtml(commit.message) + '</strong>';
+				if (commit.message_body) {
+					rows += '<div class="commit-body" title="' + escapeHtml(fullMsg) + '"><small>' + escapeHtml(commit.message_body).replace(/\n/g, '<br>') + '</small></div>';
+				}
+				rows += '</td>';
+				rows += '</tr>';
+			});
+			return rows;
+		}
+
+		function displayGitLogs(commits, isInitial) {
+			if (isInitial === undefined) isInitial = true;
 			
-			if (commits.length === 0) {
-				html += '<tr><td colspan="4" style="text-align: center;">No commits available</td></tr>';
+			if (isInitial) {
+				// Initialize the table on first load
+				var html = '<table>';
+				html += '<thead>';
+				html += '<tr>';
+				html += '<th>Hash</th>';
+				html += '<th>Author</th>';
+				html += '<th>Date</th>';
+				html += '<th>Message</th>';
+				html += '</tr>';
+				html += '</thead>';
+				html += '<tbody>';
+				
+				if (commits.length === 0) {
+					html += '<tr><td colspan="4" style="text-align: center;">No commits available</td></tr>';
+				} else {
+					html += buildCommitRows(commits);
+				}
+				
+				html += '<tr class="git-logs-more-row">';
+				html += '<td colspan="4" style="text-align: center; padding: 8px;">';
+				html += '<button onclick="loadMoreGitLogs()" class="more-button">More...</button>';
+				html += '</td>';
+				html += '</tr>';
+				
+				html += '</tbody>';
+				html += '</table>';
+				$('#git-logs-container').html(html);
 			} else {
-					$.each(commits, function(idx, commit) {
-					html += '<tr class="commit-row">';
-					html += '<td><span class="commit-hash">' + escapeHtml(commit.hash.substring(0, 7)) + '</span></td>';
-					html += '<td>';
-					html += '<span title="' + escapeHtml(commit.email) + '">' + escapeHtml(commit.author) + '</span><br>';
-					html += '</td>';
-					html += '<td>' + formatDateISO(commit.date) + '</td>';
-					html += '<td>';
-					html += '<strong>' + escapeHtml(commit.message) + '</strong>';
-					if (commit.message_body) {
-						html += '<div class="commit-body"><small>' + escapeHtml(commit.message_body).replace(/\n/g, '<br>') + '</small></div>';
-					}
-					html += '</td>';
-					html += '</tr>';
-				});
+				// Append more rows to existing table
+				var rows = buildCommitRows(commits);
+				$('#git-logs-container table tbody tr.git-logs-more-row').before(rows);
 			}
-			
-			html += '</tbody>';
-			html += '</table>';
-			$('#git-logs-container').html(html);
 		}
 
 		function showError(message, container) {

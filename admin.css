@@ -455,4 +455,50 @@ tr.topic-row {
 	font-size:10px;
 	overflow-y:scroll;
 	height:20em;
+
+	table {
+		td {
+			max-width: 300px;
+			overflow: hidden;
+
+			strong {
+				display: block;
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+
+			.commit-body {
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				display: block;
+			}
+		}
+	}
+
+	.git-logs-more-row {
+		background-color: #f0f0f0;
+		border-top: 2px solid #ddd;
+	}
+
+	.more-button {
+		padding: 6px 12px;
+		background-color: #673ab7;
+		color: white;
+		border: none;
+		border-radius: 3px;
+		cursor: pointer;
+		font-size: 11px;
+		font-weight: bold;
+		transition: background-color 0.2s;
+
+		&:hover {
+			background-color: #7e57c2;
+		}
+
+		&:active {
+			background-color: #5e35b1;
+		}
+	}
 }
