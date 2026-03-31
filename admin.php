@@ -29,61 +29,35 @@
 			loadSources();
 		});
 
-		function loadStatus() {
+		function loadData(doParam, containerSelector, responseKey, displayFunction) {
 			$.ajax({
 				url: 'telemetry_endpoint.php',
 				type: 'GET',
-				data: { do: 'get_status' },
+				data: { do: doParam },
 				dataType: 'json',
 				success: function(response) {
 					if (response.success) {
-						displayStatus(response.statuses);
+						displayFunction(response[responseKey]);
 					} else {
-						showError('Failed to load status: ' + response.error, 'status-container');
+						showError('Failed to load data: ' + response.message, containerSelector);
 					}
 				},
 				error: function(xhr, status, error) {
-					showError('Error loading status: ' + error, 'status-container');
+					showError('Error loading data: ' + error, containerSelector);
 				}
 			});
+		}
+
+		function loadStatus() {
+			loadData('get_status', 'status-container', 'statuses', displayStatus);
 		}
 
 		function loadTopics() {
-			$.ajax({
-				url: 'telemetry_endpoint.php',
-				type: 'GET',
-				data: { do: 'list_topics' },
-				dataType: 'json',
-				success: function(response) {
-					if (response.success) {
-						displayTopics(response.topics);
-					} else {
-						showError('Failed to load topics: ' + response.error, 'topics-container');
-					}
-				},
-				error: function(xhr, status, error) {
-					showError('Error loading topics: ' + error, 'topics-container');
-				}
-			});
+			loadData('list_topics', 'topics-container', 'topics', displayTopics);
 		}
 
 		function loadSources() {
-			$.ajax({
-				url: 'telemetry_endpoint.php',
-				type: 'GET',
-				data: { do: 'list_sources' },
-				dataType: 'json',
-				success: function(response) {
-					if (response.success) {
-						displaySources(response.sources);
-					} else {
-						showError('Failed to load sources: ' + response.error, 'sources-container');
-					}
-				},
-				error: function(xhr, status, error) {
-					showError('Error loading sources: ' + error, 'sources-container');
-				}
-			});
+			loadData('list_sources', 'sources-container', 'sources', displaySources);
 		}
 
 		function displayStatus(statuses) {
