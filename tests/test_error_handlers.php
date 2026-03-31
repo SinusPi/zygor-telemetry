@@ -33,7 +33,7 @@ try {
     die("Failed to initialize telemetry: " . $e->getMessage() . "\n");
 }
 
-$error_type = intval($argv[1] ?? 0);
+$error_type = intval(isset($argv[1]) ? $argv[1] : 0);
 
 echo "=== Testing Error Handler Type: $error_type ===\n";
 
