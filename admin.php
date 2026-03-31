@@ -12,16 +12,66 @@
 	<div class="container">
 		<h1>Telemetry Administration</h1>
 		<h2>Available Topics</h2>
-		<div id="topics-container" class="loading">Loading topics...</div>
+		<div id="topics-container">
+			<table>
+				<thead>
+					<tr>
+						<th>Topic Name</th>
+						<th>Scraper Source</th>
+						<th>Crunchers</th>
+						<th>Endpoint</th>
+						<th>View</th>
+						<th>Actions</th>
+					</tr>
+				</thead>
+				<tbody></tbody>
+			</table>
+		</div>
 
 		<h2>Available Sources</h2>
-		<div id="sources-container" class="loading">Loading sources...</div>
+		<div id="sources-container">
+			<table>
+				<thead>
+					<tr>
+						<th>Source</th>
+						<th>Description</th>
+						<th>Topics</th>
+						<th>Status</th>
+					</tr>
+				</thead>
+				<tbody></tbody>
+			</table>
+		</div>
 
 		<h2>Process Status</h2>
-		<div id="status-container" class="loading">Loading status...</div>
+		<div id="status-container">
+			<table>
+				<thead>
+					<tr>
+						<th>Process Tag</th>
+						<th>Updated At</th>
+						<th>Component</th>
+						<th>Value</th>
+					</tr>
+				</thead>
+				<tbody></tbody>
+			</table>
+		</div>
 
 		<h2>Changelog</h2>
-		<div id="git-logs-container" class="loading">Loading commits...</div>
+		<div id="git-logs-container">
+			<table>
+				<thead>
+					<tr>
+						<th>Hash</th>
+						<th>Author</th>
+						<th>Date</th>
+						<th>Message</th>
+					</tr>
+				</thead>
+				<tbody></tbody>
+			</table>
+		</div>
 
 	</div>
 
@@ -52,7 +102,10 @@
 					showError('Error loading data: ' + error, containerSelector);
 				},
 				complete: function() {
-					$(containerSelector).removeClass('loading');
+					$(`#${containerSelector}`).removeClass('loading');
+				},
+				beforeSend: function() {
+					$(`#${containerSelector}`).addClass('loading').find("tbody").html(`<tr><td colspan="4" style="text-align: center;">Loading ${responseKey}...</td></tr>`);
 				}
 			});
 		}
@@ -86,6 +139,9 @@
 				},
 				error: function(xhr, status, error) {
 					showError('Error loading commits: ' + error, 'git-logs-container');
+				},
+				beforeSend: function() {
+					$('#git-logs-container table tbody').empty().html('<tr><td colspan="4" style="text-align: center;">Loading commits...</td></tr>');
 				}
 			});
 		}
@@ -111,58 +167,47 @@
 		}
 
 		function displayStatus(statuses) {
-			var html = '<table>';
-			html += '<thead>';
-			html += '<tr>';
-			html += '<th>Process Tag</th>';
-			html += '<th>Updated At</th>';
-			html += '<th>Component</th>';
-			html += '<th>Value</th>';
-			html += '</tr>';
-			html += '</thead>';
-			html += '<tbody>';
+			var tbody = $('#status-container table tbody').empty();
+			var statusRowTemplate = document.querySelector('#status-row-template');
+			var statusDataTemplate = document.querySelector('#status-data-row-template');
 			
 			if (statuses.length === 0) {
-				html += '<tr><td colspan="4" style="text-align: center;">No status records available</td></tr>';
+				tbody.append('<tr><td colspan="4" style="text-align: center;">No status records available</td></tr>');
 			} else {
 				$.each(statuses, function(idx, status) {
 					var data = status.data || {};
 					var keys = Object.keys(data);
 					
 					if (keys.length === 0) {
-						// No data, just show the tag and timestamp
-						html += '<tr class="status-row">';
-						html += '<td><strong>' + escapeHtml(status.tag) + '</strong></td>';
-						html += '<td><code>' + formatDateISO(status.updated_at) + '</code></td>';
-						html += '<td colspan="2" style="color: #999;"><em>No data</em></td>';
-						html += '</tr>';
+						// No data case
+						var noDataRow = statusRowTemplate.content.cloneNode(true);
+						$(noDataRow).find('[data-field="tag"]').attr('rowspan', '1').text(status.tag);
+						$(noDataRow).find('[data-field="updated_at"]').attr('rowspan', '1').text(formatDateISO(status.updated_at));
+						$(noDataRow).find('[data-field="key"]').attr('colspan', '2').css('color', '#999').html('<em>No data</em>');
+						tbody.append(noDataRow);
 					} else {
-						// Show first row with tag and timestamp
+						// First row with rowspan
 						var firstKey = keys[0];
 						var firstValue = formatStatusValue(data[firstKey]);
-						html += '<tr class="status-row">';
-						html += '<td rowspan="' + keys.length + '"><strong>' + escapeHtml(status.tag) + '</strong></td>';
-						html += '<td rowspan="' + keys.length + '"><code>' + formatDateISO(status.updated_at) + '</code></td>';
-						html += '<td><strong>' + escapeHtml(firstKey) + '</strong></td>';
-						html += '<td>' + firstValue + '</td>';
-						html += '</tr>';
+						var mainRow = statusRowTemplate.content.cloneNode(true);
+						$(mainRow).find('[data-field="tag"]').attr('rowspan', keys.length).text(status.tag);
+						$(mainRow).find('[data-field="updated_at"]').attr('rowspan', keys.length).text(formatDateISO(status.updated_at));
+						$(mainRow).find('[data-field="key"]').text(firstKey);
+						$(mainRow).find('[data-field="value"]').html(firstValue);
+						tbody.append(mainRow);
 						
-						// Show remaining keys as separate rows
+						// Additional rows for remaining data
 						for (var i = 1; i < keys.length; i++) {
 							var key = keys[i];
 							var value = formatStatusValue(data[key]);
-							html += '<tr class="status-row-data">';
-							html += '<td><strong>' + escapeHtml(key) + '</strong></td>';
-							html += '<td>' + value + '</td>';
-							html += '</tr>';
+							var dataRow = statusDataTemplate.content.cloneNode(true);
+							$(dataRow).find('[data-field="key"]').text(key);
+							$(dataRow).find('[data-field="value"]').html(value);
+							tbody.append(dataRow);
 						}
 					}
 				});
 			}
-			
-			html += '</tbody>';
-			html += '</table>';
-			$('#status-container').html(html);
 		}
 
 		function formatStatusValue(value) {
@@ -186,174 +231,136 @@
 		}
 
 		function displayTopics(topics) {
-			var html = '<table>';
-			html += '<thead>';
-			html += '<tr>';
-			html += '<th>Topic Name</th>';
-			html += '<th>Scraper Source</th>';
-			html += '<th>Crunchers</th>';
-			html += '<th>Endpoint</th>';
-			html += '<th>View</th>';
-			html += '<th>Actions</th>';
-			html += '</tr>';
-			html += '</thead>';
-			html += '<tbody>';
+			var tbody = $('#topics-container table tbody').empty();
+			var rowTemplate = document.querySelector('#topic-row-template');
+			var crunTemplate = document.querySelector('#cruncher-row-template');
 			
 			if (Object.keys(topics).length === 0) {
-				html += '<tr><td colspan="6" style="text-align: center;">No topics available</td></tr>';
+				tbody.append('<tr><td colspan="6" style="text-align: center;">No topics available</td></tr>');
 			} else {
 				$.each(topics, function(name, topic) {
-					html += '<tr class="topic-row">';
-					html += '<td><strong>' + escapeHtml(topic.name) + '</strong></td>';
-					html += '<td>' + (topic.scraper ? escapeHtml(topic.scraper) : '<em>N/A</em>') + '</td>';
-					html += '<td style="text-align: center;">' + (topic.crunchers > 0 ? '<span class="badge">' + topic.crunchers + '</span>' : '<span class="badge disabled">—</span>') + '</td>';
-					html += '<td style="text-align: center;">' + (topic.endpoint ? '<span class="badge">✓</span>' : '<span class="badge disabled">—</span>') + '</td>';
-					html += '<td style="text-align: center;">' + (topic.view ? '<span class="badge">✓</span>' : '<span class="badge disabled">—</span>') + '</td>';
-					html += '<td><a class="action-link" onclick="showDaymap(\'' + escapeHtml(topic.name) + '\')">daymap</a></td>';
-					html += '</tr>';
+					var row = rowTemplate.content.cloneNode(true);
+					$(row).find('[data-field="name"]').text(topic.name);
+					$(row).find('[data-field="scraper"]').html(topic.scraper ? escapeHtml(topic.scraper) : '<em>N/A</em>');
+					$(row).find('[data-field="crunchers"]').text(topic.crunchers > 0 ? topic.crunchers : '—').toggleClass('disabled', topic.crunchers === 0);
+					$(row).find('[data-field="endpoint"]').text(topic.endpoint ? '✓' : '—').toggleClass('disabled', !topic.endpoint);
+					$(row).find('[data-field="view"]').text(topic.view ? '✓' : '—').toggleClass('disabled', !topic.view);
+					$(row).find('[data-field="actions"]')
+						.attr('onclick', 'showDaymap(\'' + escapeHtml(topic.name) + '\')')
+						.text('daymap');
+					tbody.append(row);
 					
 					// Add sub-rows for each cruncher
 					if (topic.crunchers_list && topic.crunchers_list.length > 0) {
 						$.each(topic.crunchers_list, function(idx, cruncher) {
-							html += '<tr class="cruncher-sub-row">';
-							html += '<td class="cruncher-indent">↳ Cruncher ' + cruncher.index + '</td>';
-							html += '<td><code>' + escapeHtml(cruncher.eventtype) + '</code></td>';
-							html += '<td colspan="4">';
-							if (cruncher.table) {
-								html += '<code class="table-name">' + escapeHtml(cruncher.table) + '</code>';
-							} else {
-								html += '<em>N/A</em>';
-							}
-							html += '</td>';
-							html += '</tr>';
+							var crunRow = crunTemplate.content.cloneNode(true);
+							$(crunRow).find('[data-field="label"]').text('↳ Cruncher ' + cruncher.index);
+							$(crunRow).find('[data-field="eventtype"]').text(cruncher.eventtype);
+							$(crunRow).find('[data-field="table"]').html(cruncher.table ? escapeHtml(cruncher.table) : '<em>N/A</em>');
+							tbody.append(crunRow);
 						});
 					}
 				});
 			}
-			
-			html += '</tbody>';
-			html += '</table>';
-			$('#topics-container').html(html);
 		}
 
 		function displaySources(sources) {
-			var html = '<table>';
-			html += '<thead>';
-			html += '<tr>';
-			html += '<th>Source</th>';
-			html += '<th>Description</th>';
-			html += '<th>Topics</th>';
-			html += '<th>Status</th>';
-			html += '</tr>';
-			html += '</thead>';
-			html += '<tbody>';
+			var tbody = $('#sources-container table tbody').empty();
+			var template = document.querySelector('#source-row-template');
 			
 			if (Object.keys(sources).length === 0) {
-				html += '<tr><td colspan="4" style="text-align: center;">No sources available</td></tr>';
+				tbody.append('<tr><td colspan="4" style="text-align: center;">No sources available</td></tr>');
 			} else {
 				$.each(sources, function(key, source) {
-					var statusBadge = '<span class="badge';
-					var statusContent = '';
+					var row = template.content.cloneNode(true);
+					$(row).find('[data-field="label"]').text(source.label);
+					$(row).find('[data-field="description"]').text(source.description);
 					
-					if (source.status === 'configured') {
-						statusBadge += '">✓ Configured</span>';
-						// Show source paths for configured sources
-						if (source.source_paths && source.source_paths.length > 0) {
-							statusContent = source.source_paths.map(function(p) { return escapeHtml(p); }).join('<br>');
-						}
-					} else if (source.status === 'not-configured') {
-						statusBadge += ' disabled">⚠ Not Configured</span>';
-					} else if (source.status.indexOf('error') === 0) {
-						statusBadge += ' error">✗ Error</span>';
-						statusContent = '<code>' + escapeHtml(source.status) + '</code>';
-					} else {
-						statusBadge += '">? Unknown</span>';
-					}
-					
-					// Build topics tooltip
-					var topicsTooltip = '';
+					var topicsSpan = $(row).find('[data-field="topics"]');
+					topicsSpan.text(source.topics);
 					if (source.topics_list && source.topics_list.length > 0) {
-						topicsTooltip = ' title="' + escapeHtml(source.topics_list.join(', ')) + '"';
+						topicsSpan.attr('title', source.topics_list.join(', '));
 					}
 					
-					html += '<tr>';
-					html += '<td><strong>' + escapeHtml(source.label) + '</strong></td>';
-					html += '<td>' + escapeHtml(source.description) + '</td>';
-					html += '<td style="text-align: center;"><span class="badge"' + topicsTooltip + '>' + source.topics + '</span></td>';
-					html += '<td style="text-align: center; vertical-align: middle;">';
-					html += statusBadge;
-					if (statusContent) {
-						html += '<div class="status-paths"><code>' + statusContent + '</code></div>';
+					var statusBadge = $(row).find('[data-field="status-badge"]');
+					if (source.status === 'configured') {
+						statusBadge.text('✓ Configured').removeClass('disabled error');
+					} else if (source.status === 'not-configured') {
+						statusBadge.text('⚠ Not Configured').addClass('disabled').removeClass('error');
+					} else if (source.status.indexOf('error') === 0) {
+						statusBadge.text('✗ Error').addClass('error').removeClass('disabled');
+					} else {
+						statusBadge.text('? Unknown').removeClass('disabled error');
 					}
-					html += '</td>';
-					html += '</tr>';
+					
+					var statusPaths = $(row).find('[data-field="status-paths"]');
+					if (source.status === 'configured' && source.source_paths && source.source_paths.length > 0) {
+						statusPaths.html('<code>' + source.source_paths.map(function(p) { return escapeHtml(p); }).join('<br>') + '</code>');
+					} else if (source.status.indexOf('error') === 0) {
+						statusPaths.html('<code>' + escapeHtml(source.status) + '</code>');
+					}
+					
+					tbody.append(row);
 				});
 			}
-			
-			html += '</tbody>';
-			html += '</table>';
-			$('#sources-container').html(html);
 		}
 
 		function buildCommitRows(commits) {
-			var rows = '';
+			var tbody = $('<tbody></tbody>');
+			var template = document.querySelector('#commit-row-template');
+			
 			$.each(commits, function(idx, commit) {
-				rows += '<tr class="commit-row">';
-				rows += '<td><span class="commit-hash">' + escapeHtml(commit.hash.substring(0, 7)) + '</span></td>';
-				rows += '<td>';
-				rows += '<span title="' + escapeHtml(commit.email) + '">' + escapeHtml(commit.author) + '</span><br>';
-				rows += '</td>';
-				rows += '<td>' + formatDateISO(commit.date) + '</td>';
+				var row = template.content.cloneNode(true);
+				$(row).find('[data-field="hash"]').text(commit.hash.substring(0, 7));
+				$(row).find('[data-field="author-email"]')
+					.attr('title', commit.email)
+					.text(commit.author);
+				$(row).find('[data-field="date"]').text(formatDateISO(commit.date));
+				
 				var fullMsg = commit.message;
 				if (commit.message_body) {
 					fullMsg += '\n' + commit.message_body;
 				}
-				rows += '<td>';
-				rows += '<strong title="' + escapeHtml(fullMsg) + '">' + escapeHtml(commit.message) + '</strong>';
+				$(row).find('[data-field="message"]')
+					.attr('title', fullMsg)
+					.text(commit.message);
+				
 				if (commit.message_body) {
-					rows += '<div class="commit-body" title="' + escapeHtml(fullMsg) + '"><small>' + escapeHtml(commit.message_body).replace(/\n/g, '<br>') + '</small></div>';
+					$(row).find('[data-field="message-body"]')
+						.attr('title', fullMsg)
+						.html(escapeHtml(commit.message_body).replace(/\n/g, '<br>'));
+					$(row).find('.commit-body').show();
+				} else {
+					$(row).find('.commit-body').hide();
 				}
-				rows += '</td>';
-				rows += '</tr>';
+				
+				tbody.append(row);
 			});
-			return rows;
+			
+			return tbody.html();
 		}
 
 		function displayGitLogs(commits, isInitial) {
 			if (isInitial === undefined) isInitial = true;
 			
+			var tbody = $('#git-logs-container table tbody');
+			
 			if (isInitial) {
-				// Initialize the table on first load
-				var html = '<table>';
-				html += '<thead>';
-				html += '<tr>';
-				html += '<th>Hash</th>';
-				html += '<th>Author</th>';
-				html += '<th>Date</th>';
-				html += '<th>Message</th>';
-				html += '</tr>';
-				html += '</thead>';
-				html += '<tbody>';
+				// Clear and repopulate on first load
+				tbody.empty();
 				
 				if (commits.length === 0) {
-					html += '<tr><td colspan="4" style="text-align: center;">No commits available</td></tr>';
+					tbody.append('<tr><td colspan="4" style="text-align: center;">No commits available</td></tr>');
 				} else {
-					html += buildCommitRows(commits);
+					var rows = buildCommitRows(commits);
+					tbody.append(rows);
 				}
 				
-				html += '<tr class="git-logs-more-row">';
-				html += '<td colspan="4" style="text-align: center; padding: 8px;">';
-				html += '<button onclick="loadMoreGitLogs()" class="more-button">More...</button>';
-				html += '</td>';
-				html += '</tr>';
-				
-				html += '</tbody>';
-				html += '</table>';
-				$('#git-logs-container').html(html);
+				tbody.append('<tr class="git-logs-more-row"><td colspan="4" style="text-align: center; padding: 8px;"><button onclick="loadMoreGitLogs()" class="more-button">More...</button></td></tr>');
 			} else {
-				// Append more rows to existing table
+				// Append more rows before the "More..." button
 				var rows = buildCommitRows(commits);
-				$('#git-logs-container table tbody tr.git-logs-more-row').before(rows);
+				tbody.find('tr.git-logs-more-row').before(rows);
 			}
 		}
 
@@ -563,6 +570,66 @@
 			$('#calendar-modal').removeClass('active');
 		}
 	</script>
+
+	<!-- HTML Templates for table rows -->
+	<template id="status-row-template">
+		<tr class="status-row">
+			<td><strong data-field="tag"></strong></td>
+			<td><code data-field="updated_at"></code></td>
+			<td><strong data-field="key"></strong></td>
+			<td data-field="value"></td>
+		</tr>
+	</template>
+
+	<template id="status-data-row-template">
+		<tr class="status-row-data">
+			<td><strong data-field="key"></strong></td>
+			<td data-field="value"></td>
+		</tr>
+	</template>
+
+	<template id="topic-row-template">
+		<tr class="topic-row">
+			<td><strong data-field="name"></strong></td>
+			<td data-field="scraper"></td>
+			<td style="text-align: center;"><span class="badge" data-field="crunchers"></span></td>
+			<td style="text-align: center;"><span class="badge" data-field="endpoint"></span></td>
+			<td style="text-align: center;"><span class="badge" data-field="view"></span></td>
+			<td><a class="action-link" data-field="actions"></a></td>
+		</tr>
+	</template>
+
+	<template id="cruncher-row-template">
+		<tr class="cruncher-sub-row">
+			<td class="cruncher-indent" data-field="label"></td>
+			<td><code data-field="eventtype"></code></td>
+			<td colspan="4"><code class="table-name" data-field="table"></code></td>
+		</tr>
+	</template>
+
+	<template id="source-row-template">
+		<tr>
+			<td><strong data-field="label"></strong></td>
+			<td data-field="description"></td>
+			<td style="text-align: center;"><span class="badge" data-field="topics"></span></td>
+			<td style="text-align: center; vertical-align: middle;">
+				<span class="badge" data-field="status-badge"></span>
+				<div class="status-paths" data-field="status-paths"></div>
+			</td>
+		</tr>
+	</template>
+
+	<template id="commit-row-template">
+		<tr class="commit-row">
+			<td><span class="commit-hash" data-field="hash"></span></td>
+			<td><span data-field="author-email"></span><br></td>
+			<td data-field="date"></td>
+			<td>
+				<strong data-field="message"></strong>
+				<div class="commit-body"><small data-field="message-body"></small></div>
+			</td>
+		</tr>
+	</template>
 
 	<div id="calendar-modal" class="calendar-modal">
 		<div class="calendar-content"></div>
