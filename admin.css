@@ -449,3 +449,10 @@ tr.topic-row {
 		}
 	}
 }
+
+#git-logs-container {
+	font-family: 'Consolas','Courier New', monospace;
+	font-size:10px;
+	overflow-y:scroll;
+	height:20em;
+}

@@ -20,6 +20,9 @@
 		<h2>Process Status</h2>
 		<div id="status-container" class="loading">Loading status...</div>
 
+		<h2>Changelog</h2>
+		<div id="git-logs-container" class="loading">Loading commits...</div>
+
 	</div>
 
 	<script>
@@ -27,6 +30,7 @@
 			loadStatus();
 			loadTopics();
 			loadSources();
+			loadGitLogs();
 		});
 
 		function loadData(doParam, containerSelector, responseKey, displayFunction) {
@@ -44,6 +48,9 @@
 				},
 				error: function(xhr, status, error) {
 					showError('Error loading data: ' + error, containerSelector);
+				},
+				complete: function() {
+					$(containerSelector).removeClass('loading');
 				}
 			});
 		}
@@ -58,6 +65,25 @@
 
 		function loadSources() {
 			loadData('list_sources', 'sources-container', 'sources', displaySources);
+		}
+
+		function loadGitLogs() {
+			$.ajax({
+				url: 'git_logs.php',
+				type: 'GET',
+				data: { limit: 15 },
+				dataType: 'json',
+				success: function(response) {
+					if (response.success) {
+						displayGitLogs(response.commits);
+					} else {
+						showError('Failed to load commits: ' + response.error, 'git-logs-container');
+					}
+				},
+				error: function(xhr, status, error) {
+					showError('Error loading commits: ' + error, 'git-logs-container');
+				}
+			});
 		}
 
 		function displayStatus(statuses) {
@@ -83,7 +109,7 @@
 						// No data, just show the tag and timestamp
 						html += '<tr class="status-row">';
 						html += '<td><strong>' + escapeHtml(status.tag) + '</strong></td>';
-						html += '<td><code>' + escapeHtml(status.updated_at || 'N/A') + '</code></td>';
+						html += '<td><code>' + formatDateISO(status.updated_at) + '</code></td>';
 						html += '<td colspan="2" style="color: #999;"><em>No data</em></td>';
 						html += '</tr>';
 					} else {
@@ -92,7 +118,7 @@
 						var firstValue = formatStatusValue(data[firstKey]);
 						html += '<tr class="status-row">';
 						html += '<td rowspan="' + keys.length + '"><strong>' + escapeHtml(status.tag) + '</strong></td>';
-						html += '<td rowspan="' + keys.length + '"><code>' + escapeHtml(status.updated_at || 'N/A') + '</code></td>';
+						html += '<td rowspan="' + keys.length + '"><code>' + formatDateISO(status.updated_at) + '</code></td>';
 						html += '<td><strong>' + escapeHtml(firstKey) + '</strong></td>';
 						html += '<td>' + firstValue + '</td>';
 						html += '</tr>';
@@ -245,6 +271,43 @@
 			$('#sources-container').html(html);
 		}
 
+		function displayGitLogs(commits) {
+			var html = '<table>';
+			html += '<thead>';
+			html += '<tr>';
+			html += '<th>Hash</th>';
+			html += '<th>Author</th>';
+			html += '<th>Date</th>';
+			html += '<th>Message</th>';
+			html += '</tr>';
+			html += '</thead>';
+			html += '<tbody>';
+			
+			if (commits.length === 0) {
+				html += '<tr><td colspan="4" style="text-align: center;">No commits available</td></tr>';
+			} else {
+					$.each(commits, function(idx, commit) {
+					html += '<tr class="commit-row">';
+					html += '<td><span class="commit-hash">' + escapeHtml(commit.hash.substring(0, 7)) + '</span></td>';
+					html += '<td>';
+					html += '<span title="' + escapeHtml(commit.email) + '">' + escapeHtml(commit.author) + '</span><br>';
+					html += '</td>';
+					html += '<td>' + formatDateISO(commit.date) + '</td>';
+					html += '<td>';
+					html += '<strong>' + escapeHtml(commit.message) + '</strong>';
+					if (commit.message_body) {
+						html += '<div class="commit-body"><small>' + escapeHtml(commit.message_body).replace(/\n/g, '<br>') + '</small></div>';
+					}
+					html += '</td>';
+					html += '</tr>';
+				});
+			}
+			
+			html += '</tbody>';
+			html += '</table>';
+			$('#git-logs-container').html(html);
+		}
+
 		function showError(message, container) {
 			var containerId = container || 'topics-container';
 			$('#' + containerId).html('<div class="error">' + escapeHtml(message) + '</div>');
@@ -259,6 +322,22 @@
 				"'": '&#039;'
 			};
 			return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+		}
+
+		function formatDateISO(isoString) {
+			if (!isoString) return 'N/A';
+			try {
+				var date = new Date(isoString);
+				var year = date.getUTCFullYear();
+				var month = String(date.getUTCMonth() + 1).padStart(2, '0');
+				var day = String(date.getUTCDate()).padStart(2, '0');
+				var hours = String(date.getUTCHours()).padStart(2, '0');
+				var minutes = String(date.getUTCMinutes()).padStart(2, '0');
+				var seconds = String(date.getUTCSeconds()).padStart(2, '0');
+				return year + '-' + month + '-' + day + ' ' + hours + ':' + minutes + ':' + seconds;
+			} catch (e) {
+				return isoString;
+			}
 		}
 
 		function showDaymap(topicName, selectedYear) {
