@@ -447,21 +447,54 @@ class Telemetry {
 		}, $cfg))));
 	}
 
-	static function merge_configs($base,...$overrides) {
-		foreach ($overrides as $override) {
-			foreach ($override as $k=>$v) {
-				if (is_array($v) && isset($base[$k]) && is_array($base[$k])) {
-					$base[$k] = self::merge_configs($base[$k], $v);
-				} else {
-					$base[$k] = $v;
-				}
-			}
-		}
-		return $base;
-	}
-
 	static function startup_classes() {
 		TelemetryScrape::startup();
+	}
+
+	/**
+	 * Helper to group consecutive date values into ranges, e.g. [20240101, 20240102, 20240103, 20240105] => ["20240101-20240103", "20240105"]
+	 */
+	static function group_date_ranges($arr) {
+		$grouped = [];
+		$current_range = [];
+		foreach ($arr as $value) {
+			$last = end($current_range);
+			if (!$last) {
+				$current_range = [$value];
+			} elseif ($value == $last + 1) {
+				$current_range[] = $value;
+			} elseif (($last%10000== 131 && $value%10000== 201)
+			       || ($last%10000== 228+(floor($value/10000)%4==0?1:0) && $value%10000== 301)
+				   || ($last%10000== 331 && $value%10000== 401)
+				   || ($last%10000== 430 && $value%10000== 501)
+				   || ($last%10000== 531 && $value%10000== 601)
+				   || ($last%10000== 630 && $value%10000== 701)
+				   || ($last%10000== 731 && $value%10000== 801)
+				   || ($last%10000== 831 && $value%10000== 901)
+				   || ($last%10000== 930 && $value%10000==1001)
+				   || ($last%10000==1031 && $value%10000==1101)
+				   || ($last%10000==1130 && $value%10000==1201)
+				   || ($last%10000==1231 && $value%10000==0101)) {
+				$current_range[] = $value;
+			} else {
+				$grouped[] = $current_range;
+				$current_range = [$value];
+			}
+		}
+		if (!empty($current_range)) {
+			$grouped[] = $current_range;
+		}
+
+		// Format the ranges
+		$formatted = [];
+		foreach ($grouped as $range) {
+			if (count($range) > 1) {
+				$formatted[] = $range[0] . "-" . end($range);
+			} else {
+				$formatted[] = $range[0];
+			}
+		}
+		return $formatted;
 	}
 
 }
