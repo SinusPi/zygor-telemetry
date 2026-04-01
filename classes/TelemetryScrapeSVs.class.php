@@ -11,22 +11,45 @@ use TelemetryStatus as TmSt;
  * Extracted datapoints are stored into 'events' table, with foreign key to sv_files table.
  */
 class TelemetryScrapeSVs extends TelemetryScrape {
+	static $config_errors = [];
+
 	static function init() {
-		// Register this scraper source
-		self::config();
 	}
 
 	static function config($cfg=[]) {
-		self::$CFG = &TelemetryScrape::$CFG; // reference parent's CFG slot (self:: would be a separate null slot)
+		self::$CFG = &TelemetryScrape::$CFG;
+
 		$configfile = (array)(@include "config-scrape-sv.inc.php"); // load defaults
+		if (!$configfile) throw new ConfigException("Failed to load config-scrape-sv.inc.php");
+
 		self::$CFG->add($configfile,12,"scrape sv config");
 
-		if (!self::$CFG['SV_STORAGE_ROOT']) throw new ErrorException("SV_STORAGE_ROOT not defined in config, config-scrape-sv.inc.php not loaded?");
+		if (!isset(self::$CFG['SV_STORAGE_ROOT'])) throw new ConfigException("SV_STORAGE_ROOT not set");
+		if (!is_dir(self::$CFG['SV_STORAGE_ROOT'])) throw new ConfigException("SV_STORAGE_ROOT is not a valid directory: ".self::$CFG['SV_STORAGE_ROOT']);
+		
+		$svsync_config_path = self::$CFG['SV_STORAGE_ROOT']."/config.inc.php";
+		if (!file_exists($svsync_config_path)) throw new ConfigException("SV Sync config not found at: ".$svsync_config_path);
 
 		// load sync's config
-		@include self::$CFG['SV_STORAGE_ROOT']."/config.inc.php"; // defines SYNC_CFG
-		if (!$SYNC_CFG) throw new ErrorException("Failed to load sync config from ".self::$CFG['SV_STORAGE_ROOT']."/config.inc.php");
+		@include $svsync_config_path; // defines SYNC_CFG
+		if (!isset($SYNC_CFG)) throw new ConfigException("SV Sync config invalid in ".$svsync_config_path);
 		self::$CFG->add(['SV_STORAGE_DATA_PATH'=>Telemetry::cfgstr('SV_STORAGE_DATA_PATH',['SYNC_FOLDER'=>$SYNC_CFG['folder']])],13,"scrape sv: storage path");
+		if (!is_dir(self::$CFG['SV_STORAGE_DATA_PATH'])) throw new ConfigException("Missing SV storage folder: ".self::$CFG['SV_STORAGE_DATA_PATH']);
+
+		if ($missing_flavours=array_filter(array_map(function($flav) { $path = Tm::cfgstr('SV_STORAGE_FLAVOUR_PATH',['FLAVOUR'=>$flav]); return !is_dir($path) ? $path : null; }, array_keys(self::$CFG['WOW_FLAVOUR_DATA'])))) {
+			throw new ConfigException("Missing SV storage flavour folders: ".join(", ",$missing_flavours));
+		}
+
+	}
+
+	static function startup() {
+		self::init();
+		try {
+			self::config();
+		} catch (ConfigException $e) {
+			Logger::log("Configuration error for SV scraper: ".$e->getMessage());
+			self::$config_errors[] = $e->getMessage();
+		}
 	}
 
 	static function identifySelf() {
@@ -56,24 +79,6 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		}
 	}
 
-	/**
-	 * Verify that the SV storage paths are configured and accessible
-	 * @return bool True if both SV_STORAGE_ROOT and SV_STORAGE_DATA_PATH exist as directories, false otherwise
-	 */
-	static function verifyConfiguredPaths() {
-		try {
-			self::config();
-			// Both paths are required for SVs scraper
-			if (!isset(self::$CFG['SV_STORAGE_ROOT']) || !isset(self::$CFG['SV_STORAGE_DATA_PATH'])) {
-				return false;
-			}
-			// Both must be valid directories
-			return is_dir(self::$CFG['SV_STORAGE_ROOT']) && is_dir(self::$CFG['SV_STORAGE_DATA_PATH']);
-		} catch (Exception $e) {
-			return false;
-		}
-	}
-
 	static function filter_younger_files($files, $days_old) {
 		$time_limit = time() - ($days_old * DAY);
 		return array_values(array_filter($files, function($f) use ($time_limit) {
@@ -86,6 +91,10 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 	 * @param string $flavour
 	 */
 	static function scrape($flavour) {
+		if (self::$config_errors) {
+			Logger::log("Cannot start SV scrape for flavour '$flavour' due to configuration errors: ".join("; ", self::$config_errors));
+			throw new MinorError("Configuration errors: ".join("; ", self::$config_errors));
+		}
 		return self::scrape2($flavour); // new scrape method with generator for files, but keep old one for now for comparison and safety
 
 		// THE REST IS DEPRECATED
@@ -783,4 +792,5 @@ ENDLUA;
 		list($flavour, $acctfile) = explode("/", $slug, 2);
 		return Tm::cfgstr('SV_STORAGE_FLAVOUR_PATH',['FLAVOUR'=>$flavour])."/".$acctfile."--SavedVariables--ZygorGuidesViewer.lua.gz";
 	}
+
 }

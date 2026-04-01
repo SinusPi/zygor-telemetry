@@ -26,8 +26,10 @@ class Telemetry {
 	/** @var TelemetryDB */
 	static $db = null;
 
+	static $config_errors = [];
+
 	static $DBG = [];
-	
+
 	static function config($opts=[]) {
 		self::$CFG = new Config();
 		self::$CFG->add(self::$CFG_defaults,0,"base default");
@@ -62,7 +64,11 @@ class Telemetry {
 
 	static function startup($opts=[]) {
 		self::init();
-		self::config($opts);
+		try {
+			self::config($opts);
+		} catch (ConfigException $e) {
+			self::$config_errors[] = $e->getMessage();
+		}
 
 		Logger::init([
 			'log_path'=>self::$CFG['TELEMETRY_ROOT']."/".self::$CFG['LOG_FILENAME'],
@@ -75,7 +81,7 @@ class Telemetry {
 
 		self::db_startup();
 
-		self::init_classes(); // may need db
+		self::startup_classes(); // may need db
 
 		self::self_tests();
 	}
@@ -454,11 +460,8 @@ class Telemetry {
 		return $base;
 	}
 
-	/**
-	 * Load all dependent class files from the classes directory.
-	 */
-	static function init_classes() {
-		TelemetryScrape::init();
+	static function startup_classes() {
+		TelemetryScrape::startup();
 	}
 
 }
@@ -585,4 +588,8 @@ class TelemetryStatus {
 		}
 	}
 
+}
+
+class ConfigException extends Exception {
+	// Custom exception for configuration errors
 }

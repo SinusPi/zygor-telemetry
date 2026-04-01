@@ -14,18 +14,29 @@ class TelemetryScrape {
 	static $logtag = "";
 
 	static $CFG = null; // ref to main config for easy access
+	static $config_errors = [];
 
 	static function init() {
-		// any local inits?
-		self::config();
+	}
+
+	static function startup() {
+		self::init();
+		try {
+			self::config();
+		} catch (ConfigException $e) {
+			Logger::log("Configuration error in scraper core: ".$e->getMessage());
+			self::$config_errors[] = $e->getMessage();
+		}
 		self::db_create(); // create generic scraping-related tables if not exist
-		self::init_scrapers();
+		
+		self::startup_scrapers();
 	}
 
 	static function config($cfg=[]) {
 		self::$CFG = &Telemetry::$CFG;
 
 		$configfile = (array)(@include "config-scrape.inc.php"); // load scraping defaults
+		if (!$configfile) throw new ConfigException("Failed to load scrape config file: config-scrape.inc.php");
 		self::$CFG->add($configfile,10,"scrape base config");
 	}
 
@@ -55,7 +66,7 @@ class TelemetryScrape {
 		});
 	}
 
-	static function init_scrapers($do_init=true) {
+	static function startup_scrapers($do_startup=true) {
 		foreach (self::getSubclasses() as $subclass) {
 			if (method_exists($subclass, 'identifySelf')) {
 				$info = $subclass::identifySelf();
@@ -64,29 +75,24 @@ class TelemetryScrape {
 					self::registerSource($info['key'], $info);
 				}
 			}
-			if ($do_init && method_exists($subclass, 'init')) {
-				$subclass::init();
+			if ($do_startup && method_exists($subclass, 'startup')) {
+				try {
+					$subclass::startup();
+				} catch (Exception $e) {
+					Logger::log("Startup error in scraper $subclass: ".$e->getMessage());
+					throw $e;
+				}
 			}
 		}
 	}
 
-	/**
-	 * Get a summary of configured paths for this scraper source
-	 * Subclasses should override this method to return their specific paths
-	 * @return array Array of configured paths, or empty array if not configured
-	 */
-	static function getConfiguredPaths() {
-		return [];
-	}
 
-	/**
-	 * Verify that all configured paths exist
-	 * Subclasses should override this method to implement their specific path verification logic
-	 * @return bool True if all configured paths exist and are valid, false otherwise
-	 */
-	static function verifyConfiguredPaths() {
-		return true;
-	}
+
+
+
+
+
+
 
 	static function filter_younger_files($files, $days_old) {
 		$time_limit = time() - ($days_old * DAY);
@@ -199,7 +205,7 @@ class TelemetryScrape {
 			if (self::$CFG['ignore-mtimes']) {
 				Logger::vlog("- Ignoring mtimes for freshness check (config ignore-mtimes=true)");
 				// fill array: [$ids]=>-1
-				$batch_scrapetimes = array_map(function($id) { return ['topics' => [], 'newest_scrape_time' => -1]; }, $ids);
+				$batch_scrapetimes = array_map(function($id) { return ['topics' => [], 'newest_scrape_time' => 0]; }, $ids);
 			} else {
 				$batch_scrapetimes = self::get_file_scrapetimes_batch($topics,$ids);
 			}
@@ -327,4 +333,3 @@ class TelemetryScrape {
 	}
 
 }
-

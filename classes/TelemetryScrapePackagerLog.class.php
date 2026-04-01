@@ -9,16 +9,26 @@ use TelemetryStatus as TmSt;
  * Extracted datapoints are stored into 'events' table, with foreign key to packagerlog_files table.
  */
 class TelemetryScrapePackagerLog extends TelemetryScrape {
-	static function init() {
-		self::config();
+	static $config_errors = [];
+
+	static function startup() {
+		try {
+			self::config();
+		} catch (ConfigException $e) {
+			Logger::log("Configuration error for Packager Log scraper: ".$e->getMessage());
+			self::$config_errors[] = $e->getMessage();
+		}
 	}
 
 	static function config($cfg=[]) {
 		self::$CFG = &TelemetryScrape::$CFG; // reference parent's CFG slot (self:: would be a separate null slot)
 		$configfile = (array)(@include "config-scrape-packagerlog.inc.php"); // load defaults
+		if (!$configfile) throw new ConfigException("Failed to load config-scrape-packagerlog.inc.php");
+		
 		self::$CFG->add($configfile, 13, "scrape packagerlog config");
 		
-		if (!self::$CFG['PACKAGERLOG_PATH']) throw new ErrorException("PACKAGERLOG_PATH not defined in config, config-scrape-packagerlog.inc.php not loaded?");
+		if (!self::$CFG['PACKAGERLOG_PATH']) throw new ConfigException("PACKAGERLOG_PATH not defined in config, config-scrape-packagerlog.inc.php not loaded?");
+		if (!is_dir(self::$CFG['PACKAGERLOG_PATH'])) throw new ConfigException("PACKAGERLOG_PATH is not a valid directory: ".self::$CFG['PACKAGERLOG_PATH']);
 	}
 
 	static function identifySelf() {
@@ -47,26 +57,15 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 	}
 
 	/**
-	 * Verify that the packager log path is configured and accessible
-	 * @return bool True if path exists and is a directory, false otherwise
-	 */
-	static function verifyConfiguredPaths() {
-		try {
-			self::config();
-			if (!isset(self::$CFG['PACKAGERLOG_PATH'])) {
-				return false;
-			}
-			return is_dir(self::$CFG['PACKAGERLOG_PATH']);
-		} catch (Exception $e) {
-			return false;
-		}
-	}
-
-	/**
 	 * Grab data from packager logs
 	 * @param string $flavour
 	 */
 	static function scrape() {
+		if (self::$config_errors) {
+			Logger::log("Cannot start Packager Log scrape due to configuration errors: ".join("; ", self::$config_errors));
+			throw new MinorError("Configuration errors: ".join("; ", self::$config_errors));
+		}
+
 		$tag = "SCRAPEPACKLOG";
 		$status = TelemetryStatus::get_status($tag, true);
 		if ($status['status']=="SCRAPING") throw new MinorError("Another scrape of packager logs is already in progress, aborting.");

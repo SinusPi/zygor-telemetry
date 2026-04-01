@@ -3,9 +3,9 @@ if (!defined('WEBHOME')) define("WEBHOME","/home/zygordata/www");
 
 require_once __DIR__ . "/loader.inc.php";
 
-Telemetry::startup();
+header("Content-Type: application/json; charset=utf-8");
 
-header("Content-type: application/json");
+Telemetry::startup();
 
 $metric = $_REQUEST['metric'];
 
@@ -26,7 +26,11 @@ if (isset($_REQUEST['list'])) {
 }
 
 TelemetryEndpoint::serveRequest();
-die();
+die(json_encode([
+	"success" => false,
+	"code" => 400,
+	"error" => "Invalid request",
+], JSON_UNESCAPED_SLASHES|JSON_PRETTY_PRINT));
 
 try {
 	if ($metric=="usedguide") {

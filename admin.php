@@ -283,21 +283,17 @@
 					}
 					
 					var statusBadge = $(row).find('[data-field="status-badge"]');
-					if (source.status === 'configured') {
+					if (source.status === true) {
 						statusBadge.text('✓ Configured').removeClass('disabled error');
-					} else if (source.status === 'not-configured') {
-						statusBadge.text('⚠ Not Configured').addClass('disabled').removeClass('error');
-					} else if (source.status.indexOf('error') === 0) {
-						statusBadge.text('✗ Error').addClass('error').removeClass('disabled');
 					} else {
-						statusBadge.text('? Unknown').removeClass('disabled error');
+						statusBadge.text('✗ Error').addClass('error').removeClass('disabled');
 					}
 					
-					var statusPaths = $(row).find('[data-field="status-paths"]');
-					if (source.status === 'configured' && source.source_paths && source.source_paths.length > 0) {
+					var statusPaths = $(row).find('[data-field="status-details"]');
+					if (source.status === true && source.source_paths && source.source_paths.length > 0) {
 						statusPaths.html('<code>' + source.source_paths.map(function(p) { return escapeHtml(p); }).join('<br>') + '</code>');
-					} else if (source.status.indexOf('error') === 0) {
-						statusPaths.html('<code>' + escapeHtml(source.status) + '</code>');
+					} else if (source.status === false && source.errors && source.errors.length > 0) {
+						statusPaths.html('<code class="error">' + escapeHtml(source.errors.join('<br>')) + '</code>');
 					}
 					
 					tbody.append(row);
@@ -614,7 +610,7 @@
 			<td style="text-align: center;"><span class="badge" data-field="topics"></span></td>
 			<td style="text-align: center; vertical-align: middle;">
 				<span class="badge" data-field="status-badge"></span>
-				<div class="status-paths" data-field="status-paths"></div>
+				<div class="status-details" data-field="status-details"></div>
 			</td>
 		</tr>
 	</template>

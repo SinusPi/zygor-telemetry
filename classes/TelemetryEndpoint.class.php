@@ -101,9 +101,10 @@ class TelemetryEndpoint {
 				
 				// Get configured paths from the scraper class itself
 				$source_paths = $class::getConfiguredPaths();
+				$errors = $class::$config_errors;
 				
 				// Determine if scraper is configured based on whether paths exist
-				$status = (count($source_paths) > 0 && $class::verifyConfiguredPaths()) ? 'configured' : 'not-configured';
+				//$status = (count($source_paths) > 0 && $class::verifyConfiguredPaths()) ? 'configured' : 'not-configured';
 
 			} catch (Exception $e) {
 				$status = 'error: ' . $e->getMessage();
@@ -112,7 +113,8 @@ class TelemetryEndpoint {
 			$sources[$key] = array_merge($source_info, [
 				'topics' => $topic_count,
 				'topics_list' => $topics_list,
-				'status' => $status,
+				'status' => count($errors)==0,
+				'errors' => $errors,
 				'source_paths' => $source_paths
 			]);
 		}
@@ -129,6 +131,8 @@ class TelemetryEndpoint {
 		try {
 			// Fetch all status records from the database
 			$query = Telemetry::$db->query("SELECT tag, status, updated_at FROM status ORDER BY tag ASC");
+			if (!$query) 
+				throw new Exception("Database query failed: " . Telemetry::$db->error());
 			$result = $query->fetch_all(MYSQLI_ASSOC);
 
 			$statuses = [];

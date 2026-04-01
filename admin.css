@@ -236,7 +236,7 @@ code {
 							font: 11px 'Courier New', monospace;
 						}
 						
-						.status-paths {
+						.status-details {
 							margin-top: 8px;
 							font-size: 11px;
 							
@@ -249,6 +249,12 @@ code {
 								margin: 3px 0;
 								white-space: normal;
 								word-break: break-all;
+
+								&.error {
+									border-color: #f44336;
+									color: #720d05;
+									background: #ffebee;
+								}
 							}
 						}
 					}
