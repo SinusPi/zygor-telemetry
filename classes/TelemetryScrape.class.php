@@ -8,9 +8,6 @@ use Telemetry as Tm;
  * Base class to be extended by specific scrapers for different sources (e.g. SV, packager logs, etc).
  */
 class TelemetryScrape {
-	// Registry of available scraper sources
-	static $SOURCES = [];
-
 	static $logtag = "";
 
 	static $CFG = null; // ref to main config for easy access
@@ -20,13 +17,9 @@ class TelemetryScrape {
 	}
 
 	static function startup() {
+		if (!Telemetry::is_ready()) throw new Exception("Scrape core: Telemetry core not initialized");
 		self::init();
-		try {
-			self::config();
-		} catch (ConfigException $e) {
-			Logger::log("Configuration error in scraper core: ".$e->getMessage());
-			self::$config_errors[] = $e->getMessage();
-		}
+		self::config();
 		self::db_create(); // create generic scraping-related tables if not exist
 		
 		self::startup_scrapers();
@@ -41,22 +34,6 @@ class TelemetryScrape {
 	}
 
 	/**
-	 * Register a scraper source type
-	 * @param string $key Unique identifier for the source (e.g., 'sv', 'packagerlog')
-	 * @param array $info Source information containing 'class', 'label', 'description'
-	 */
-	static function registerSource($key, $info) {
-		self::$SOURCES[$key] = array_merge(['key' => $key], $info);
-	}
-
-	/**
-	 * Get all registered scrapers
-	 */
-	static function getRegisteredScrapers() {
-		return self::$SOURCES;
-	}
-
-	/**
 	 * Get all subclasses of TelemetryScrape
 	 * @return array List of subclass names
 	 */
@@ -66,16 +43,23 @@ class TelemetryScrape {
 		});
 	}
 
-	static function startup_scrapers($do_startup=true) {
+	static function list_scrapers() {
+		$list = [];
 		foreach (self::getSubclasses() as $subclass) {
 			if (method_exists($subclass, 'identifySelf')) {
 				$info = $subclass::identifySelf();
 				if (is_array($info)) {
 					$info['class'] = $subclass;
-					self::registerSource($info['key'], $info);
+					$list[$info['key']] = $info;
 				}
 			}
-			if ($do_startup && method_exists($subclass, 'startup')) {
+		}
+		return $list;
+	}
+
+	static function startup_scrapers() {
+		foreach (self::getSubclasses() as $subclass) {
+			if (method_exists($subclass, 'startup')) {
 				try {
 					$subclass::startup();
 				} catch (Exception $e) {

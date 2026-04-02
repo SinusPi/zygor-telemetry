@@ -12,12 +12,7 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 	static $config_errors = [];
 
 	static function startup() {
-		try {
-			self::config();
-		} catch (ConfigException $e) {
-			Logger::log("Configuration error for Packager Log scraper: ".$e->getMessage());
-			self::$config_errors[] = $e->getMessage();
-		}
+		self::config();
 	}
 
 	static function config($cfg=[]) {

@@ -22,7 +22,6 @@ require_once "includes/shell.class.php";
 //pcntl_signal(SIGINT,function() { write_error_to_status(E_ERROR,"Terminated",__FILE__,__LINE__); die(); return true; });
 
 Telemetry::config();
-TelemetryScrape::startup_scrapers(false); // don't really init scrapers yet
 
 $OPTS = (array)\Zygor\Shell::better_getopt([
 	['f:','flavour:',      array_keys(Telemetry::$CFG['WOW_FLAVOUR_DATA'])],
@@ -35,7 +34,7 @@ $OPTS = (array)\Zygor\Shell::better_getopt([
 	['',  'filemask:',     "*.lua*"], // use to maybe process very specific files only
 	['',  'today-too',     false],
 	['v', 'verbose',       false],
-	['i:','input:',        $valid_inputs=array_keys(TelemetryScrape::$SOURCES)],
+	['i:','input:',        $valid_inputs=array_keys(TelemetryScrape::list_scrapers())], // which sources to scrape (e.g. sv, packagerlog, etc.)
 	['',  'verboseflags:', []],
 ]);
 $FLAVOURS = $OPTS['f'];
@@ -44,6 +43,7 @@ $OPTS["MAX_DAYS"]=$OPTS['maxdays'];
 
 Telemetry::startup($OPTS);
 Telemetry::dump_config();
+TelemetryScrape::startup();
 
 $inputs = $OPTS['input'];
 

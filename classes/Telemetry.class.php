@@ -30,6 +30,8 @@ class Telemetry {
 
 	static $DBG = [];
 
+	private static $is_ready = false;
+
 	static function config($opts=[]) {
 		self::$CFG = new Config();
 		self::$CFG->add(self::$CFG_defaults,0,"base default");
@@ -38,14 +40,6 @@ class Telemetry {
 		self::$CFG->add($configfile,1,"config file");
 
 		if ($opts) self::$CFG->add($opts,100,"runtime options");
-	}
-
-	static function update_config($opts) {
-		self::$CFG->add($opts,100,"runtime options");
-		Logger::init([
-			'verbose'=>self::$CFG['verbose'],
-			'verbose_flags'=>self::$CFG['verbose_flags']]
-		);
 	}
 
 	static function init() {
@@ -59,16 +53,11 @@ class Telemetry {
 	 * This should only fail in totally unrecoverable scenarios. All scraper- or cruncher-related errors should be handled
 	 * within the respective scraper/cruncher and not cause the whole script to fail, so that other scrapers/crunchers can
 	 * continue working and partial data can still be collected.
+	 * This does NOT initialize scrapers or crunchers.
 	 */
-
-
 	static function startup($opts=[]) {
 		self::init();
-		try {
-			self::config($opts);
-		} catch (ConfigException $e) {
-			self::$config_errors[] = $e->getMessage();
-		}
+		self::config($opts);
 
 		Logger::init([
 			'log_path'=>self::$CFG['TELEMETRY_ROOT']."/".self::$CFG['LOG_FILENAME'],
@@ -81,13 +70,17 @@ class Telemetry {
 
 		self::db_startup();
 
-		self::startup_classes(); // may need db
-
 		self::self_tests();
+
+		self::$is_ready=true;
 	}
 
 	static function self_tests() {
 		TelemetryScrape::self_tests();
+	}
+
+	static function is_ready() {
+		return self::$is_ready;
 	}
 
 	static function load_topics() {
@@ -626,3 +619,4 @@ class TelemetryStatus {
 class ConfigException extends Exception {
 	// Custom exception for configuration errors
 }
+

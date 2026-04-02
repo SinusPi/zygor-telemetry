@@ -25,12 +25,9 @@ if (isset($_REQUEST['list'])) {
 	die(json_encode(['topics'=>$list],JSON_UNESCAPED_SLASHES|JSON_PRETTY_PRINT));
 }
 
+TelemetryEndpoint::startup();
 TelemetryEndpoint::serveRequest();
-die(json_encode([
-	"success" => false,
-	"code" => 400,
-	"error" => "Invalid request",
-], JSON_UNESCAPED_SLASHES|JSON_PRETTY_PRINT));
+
 
 try {
 	if ($metric=="usedguide") {

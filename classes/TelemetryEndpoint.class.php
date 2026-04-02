@@ -6,13 +6,17 @@ use Telemetry as Tm;
  * Query the database for telemetry metrics and produce them in JSON form
  */
 class TelemetryEndpoint {
-	static $CFG = [];
+	static $CFG = null;
 
-	static function config($cfg=[]) {
+	static function config() {
 		self::$CFG = &Telemetry::$CFG; // reference main config for easy access
 
 		$configfile = (array)(@include "config-endpoint.inc.php"); // load defaults
-		self::$CFG = Tm::merge_configs(self::$CFG, $configfile, $cfg);
+		self::$CFG->add($configfile, 50, "endpoint config file"); // add to main config with medium priority
+	}
+
+	static function startup() {
+		self::config();
 	}
 
 	static function serveRequest() {
@@ -83,13 +87,13 @@ class TelemetryEndpoint {
 		$sources = [];
 		
 		// Get registered sources from TelemetryScrape
-		$registered = TelemetryScrape::getRegisteredScrapers();
+		TelemetryScrape::startup(); // ensure scrapers are initialized to get their config
+		$registered = TelemetryScrape::list_scrapers();
 		
 		foreach ($registered as $key => $source_info) {
 			$class = $source_info['class'];
 			$topic_count = 0;
 			$topics_list = [];
-			$status = 'unknown';
 			$source_paths = [];
 			
 			try {
@@ -107,7 +111,7 @@ class TelemetryEndpoint {
 				//$status = (count($source_paths) > 0 && $class::verifyConfiguredPaths()) ? 'configured' : 'not-configured';
 
 			} catch (Exception $e) {
-				$status = 'error: ' . $e->getMessage();
+				$errors = ['error' => $e->getMessage()];
 			}
 			
 			$sources[$key] = array_merge($source_info, [

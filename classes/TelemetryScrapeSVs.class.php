@@ -44,12 +44,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 
 	static function startup() {
 		self::init();
-		try {
-			self::config();
-		} catch (ConfigException $e) {
-			Logger::log("Configuration error for SV scraper: ".$e->getMessage());
-			self::$config_errors[] = $e->getMessage();
-		}
+		self::config();
 	}
 
 	static function identifySelf() {
@@ -91,10 +86,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 	 * @param string $flavour
 	 */
 	static function scrape($flavour) {
-		if (self::$config_errors) {
-			Logger::log("Cannot start SV scrape for flavour '$flavour' due to configuration errors: ".join("; ", self::$config_errors));
-			throw new MinorError("Configuration errors: ".join("; ", self::$config_errors));
-		}
+		if (!Telemetry::is_ready()) throw new Exception("Telemetry core not initialized");
 		return self::scrape2($flavour); // new scrape method with generator for files, but keep old one for now for comparison and safety
 
 		// THE REST IS DEPRECATED

@@ -38,6 +38,7 @@ $OPTS["MAX_DAYS"]=$OPTS['maxdays'];
 
 Telemetry::startup($OPTS);
 Telemetry::dump_config();
+TelemetryScrape::startup();
 
 foreach ($FLAVOURS as $flav) TelemetryCrunch::crunch_flavour($flav);
 

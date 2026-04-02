@@ -7,6 +7,19 @@ use TelemetryStatus as TmSt;
  */
 class TelemetryCrunch {
 
+	static $CFG = null;
+
+	static function config() {
+		self::$CFG = &Telemetry::$CFG; // reference main config for easy access
+
+		$configfile = (array)(@include "config-crunch.inc.php"); // load defaults
+		self::$CFG->add($configfile, 50, "crunch config file"); // add to main config with medium priority
+	}
+
+	static function startup() {
+		self::config();
+	}
+	
 	/**
 	 * Combine each day's events from telemetry/\<flavor\>/scraped/\<day\>/*.json into telemetry/\<flavor>\/\<metric\>/\<day\>.json
 	 * @deprecated Use TelemetryCrunch::crunch_flavour() instead.
