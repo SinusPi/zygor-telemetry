@@ -17,7 +17,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 	}
 
 	static function config($cfg=[]) {
-		self::$CFG = &TelemetryScrape::$CFG;
+		self::$CFG = &Telemetry::$CFG;
 
 		$configfile = (array)(@include "config-scrape-sv.inc.php"); // load defaults
 		if (!$configfile) throw new ConfigException("Failed to load config-scrape-sv.inc.php");

@@ -16,7 +16,7 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 	}
 
 	static function config($cfg=[]) {
-		self::$CFG = &TelemetryScrape::$CFG; // reference parent's CFG slot (self:: would be a separate null slot)
+		self::$CFG = &Telemetry::$CFG; // reference parent's CFG slot (self:: would be a separate null slot)
 		$configfile = (array)(@include "config-scrape-packagerlog.inc.php"); // load defaults
 		if (!$configfile) throw new ConfigException("Failed to load config-scrape-packagerlog.inc.php");
 		
@@ -40,7 +40,6 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 	 */
 	static function getConfiguredPaths() {
 		try {
-			self::config();
 			$paths = [];
 			if (isset(self::$CFG['PACKAGERLOG_PATH'])) {
 				$paths[] = self::$CFG['PACKAGERLOG_PATH'];

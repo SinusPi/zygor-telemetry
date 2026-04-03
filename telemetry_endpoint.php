@@ -6,27 +6,10 @@ require_once __DIR__ . "/loader.inc.php";
 header("Content-Type: application/json; charset=utf-8");
 
 Telemetry::startup();
-
-$metric = $_REQUEST['metric'];
-
-$result['metric']=$metric;
-
-// Parts still use old format, parts will connect to db...
-
-if (isset($_REQUEST['list'])) {
-	$topics = Telemetry::$TOPICS;
-	$list = array_map(function($t) {
-		$r=[];
-		$r['endpoint'] = !!$t['endpoint'];
-		$r['view'] = !!$t['view'];
-	
-		return $r;
-	}, $topics);
-	die(json_encode(['topics'=>$list],JSON_UNESCAPED_SLASHES|JSON_PRETTY_PRINT));
-}
-
 TelemetryEndpoint::startup();
 TelemetryEndpoint::serveRequest();
+
+// died.
 
 
 try {

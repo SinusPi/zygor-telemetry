@@ -87,7 +87,7 @@ class TelemetryEndpoint {
 		$sources = [];
 		
 		// Get registered sources from TelemetryScrape
-		TelemetryScrape::startup(); // ensure scrapers are initialized to get their config
+		//TelemetryScrape::startup(); // ensure scrapers are initialized to get their config
 		$registered = TelemetryScrape::list_scrapers();
 		
 		foreach ($registered as $key => $source_info) {
@@ -97,6 +97,7 @@ class TelemetryEndpoint {
 			$source_paths = [];
 			
 			try {
+				$error = null;
 				// Count topics using this scraper and collect topic names
 				$topics_list = array_keys(array_filter((array)Telemetry::$TOPICS, function($t) use ($key) {
 					return isset($t['scraper']['input']) && $t['scraper']['input'] === $key;
@@ -104,21 +105,21 @@ class TelemetryEndpoint {
 				$topic_count = count($topics_list);
 				
 				// Get configured paths from the scraper class itself
+				$class::startup();
 				$source_paths = $class::getConfiguredPaths();
-				$errors = $class::$config_errors;
 				
 				// Determine if scraper is configured based on whether paths exist
 				//$status = (count($source_paths) > 0 && $class::verifyConfiguredPaths()) ? 'configured' : 'not-configured';
 
 			} catch (Exception $e) {
-				$errors = ['error' => $e->getMessage()];
+				$error = $e->getMessage();
 			}
 			
 			$sources[$key] = array_merge($source_info, [
 				'topics' => $topic_count,
 				'topics_list' => $topics_list,
-				'status' => count($errors)==0,
-				'errors' => $errors,
+				'status' => !$error,
+				'error' => $error,
 				'source_paths' => $source_paths
 			]);
 		}

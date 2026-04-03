@@ -99,8 +99,23 @@
 					}
 				},
 				error: function(xhr, status, error) {
-					showError('Error loading data: ' + error, containerSelector);
-				},
+						var errorMsg = 'Error loading data';
+						try {
+							var response = JSON.parse(xhr.responseText);
+							if (response.error) {
+								errorMsg = 'Error: ' + response.error + 
+									(response.errcode ? ' (' + response.errcode + ')' : '');
+							}
+						} catch (e) {
+							if (e instanceof SyntaxError) {
+								errorMsg += ': ' + xhr.responseText;
+							} else if (xhr.status) {
+								// If response is not JSON, use generic error message
+								errorMsg += ' (HTTP ' + xhr.status + ': ' + xhr.statusText + ')';
+							}
+						}
+						showError(errorMsg, containerSelector);
+					},
 				complete: function() {
 					$(`#${containerSelector}`).removeClass('loading');
 				},
@@ -292,8 +307,8 @@
 					var statusPaths = $(row).find('[data-field="status-details"]');
 					if (source.status === true && source.source_paths && source.source_paths.length > 0) {
 						statusPaths.html('<code>' + source.source_paths.map(function(p) { return escapeHtml(p); }).join('<br>') + '</code>');
-					} else if (source.status === false && source.errors && source.errors.length > 0) {
-						statusPaths.html('<code class="error">' + escapeHtml(source.errors.join('<br>')) + '</code>');
+					} else if (source.status === false && source.error) {
+						statusPaths.html('<code class="error">' + escapeHtml(source.error) + '</code>');
 					}
 					
 					tbody.append(row);
@@ -437,8 +452,10 @@
 								(response.errcode ? ' (' + response.errcode + ')' : '');
 						}
 					} catch (e) {
-						// If response is not JSON, use generic error message
-						if (xhr.status) {
+						if (e instanceof SyntaxError) {
+							errorMsg += ': ' + xhr.responseText;
+						} else if (xhr.status) {
+							// If response is not JSON, use generic error message
 							errorMsg += ' (HTTP ' + xhr.status + ': ' + xhr.statusText + ')';
 						}
 					}
