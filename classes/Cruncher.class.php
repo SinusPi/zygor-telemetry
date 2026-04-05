@@ -45,16 +45,8 @@ class Cruncher {
 	 * Get all data as array
 	 */
 	public function toArray() {
-		return [
-			'name' => $this->name,
-			'eventtype' => $this->eventtype,
-			'function' => $this->function,
-			'crunch_function' => $this->crunch_function,
-			'table' => $this->table,
-			'table_schema' => $this->table_schema,
-			'action' => $this->action,
-			'input' => $this->input,
-			'output_mode' => $this->output_mode,
-		] + $this->customFields;
+		$vars = get_object_vars($this);
+		unset($vars['customFields']);
+		return $vars + $this->customFields;
 	}
 }

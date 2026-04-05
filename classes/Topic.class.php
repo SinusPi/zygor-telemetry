@@ -70,15 +70,9 @@ class Topic implements ArrayAccess {
 	 * Get all data as array
 	 */
 	public function toArray() {
-		return [
-			'name' => $this->name,
-			'eventtype' => $this->eventtype,
-			'scraper' => $this->scraper,
-			'crunchers' => $this->crunchers,
-			'endpoint' => $this->endpoint,
-			'view' => $this->view,
-			'skip' => $this->skip,
-		] + $this->customFields;
+		$vars = get_object_vars($this);
+		unset($vars['customFields']);
+		return $vars + $this->customFields;
 	}
 
 	/**
