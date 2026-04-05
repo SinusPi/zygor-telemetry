@@ -20,19 +20,33 @@ class Topic implements ArrayAccess {
 	 */
 	public function __construct($name, array $data = []) {
 		$this->name = $name;
-		$this->eventtype = isset($data['eventtype']) ? $data['eventtype'] : $name;
-		$this->scraper = isset($data['scraper']) ? $data['scraper'] : null;
-		$this->crunchers = isset($data['crunchers']) ? $data['crunchers'] : [];
-		$this->endpoint = isset($data['endpoint']) ? $data['endpoint'] : null;
-		$this->view = isset($data['view']) ? $data['view'] : null;
-		$this->skip = isset($data['skip']) ? $data['skip'] : false;
+		$this->crunchers = [];
 		
-		// Store any additional fields not explicitly defined
-		$definedFields = ['name', 'eventtype', 'scraper', 'crunchers', 'endpoint', 'view', 'skip'];
 		foreach ($data as $key => $value) {
-			if (!in_array($key, $definedFields)) {
+			if ($key === 'crunchers') {
+				// Special handling for crunchers conversion
+				if (is_array($value)) {
+					foreach ($value as $cruncher_data) {
+						if (is_array($cruncher_data)) {
+							$this->crunchers[] = new Cruncher($cruncher_data);
+						} elseif ($cruncher_data instanceof Cruncher) {
+							$this->crunchers[] = $cruncher_data;
+						}
+					}
+				}
+			} elseif (property_exists($this, $key) && $key !== 'customFields' && $key !== 'name') {
+				$this->$key = $value;
+			} else {
 				$this->customFields[$key] = $value;
 			}
+		}
+		
+		// Set defaults for unset fields
+		if (!isset($data['eventtype'])) {
+			$this->eventtype = $name;
+		}
+		if (!isset($data['skip'])) {
+			$this->skip = false;
 		}
 	}
 

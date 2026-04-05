@@ -66,8 +66,9 @@ class TelemetryEndpoint {
 			$crunchers_list = [];
 			if ($has_crunchers) {
 				foreach ($topicObj->crunchers as $idx => $cruncher) {
-					$eventtype = isset($cruncher['eventtype']) ? $cruncher['eventtype'] : 'unknown';
-					$table = isset($cruncher['table']) ? $cruncher['table'] : null;
+					/** @var Cruncher $cruncher */
+					$eventtype = $cruncher->eventtype ?: 'unknown';
+					$table = $cruncher->table;
 					$crunchers_list[] = [
 						'index' => $idx,
 						'eventtype' => $eventtype,
@@ -227,7 +228,7 @@ class TelemetryEndpoint {
 		$topicObj = Telemetry::getTopic($topic);
 		$topicendpoint = $topicObj ? $topicObj->endpoint : null;
 		$crunchers = $topicObj ? $topicObj->crunchers : [];
-		$table = isset($crunchers[0]['table']) ? $crunchers[0]['table'] : null;
+		$table = isset($crunchers[0]) ? $crunchers[0]->table : null;
 
 		if (!$table) {
 			self::response([

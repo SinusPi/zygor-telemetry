@@ -2,6 +2,7 @@
 require_once __DIR__ . '/classes/Config.class.php';
 require_once __DIR__ . '/classes/FileTools.class.php';
 require_once __DIR__ . '/classes/Logger.class.php';
+require_once __DIR__ . '/classes/Cruncher.class.php';
 require_once __DIR__ . '/classes/Topic.class.php';
 require_once __DIR__ . '/classes/Telemetry.class.php';
 require_once __DIR__ . '/classes/TelemetryCrunch.class.php';

@@ -134,7 +134,10 @@ class Telemetry {
 			if ($t->scraper) $r .= $dot()."scraping: ".(isset($t->scraper['input']) ? $t->scraper['input'] : "???");
 			if ($cc==0) $r .= $dot()."not crunched";
 			elseif ($cc==1) $r .= $dot()."crunched";
-			else $r .= $dot()."$cc crunchers: ".($c=count($t->crunchers))." (".implode(", ",array_column($t->crunchers,'name')).")";
+			else {
+				$cruncher_names = array_map(function($c) { /** @var Cruncher $c */ return $c->name; }, $t->crunchers);
+				$r .= $dot()."$cc crunchers: ".($c=count($t->crunchers))." (".implode(", ", $cruncher_names).")";
+			}
 			return $r;
 		}, self::$TOPICS)));
 	}
