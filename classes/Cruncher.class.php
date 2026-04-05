@@ -5,13 +5,12 @@
  */
 class Cruncher {
 	public $name;
+	public $input = "event";
 	public $eventtype;
 	public $function;
-	public $crunch_function;
 	public $table;
 	public $table_schema;
 	public $action;
-	public $input;
 	public $output_mode;
 	public $customFields = [];
 

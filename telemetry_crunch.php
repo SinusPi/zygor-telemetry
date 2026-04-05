@@ -32,7 +32,7 @@ $OPTS = \Zygor\Shell::better_getopt([
 	['v', 'verbose',       false],
 	['',  'verboseflags:', []],
 ]);
-$FLAVOURS = $OPTS['f'];
+$FLAVOURS = (array)$OPTS['f'];
 if (substr($OPTS['start-day'],0,1)=="-") $OPTS['start-day']=date("Ymd",strtotime($OPTS['start-day']." days"));
 $OPTS["MAX_DAYS"]=$OPTS['maxdays'];
 

@@ -7,10 +7,10 @@ class Topic implements ArrayAccess {
 	public $name;
 	public $eventtype;
 	public $scraper;
-	public $crunchers;
+	public $crunchers = [];
 	public $endpoint;
 	public $view;
-	public $skip;
+	public $skip = false;
 	public $customFields = []; // For any additional fields not explicitly defined
 
 	/**
@@ -42,19 +42,7 @@ class Topic implements ArrayAccess {
 		}
 		
 		// Set defaults for unset fields
-		if (!isset($data['eventtype'])) {
-			$this->eventtype = $name;
-		}
-		if (!isset($data['skip'])) {
-			$this->skip = false;
-		}
-	}
-
-	/**
-	 * Check if topic should be skipped
-	 */
-	public function isSkipped() {
-		return $this->skip === false ? false : $this->skip;
+		if (!$data['eventtype']) $this->eventtype = $name;
 	}
 
 	/**

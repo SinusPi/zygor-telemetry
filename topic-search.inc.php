@@ -21,8 +21,8 @@ ENDLUA
 	],
 	'crunchers'=>[
 		[
-			//'input'=>"event",
-			//'eventtype'=>"search",
+			'input'=>"event",
+			'eventtype'=>"search",
 			'function' => function($line) {
 				$unpacked = json_decode($line["data"], true);
 				$line = $unpacked + $line;

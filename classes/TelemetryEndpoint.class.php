@@ -58,10 +58,10 @@ class TelemetryEndpoint {
 		$topics = [];
 		foreach (Telemetry::$TOPICS as $name => $topicObj) {
 			/** @var Topic $topicObj */
-			$scraper_input = isset($topicObj->scraper['input']) ? $topicObj->scraper['input'] : null;
-			$has_crunchers = is_array($topicObj->crunchers) && count($topicObj->crunchers) > 0;
-			$has_endpoint = $topicObj->endpoint !== null;
-			$has_view = $topicObj->view !== null;
+			$scraper_input = $topicObj->scraper['input'];
+			$has_crunchers = count($topicObj->crunchers) > 0;
+			$has_endpoint = !!$topicObj->endpoint;
+			$has_view = !!$topicObj->view;
 			
 			$crunchers_list = [];
 			if ($has_crunchers) {

@@ -27,12 +27,12 @@ class TelemetryView {
 		return;
 		//self::test_paths();
 		try {
-			self::$db->create_tables();
-			self::test_status();
-			self::vlog("Database: connected and present.");
+			Telemetry::$db->create_tables();
+			//self::test_status();
+			Logger::vlog("Database: connected and present.");
 		} catch (Exception $e) {
-			die("DB Connection to ".self::$CFG['DB']['host']." FAILED - ".$e->getMessage());
+			die("DB Connection to ".Telemetry::$CFG['DB']['host']." FAILED - ".$e->getMessage());
 		}
-		self::vlog("Self-tests: \x1b[48;5;70;30mPASS\x1b[0m");
+		Logger::vlog("Self-tests: \x1b[48;5;70;30mPASS\x1b[0m");
 	}
 }

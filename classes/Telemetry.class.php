@@ -443,7 +443,7 @@ class Telemetry {
 		foreach (self::$TOPICS as $dp_name=>$topic) {
 			/** @var Topic $topic */
 			$hook_func = $topic->get($hook);
-			if ($hook_func && !$topic->isSkipped()) { 
+			if ($hook_func && !$topic->skip) { 
 				Logger::vlog(" - Calling $hook for $dp_name"); 
 				call_user_func_array($hook_func, $args); 
 			}

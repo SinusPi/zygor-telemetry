@@ -274,8 +274,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			return;
 		}
 
-		$topics = Telemetry::$TOPICS;
-		$topics_sv = array_filter($topics, function($t) { 
+		$topics_sv = array_filter(Telemetry::$TOPICS, function($t) { 
 			/** @var Topic $t */
 			return (isset($t->scraper['input']) ? $t->scraper['input'] : "") == "sv"; 
 		});
@@ -297,7 +296,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		});
 
 		foreach ($gen_narrowed_svfiles_2 as $n => $file) {
-			$fresh_topics_in_file = array_filter($topics, function($topic,$name) use ($file) { return $file->topics[$name]['fresh']; },ARRAY_FILTER_USE_BOTH);
+			$fresh_topics_in_file = array_filter($topics_sv, function($topic,$name) use ($file) { return $file->topics[$name]['fresh']; },ARRAY_FILTER_USE_BOTH);
 			self::process_single_sv_file($flavour, $file, $fresh_topics_in_file, $totals);
 
 			// obey limit
@@ -726,7 +725,7 @@ ENDLUA;
 	static function test_group_ranges() {
 		$input = [1, 2, 3, 5, 6, 8, 9, 10];
 		$expected = ["1-3", "5-6", "8-10"];
-		$output = self::group_ranges($input);
+		$output = Telemetry::group_date_ranges($input);
 		if ($output !== $expected) {
 			die("FAILED testing group_ranges:\n".print_r($output,1)."\n");
 		}

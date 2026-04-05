@@ -316,7 +316,7 @@ class TelemetryCrunch {
 					$count++;
 					//Logger::vlog("Processing ".strval($count)."/".strval($getrequest->num_rows));
 
-				$func = $cruncher->crunch_function ?: $cruncher->function;
+				$func = $cruncher->function;
 				if ($cruncher->action === "insert" && $cruncher->table !== null) {
 					$table = $cruncher->table;
 					$insertquery = Tm::$db->qarrayesc("INSERT INTO {$table} ({keys}) VALUES ({values})",$fields);
