@@ -138,24 +138,27 @@ class TelemetryCrunch {
 
 			// get maxmtime of each output file type
 			foreach ($DEFS as $dp_name=>&$dp_def) {
-				$mode = $dp_def['output_mode'];
+				/** @var Topic $dp_def */
+				$mode = $dp_def->get('output_mode');
 
 				if ($mode=="day_user") {
 					// 
 					$dayglob = self::cfgstr('DATA_PATH_DPMODE_DAY_USER',['FLAVOUR'=>$flavour,'TOPIC'=>$dp_name,'DAY'=>$day,'USER'=>"*"]);
 					$outuserfiles = glob($dayglob,GLOB_NOSORT);
 					$mtimes = array_map("filemtime", $outuserfiles);
-					$dp_def['dayuser_mtimes'] = array_combine($outuserfiles, $mtimes);
-					$dp_def['max_out_mtime'] = max($mtimes) ?: 0;
+					$dp_def->dayuser_mtimes = array_combine($outuserfiles, $mtimes);
+					$dp_def->max_out_mtime = max($mtimes) ?: 0;
 				} elseif ($mode=="day") {
 					$dayfile = self::cfgstr('DATA_PATH_DPMODE_DAY',['FLAVOUR'=>$flavour,'TOPIC'=>$dp_name,'DAY'=>$day]);
-					$dp_def['max_out_mtime'] = @filemtime($dayfile) ?: 0;
+					$dp_def->max_out_mtime = @filemtime($dayfile) ?: 0;
 				} else {
-					$dp_def['max_out_mtime'] = 0;
+					$dp_def->max_out_mtime = 0;
 				}
 
-				$dp_def['skip'] = $newest_userfile_date <= $dp_def['max_out_mtime'];
-				Logger::vlog(sprintf("| Datapoint %-10s (mode: %-8s) - last modified %s%s\x1b[0m - %s", $dp_name, $mode, ($dp_def['skip'] ? "\x1b[38;5;104m": "\x1b[38;5;174m"), $dp_def['max_out_mtime']?date("Y-m-d H:i:s",$dp_def['max_out_mtime']):"never",($dp_def['skip'] ? "\x1b[38;5;103mUP-TO-DATE\x1b[0m" : "\x1b[32mUPDATE NEEDED\x1b[0m")));
+				$dp_def->skip = $newest_userfile_date <= $dp_def->max_out_mtime;
+				$skip_display = $dp_def->skip;
+				$max_out_mtime = $dp_def->max_out_mtime;
+				Logger::vlog(sprintf("| Datapoint %-10s (mode: %-8s) - last modified %s%s\x1b[0m - %s", $dp_name, $mode, ($skip_display ? "\x1b[38;5;104m": "\x1b[38;5;174m"), $max_out_mtime?date("Y-m-d H:i:s",$max_out_mtime):"never",($skip_display ? "\x1b[38;5;103mUP-TO-DATE\x1b[0m" : "\x1b[32mUPDATE NEEDED\x1b[0m")));
 				/*
 				if ($newest_userfile_date < $oldest_outfile_date) {
 					if (count($nonew_streak)==0) Logger::log("No new userfiles for $day.");
@@ -210,46 +213,48 @@ class TelemetryCrunch {
 			$datacount = array_sum(array_map(function($v) { return count($v); }, $DATA));
 			Logger::vlog("Data crunched. $num_read read, $num_crunched crunched: ".join(", ", array_map(function($k,$v) { return "$k=".count($v); }, array_keys($DATA), $DATA)));
 
-			//if ($OPTS['verbose']) print_r($DATA);
-			$written=0;
+		//if ($OPTS['verbose']) print_r($DATA);
+		$written=0;
 
-			// write out $DATA to summary file as {datatype}/{day}.json
-			foreach ($DEFS as $dp_name=>$dp_def) {
-				if ($dp_def['skip']) { continue; }
-				//if (!$DATA[$dp_name]) continue;  // no data - no job. // #f80
-				$dp_data = $DATA[$dp_name] ?: [];
-				switch ($dp_def['output_mode']) {
-					case "day":
-						$outfile = self::cfgstr('DATA_PATH_DPMODE_DAY',['FLAVOUR'=>$flavour,'TOPIC'=>$dp_name,'DAY'=>$day]);
-						self::vflog("renderdetails","Rendering {$dp_name} mode='day' into {$outfile}");
+		// write out $DATA to summary file as {datatype}/{day}.json
+		foreach ($DEFS as $dp_name=>$dp_def) {
+			/** @var Topic $dp_def */
+			if ($dp_def->skip) { continue; }
+			//if (!$DATA[$dp_name]) continue;  // no data - no job. // #f80
+			$dp_data = isset($DATA[$dp_name]) ? $DATA[$dp_name] : [];
+			$output_mode = $dp_def->get('output_mode');
+			switch ($output_mode) {
+				case "day":
+					$outfile = self::cfgstr('DATA_PATH_DPMODE_DAY',['FLAVOUR'=>$flavour,'TOPIC'=>$dp_name,'DAY'=>$day]);
+					self::vflog("renderdetails","Rendering {$dp_name} mode='day' into {$outfile}");
+					@mkdir(dirname($outfile),0777,true);
+					@file_put_contents($outfile,@json_encode($dp_data));
+					$status[$dp_name.'_days_written']++;
+					$status[$dp_name.'_days_lastfile']=$outfile;
+					$written++;
+					break;
+				case "day_user":
+					foreach ($dp_data as $userfn=>$userdata) {
+						$outfile = self::cfgstr('DATA_PATH_DPMODE_DAY_USER',['FLAVOUR'=>$flavour,'TOPIC'=>$dp_name,'DAY'=>$day,'USER'=>$userfn]);
+						self::vflog("renderdetails","Rendering {$dp_name} mode='day_user' {$userfn} into {$outfile}");
 						@mkdir(dirname($outfile),0777,true);
-						@file_put_contents($outfile,@json_encode($dp_data));
+						@file_put_contents($outfile,@json_encode($userdata));
 						$status[$dp_name.'_days_written']++;
 						$status[$dp_name.'_days_lastfile']=$outfile;
 						$written++;
-						break;
-					case "day_user":
-						foreach ($dp_data as $userfn=>$userdata) {
-							$outfile = self::cfgstr('DATA_PATH_DPMODE_DAY_USER',['FLAVOUR'=>$flavour,'TOPIC'=>$dp_name,'DAY'=>$day,'USER'=>$userfn]);
-							self::vflog("renderdetails","Rendering {$dp_name} mode='day_user' {$userfn} into {$outfile}");
-							@mkdir(dirname($outfile),0777,true);
-							@file_put_contents($outfile,@json_encode($userdata));
-							$status[$dp_name.'_days_written']++;
-							$status[$dp_name.'_days_lastfile']=$outfile;
-							$written++;
-						}
-						// else
-						if (!$dp_data) {
-							// record empty file, to prevent future processing
-							$outfile = self::cfgstr('DATA_PATH_DPMODE_DAY_USER',['FLAVOUR'=>$flavour,'TOPIC'=>$dp_name,'DAY'=>$day,'USER'=>'_@_']);
-							self::vflog("renderdetails","Rendering empty {$dp_name} mode='day_user' into {$outfile}");
-							@mkdir(dirname($outfile),0777,true);
-							@file_put_contents($outfile,@json_encode([]));
-							$written++;
-						}
-						break;
-				}
+					}
+					// else
+					if (!$dp_data) {
+						// record empty file, to prevent future processing
+						$outfile = self::cfgstr('DATA_PATH_DPMODE_DAY_USER',['FLAVOUR'=>$flavour,'TOPIC'=>$dp_name,'DAY'=>$day,'USER'=>'_@_']);
+						self::vflog("renderdetails","Rendering empty {$dp_name} mode='day_user' into {$outfile}");
+						@mkdir(dirname($outfile),0777,true);
+						@file_put_contents($outfile,@json_encode([]));
+						$written++;
+					}
+					break;
 			}
+		}
 			unset($dp_data);
 
 			$progs=[]; foreach ($DEFS as $dp_name=>$dp_def) { $progs[]=$dp_name.'='.$status[$dp_name.'_days_written']; }

@@ -86,6 +86,15 @@ class Topic implements ArrayAccess {
 	}
 
 	/**
+	 * Get a field value by name (for core fields and custom fields)
+	 * @param string $fieldName Field name
+	 * @return mixed Field value or null if not found
+	 */
+	public function get($fieldName) {
+		return $this->__get($fieldName);
+	}
+
+	/**
 	 * Get all data as array
 	 */
 	public function toArray() {

@@ -126,14 +126,17 @@ class Telemetry {
 		
 		$dot = function($reset=false) { static $s=0; if ($reset) $s=-1; return $s++ ? ", ":" - "; };
 		Logger::vlog("Loaded ".count(self::$TOPICS)." telemetry topics:\n".implode("\n",array_map(function($t) use ($dot) {
-			$cc = count($t['crunchers']);
+			/** @var Topic $t */
+			$crunchers = $t->getCrunchers();
+			$cc = count($crunchers);
 			$r = "* ";
-			$r .= C_MTHD.$t['name'].C_R;
+			$r .= C_MTHD.$t->getName().C_R;
 			$dot(true);
-			if ($t['scraper']) $r .= $dot()."scraping: ".($t['scraper']['input'] ?: "???");
+			$scraper = $t->getScraper();
+			if ($scraper) $r .= $dot()."scraping: ".(isset($scraper['input']) ? $scraper['input'] : "???");
 			if ($cc==0) $r .= $dot()."not crunched";
 			elseif ($cc==1) $r .= $dot()."crunched";
-			else $r .= $dot()."$cc crunchers: ".($c=count($t['crunchers']))." (".implode(", ",array_column($t['crunchers'],'name')).")";
+			else $r .= $dot()."$cc crunchers: ".($c=count($crunchers))." (".implode(", ",array_column($crunchers,'name')).")";
 			return $r;
 		}, self::$TOPICS)));
 	}
@@ -216,18 +219,20 @@ class Telemetry {
 	}
 
 	static function get_counts($flavour,$topic) {
-		$def = self::$TOPICS[$topic] ?: null;
-		if (!$def) return ['total'=>0,'matching'=>0];
-		if ($def['output_mode']=="day") {
-			$file_glob = self::cfgstr('DATA_PATH_DPMODE_DAY',['FLAVOUR'=>$flavour,'TOPIC'=>$topic,'DAY'=>"*"]);
+		$def = self::$TOPICS[$topic];
+		$def = isset($def) ? $def : null;
+		if (!$def) return array('total'=>0,'matching'=>0);
+		$output_mode = $def->get('output_mode');
+		if ($output_mode=="day") {
+			$file_glob = self::cfgstr('DATA_PATH_DPMODE_DAY',array('FLAVOUR'=>$flavour,'TOPIC'=>$topic,'DAY'=>"*"));
 			$files = glob($file_glob);
 			foreach ($files as $file) {
 				readfile($file);
 				die();
 			}
 		}
-		elseif ($def['output_mode']=="day_user") {
-			$file_glob = self::cfgstr('DATA_PATH_DPMODE_DAY_USER',['FLAVOUR'=>$flavour,'TOPIC'=>$topic,'DAY'=>"*",'USER'=>"*.json"]);
+		elseif ($output_mode=="day_user") {
+			$file_glob = self::cfgstr('DATA_PATH_DPMODE_DAY_USER',array('FLAVOUR'=>$flavour,'TOPIC'=>$topic,'DAY'=>"*",'USER'=>"*.json"));
 			$files = glob($file_glob);
 		}
 
@@ -437,9 +442,8 @@ class Telemetry {
 		//self::vlog("Hook: $hook calls starting.");
 		foreach (self::$TOPICS as $dp_name=>$topic) {
 			/** @var Topic $topic */
-			$hook_func = $topic[$hook];
-			$is_skipped = $topic['skip'] === false ? false : $topic['skip'];
-			if ($hook_func && !$is_skipped) { 
+			$hook_func = $topic->get($hook);
+			if ($hook_func && !$topic->isSkipped()) { 
 				Logger::vlog(" - Calling $hook for $dp_name"); 
 				call_user_func_array($hook_func, $args); 
 			}
