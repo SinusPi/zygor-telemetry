@@ -103,8 +103,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		$topics = Telemetry::$TOPICS;
 		$topics = array_filter($topics, function($t) { 
 			/** @var Topic $t */
-			$scraper = $t->getScraper();
-			return ($scraper['input']?:"") == "sv"; 
+			return (isset($t->scraper['input']) ? $t->scraper['input'] : "") == "sv"; 
 		});
 		$sync_path = Tm::cfgstr('SV_STORAGE_FLAVOUR_PATH',["FLAVOUR"=>$flavour]);
 
@@ -278,8 +277,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		$topics = Telemetry::$TOPICS;
 		$topics_sv = array_filter($topics, function($t) { 
 			/** @var Topic $t */
-			$scraper = $t->getScraper();
-			return ($scraper['input']?:"") == "sv"; 
+			return (isset($t->scraper['input']) ? $t->scraper['input'] : "") == "sv"; 
 		});
 		$sync_path = Tm::cfgstr('SV_STORAGE_FLAVOUR_PATH',["FLAVOUR"=>$flavour]);
 
@@ -523,7 +521,7 @@ ENDLUA;
 		foreach($topic_defs as $name=>$def) {
 			/** @var Topic|array $def */
 			// Handle both Topic objects and raw arrays for backward compatibility
-			$scraper = is_array($def) ? $def['scraper'] : ($def instanceof Topic ? $def->getScraper() : $def['scraper']);
+			$scraper = is_array($def) ? $def['scraper'] : ($def instanceof Topic ? $def->scraper : $def['scraper']);
 			$lua_extractors .= 
 				  "\nlocal time1=os.clock()\n"
 				. $scraper['extraction_lua'] . "\n"

@@ -58,16 +58,14 @@ class TelemetryEndpoint {
 		$topics = [];
 		foreach (Telemetry::$TOPICS as $name => $topicObj) {
 			/** @var Topic $topicObj */
-			$scraper = $topicObj->getScraper();
-			$scraper_input = isset($scraper['input']) ? $scraper['input'] : null;
-			$crunchers = $topicObj->getCrunchers();
-			$has_crunchers = is_array($crunchers) && count($crunchers) > 0;
-			$has_endpoint = $topicObj->getEndpoint() !== null;
-			$has_view = $topicObj->getView() !== null;
+			$scraper_input = isset($topicObj->scraper['input']) ? $topicObj->scraper['input'] : null;
+			$has_crunchers = is_array($topicObj->crunchers) && count($topicObj->crunchers) > 0;
+			$has_endpoint = $topicObj->endpoint !== null;
+			$has_view = $topicObj->view !== null;
 			
 			$crunchers_list = [];
 			if ($has_crunchers) {
-				foreach ($crunchers as $idx => $cruncher) {
+				foreach ($topicObj->crunchers as $idx => $cruncher) {
 					$eventtype = isset($cruncher['eventtype']) ? $cruncher['eventtype'] : 'unknown';
 					$table = isset($cruncher['table']) ? $cruncher['table'] : null;
 					$crunchers_list[] = [
@@ -112,8 +110,7 @@ class TelemetryEndpoint {
 				// Count topics using this scraper and collect topic names
 				$topics_list = array_keys(array_filter((array)Telemetry::$TOPICS, function($t) use ($key) {
 					/** @var Topic $t */
-					$scraper = $t->getScraper();
-					return isset($scraper['input']) && $scraper['input'] === $key;
+					return isset($t->scraper['input']) && $t->scraper['input'] === $key;
 				}));
 				$topic_count = count($topics_list);
 				
@@ -192,7 +189,7 @@ class TelemetryEndpoint {
 		}
 
 		$topicObj = Telemetry::getTopic($topic);
-		$topicendpoint = $topicObj ? $topicObj->getEndpoint() : null;
+		$topicendpoint = $topicObj ? $topicObj->endpoint : null;
 		if (!$topicendpoint || !is_callable($topicendpoint['queryfunc'])) {
 			self::response([
 				"success" => false,
@@ -228,8 +225,8 @@ class TelemetryEndpoint {
 
 	static function serveDataRequestDaymap($topic, $from, $to, $flavnum) {
 		$topicObj = Telemetry::getTopic($topic);
-		$topicendpoint = $topicObj ? $topicObj->getEndpoint() : null;
-		$crunchers = $topicObj ? $topicObj->getCrunchers() : [];
+		$topicendpoint = $topicObj ? $topicObj->endpoint : null;
+		$crunchers = $topicObj ? $topicObj->crunchers : [];
 		$table = isset($crunchers[0]['table']) ? $crunchers[0]['table'] : null;
 
 		if (!$table) {

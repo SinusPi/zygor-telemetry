@@ -69,8 +69,7 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 		$topics = Telemetry::$TOPICS;
 		$topics = array_filter($topics, function($t) { 
 			/** @var Topic $t */
-			$scraper = $t->getScraper();
-			return ($scraper['input']?:"") == "packagerlog"; 
+			return (isset($t->scraper['input']) ? $t->scraper['input'] : "") == "packagerlog"; 
 		});
 		
 		// pick just the topics relevant to packager logs

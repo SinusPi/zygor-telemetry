@@ -127,16 +127,14 @@ class Telemetry {
 		$dot = function($reset=false) { static $s=0; if ($reset) $s=-1; return $s++ ? ", ":" - "; };
 		Logger::vlog("Loaded ".count(self::$TOPICS)." telemetry topics:\n".implode("\n",array_map(function($t) use ($dot) {
 			/** @var Topic $t */
-			$crunchers = $t->getCrunchers();
-			$cc = count($crunchers);
+			$cc = count($t->crunchers);
 			$r = "* ";
-			$r .= C_MTHD.$t->getName().C_R;
+			$r .= C_MTHD.$t->name.C_R;
 			$dot(true);
-			$scraper = $t->getScraper();
-			if ($scraper) $r .= $dot()."scraping: ".(isset($scraper['input']) ? $scraper['input'] : "???");
+			if ($t->scraper) $r .= $dot()."scraping: ".(isset($t->scraper['input']) ? $t->scraper['input'] : "???");
 			if ($cc==0) $r .= $dot()."not crunched";
 			elseif ($cc==1) $r .= $dot()."crunched";
-			else $r .= $dot()."$cc crunchers: ".($c=count($crunchers))." (".implode(", ",array_column($crunchers,'name')).")";
+			else $r .= $dot()."$cc crunchers: ".($c=count($t->crunchers))." (".implode(", ",array_column($t->crunchers,'name')).")";
 			return $r;
 		}, self::$TOPICS)));
 	}
@@ -219,8 +217,7 @@ class Telemetry {
 	}
 
 	static function get_counts($flavour,$topic) {
-		$def = self::$TOPICS[$topic];
-		$def = isset($def) ? $def : null;
+		$def = isset(self::$TOPICS[$topic]) ? self::$TOPICS[$topic] : null;
 		if (!$def) return array('total'=>0,'matching'=>0);
 		$output_mode = $def->get('output_mode');
 		if ($output_mode=="day") {

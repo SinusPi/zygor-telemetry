@@ -4,14 +4,14 @@
  * Represents a telemetry topic loaded from topic-*.inc.php files
  */
 class Topic implements ArrayAccess {
-	private $name;
-	private $eventtype;
-	private $scraper;
-	private $crunchers;
-	private $endpoint;
-	private $view;
-	private $skip;
-	private $customFields = []; // For any additional fields not explicitly defined
+	public $name;
+	public $eventtype;
+	public $scraper;
+	public $crunchers;
+	public $endpoint;
+	public $view;
+	public $skip;
+	public $customFields = []; // For any additional fields not explicitly defined
 
 	/**
 	 * Constructor
@@ -20,7 +20,7 @@ class Topic implements ArrayAccess {
 	 */
 	public function __construct($name, array $data = []) {
 		$this->name = $name;
-		$this->eventtype = isset($data['eventtype']) ? $data['eventtype'] : $name; // default event name is the same as topic name, can be overridden
+		$this->eventtype = isset($data['eventtype']) ? $data['eventtype'] : $name;
 		$this->scraper = isset($data['scraper']) ? $data['scraper'] : null;
 		$this->crunchers = isset($data['crunchers']) ? $data['crunchers'] : [];
 		$this->endpoint = isset($data['endpoint']) ? $data['endpoint'] : null;
@@ -34,48 +34,6 @@ class Topic implements ArrayAccess {
 				$this->customFields[$key] = $value;
 			}
 		}
-	}
-
-	/**
-	 * Get topic name
-	 */
-	public function getName() {
-		return $this->name;
-	}
-
-	/**
-	 * Get event type name
-	 */
-	public function getEventType() {
-		return $this->eventtype;
-	}
-
-	/**
-	 * Get scraper configuration
-	 */
-	public function getScraper() {
-		return $this->scraper;
-	}
-
-	/**
-	 * Get crunchers
-	 */
-	public function getCrunchers() {
-		return $this->crunchers;
-	}
-
-	/**
-	 * Get endpoint configuration
-	 */
-	public function getEndpoint() {
-		return $this->endpoint;
-	}
-
-	/**
-	 * Get view configuration
-	 */
-	public function getView() {
-		return $this->view;
 	}
 
 	/**
