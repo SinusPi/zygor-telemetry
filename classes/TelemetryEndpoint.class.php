@@ -4,6 +4,14 @@ use Telemetry as Tm;
 
 /**
  * Query the database for telemetry metrics and produce them in JSON form
+ * 
+ * Maintenance requests:
+ * - do=list_topics: list all loaded topics with metadata (e.g. which scraper they use, how many crunchers, etc.)
+ * - do=list_sources: list all registered sources with metadata (e.g. which topics use them, whether they are configured properly, etc.)
+ * - do=get_status: return all status records from the database (for now, just dump them all, maybe later add filtering by tag or something)
+ * Data requests:
+ * - topic=<topic>&flavour=<flavour>&from=<timestamp>&to=<timestamp>: return data for a specific topic and flavour in the given time range.
+ *   - optional: variant=daymap: get a day->count map instead of raw data (for showing activity over time in a calendar-style heatmap)
  */
 class TelemetryEndpoint {
 	static $CFG = null;
@@ -35,7 +43,7 @@ class TelemetryEndpoint {
 		}
 
 		if (isset($_REQUEST['topic'])) {
-			return self::serveDataRequest($_REQUEST['topic']);
+			return self::serveDataRequest();
 		}
 
 		// Handle other requests here
@@ -160,7 +168,8 @@ class TelemetryEndpoint {
 		}
 	}
 
-	static function serveDataRequest($topic) {
+	static function serveDataRequest() {
+		$topic = isset($_REQUEST['topic']) ? $_REQUEST['topic'] : "";
 		$flavour = isset($_REQUEST['flavour']) ? $_REQUEST['flavour'] : "";
 		$flavnum = isset(self::$CFG['WOW_FLAVOUR_DATA'][$flavour]['num']) ? self::$CFG['WOW_FLAVOUR_DATA'][$flavour]['num'] : 0;
 		if (!$flavnum) self::response(["success" => false, "error" => "Invalid flavour specified", "errcode" => "BAD_FLAVOUR"]);
