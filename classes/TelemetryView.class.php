@@ -10,8 +10,9 @@ class TelemetryView {
 	}
 
 	static function renderMetrics() {
-		foreach (Telemetry::$TOPICS as $topicname => &$topicdata) {
-			$view = &$topicdata['view'] ?: null;
+		foreach (Telemetry::$TOPICS as $topicname => $topicObj) {
+			/** @var Topic $topicObj */
+			$view = $topicObj->getView();
 			if (is_callable($view['printer'])) {
 				?><div id="topic-<?=$topicname?>" class="telemetry-topic telemetry-topic-<?=$topicname?> <?=($view['class'] ?: '')?>"><?php
 				?><h2 class="telemetry-topic-title"><?=$view['title']?></h2><?php

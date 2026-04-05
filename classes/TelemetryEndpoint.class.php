@@ -56,15 +56,18 @@ class TelemetryEndpoint {
 
 	static function serveListTopics() {
 		$topics = [];
-		foreach (Telemetry::$TOPICS as $name => $config) {
-			$scraper = isset($config['scraper']['input']) ? $config['scraper']['input'] : null;
-			$has_crunchers = isset($config['crunchers']) && is_array($config['crunchers']) && count($config['crunchers']) > 0;
-			$has_endpoint = isset($config['endpoint']);
-			$has_view = isset($config['view']);
+		foreach (Telemetry::$TOPICS as $name => $topicObj) {
+			/** @var Topic $topicObj */
+			$scraper = $topicObj->getScraper();
+			$scraper_input = isset($scraper['input']) ? $scraper['input'] : null;
+			$crunchers = $topicObj->getCrunchers();
+			$has_crunchers = is_array($crunchers) && count($crunchers) > 0;
+			$has_endpoint = $topicObj->getEndpoint() !== null;
+			$has_view = $topicObj->getView() !== null;
 			
 			$crunchers_list = [];
 			if ($has_crunchers) {
-				foreach ($config['crunchers'] as $idx => $cruncher) {
+				foreach ($crunchers as $idx => $cruncher) {
 					$eventtype = isset($cruncher['eventtype']) ? $cruncher['eventtype'] : 'unknown';
 					$table = isset($cruncher['table']) ? $cruncher['table'] : null;
 					$crunchers_list[] = [
@@ -77,7 +80,7 @@ class TelemetryEndpoint {
 			
 			$topics[$name] = [
 				'name' => $name,
-				'scraper' => $scraper,
+				'scraper' => $scraper_input,
 				'crunchers' => count($crunchers_list),
 				'crunchers_list' => $crunchers_list,
 				'endpoint' => $has_endpoint,
@@ -108,7 +111,9 @@ class TelemetryEndpoint {
 				$error = null;
 				// Count topics using this scraper and collect topic names
 				$topics_list = array_keys(array_filter((array)Telemetry::$TOPICS, function($t) use ($key) {
-					return isset($t['scraper']['input']) && $t['scraper']['input'] === $key;
+					/** @var Topic $t */
+					$scraper = $t->getScraper();
+					return isset($scraper['input']) && $scraper['input'] === $key;
 				}));
 				$topic_count = count($topics_list);
 				
@@ -186,7 +191,8 @@ class TelemetryEndpoint {
 			]);
 		}
 
-		$topicendpoint = isset(Telemetry::$TOPICS[$topic]['endpoint']) ? Telemetry::$TOPICS[$topic]['endpoint'] : null;
+		$topicObj = Telemetry::getTopic($topic);
+		$topicendpoint = $topicObj ? $topicObj->getEndpoint() : null;
 		if (!$topicendpoint || !is_callable($topicendpoint['queryfunc'])) {
 			self::response([
 				"success" => false,
@@ -221,8 +227,10 @@ class TelemetryEndpoint {
 	}
 
 	static function serveDataRequestDaymap($topic, $from, $to, $flavnum) {
-		$topicendpoint = isset(Telemetry::$TOPICS[$topic]['endpoint']) ? Telemetry::$TOPICS[$topic]['endpoint'] : null;
-		$table = isset(Telemetry::$TOPICS[$topic]['crunchers'][0]['table']) ? Telemetry::$TOPICS[$topic]['crunchers'][0]['table'] : null;
+		$topicObj = Telemetry::getTopic($topic);
+		$topicendpoint = $topicObj ? $topicObj->getEndpoint() : null;
+		$crunchers = $topicObj ? $topicObj->getCrunchers() : [];
+		$table = isset($crunchers[0]['table']) ? $crunchers[0]['table'] : null;
 
 		if (!$table) {
 			self::response([

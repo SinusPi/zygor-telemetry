@@ -266,8 +266,10 @@ class TelemetryCrunch {
 		$topics = Telemetry::$TOPICS;
 
 		Logger::vlog("Running crunchers for flavour \x1b[38;5;78m{$flavour}\x1b[0m...");
-		foreach($topics as $name=>$topic) {
-			foreach($topic['crunchers'] as $num=>$cruncher) {
+		foreach($topics as $name=>$topicObj) {
+			/** @var Topic $topicObj */
+			$crunchers = $topicObj->getCrunchers();
+			foreach($crunchers as $num=>$cruncher) {
 				$subname = ($cruncher['name'] ?: "#".($num+1));
 				$colorname = "\x1b[38;5;148m{$name}\x1b[0m";
 				$colordashsubname = "-\x1b[38;5;118m".$subname."\x1b[0m";

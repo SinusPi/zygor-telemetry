@@ -67,7 +67,11 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 		// TODO : go through log-<Y>-<M>-<D> files, bzipped or not, extract flavour update lines, treat them similarly to "ui-VERSION" type events (but store them separately!). Remember which logs were parsed.
 
 		$topics = Telemetry::$TOPICS;
-		$topics = array_filter($topics, function($t) { return ($t['scraper']['input']?:"") == "packagerlog"; });
+		$topics = array_filter($topics, function($t) { 
+			/** @var Topic $t */
+			$scraper = $t->getScraper();
+			return ($scraper['input']?:"") == "packagerlog"; 
+		});
 		
 		// pick just the topics relevant to packager logs
 		//$topics = array_filter($topics, function($t) { return ($t['scraper']['input']?:"") == "packagerlog"; });

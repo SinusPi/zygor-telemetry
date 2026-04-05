@@ -101,7 +101,11 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		}
 
 		$topics = Telemetry::$TOPICS;
-		$topics = array_filter($topics, function($t) { return ($t['scraper']['input']?:"") == "sv"; });
+		$topics = array_filter($topics, function($t) { 
+			/** @var Topic $t */
+			$scraper = $t->getScraper();
+			return ($scraper['input']?:"") == "sv"; 
+		});
 		$sync_path = Tm::cfgstr('SV_STORAGE_FLAVOUR_PATH',["FLAVOUR"=>$flavour]);
 
 		Logger::log("Starting scrape of flavour '\x1b[38;5;78m{$flavour}\x1b[0m' in \x1b[33;1m{$sync_path}\x1b[0m.");
@@ -272,7 +276,11 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		}
 
 		$topics = Telemetry::$TOPICS;
-		$topics_sv = array_filter($topics, function($t) { return ($t['scraper']['input']?:"") == "sv"; });
+		$topics_sv = array_filter($topics, function($t) { 
+			/** @var Topic $t */
+			$scraper = $t->getScraper();
+			return ($scraper['input']?:"") == "sv"; 
+		});
 		$sync_path = Tm::cfgstr('SV_STORAGE_FLAVOUR_PATH',["FLAVOUR"=>$flavour]);
 
 		Logger::log("Starting scrape of flavour '\x1b[38;5;78m{$flavour}\x1b[0m' in \x1b[33;1m{$sync_path}\x1b[0m.");
@@ -513,7 +521,9 @@ ENDLUA;
 
 		$lua_extractors = "";
 		foreach($topic_defs as $name=>$def) {
-			$scraper = $def['scraper'];
+			/** @var Topic|array $def */
+			// Handle both Topic objects and raw arrays for backward compatibility
+			$scraper = is_array($def) ? $def['scraper'] : ($def instanceof Topic ? $def->getScraper() : $def['scraper']);
 			$lua_extractors .= 
 				  "\nlocal time1=os.clock()\n"
 				. $scraper['extraction_lua'] . "\n"

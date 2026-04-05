@@ -21,6 +21,7 @@ class Telemetry {
 
 	static $json = false;
 
+	/** @var Topic[] */
 	static $TOPICS = []; // loaded from topic-*.inc.php files, see load_topics()
 
 	/** @var TelemetryDB */
@@ -83,6 +84,24 @@ class Telemetry {
 		return self::$is_ready;
 	}
 
+	/**
+	 * Get a topic by name
+	 * @param string $topicName Topic name
+	 * @return Topic|null Topic object or null if not found
+	 */
+	static function getTopic($topicName) {
+		return isset(self::$TOPICS[$topicName]) ? self::$TOPICS[$topicName] : null;
+	}
+
+	/**
+	 * Check if a topic exists
+	 * @param string $topicName Topic name
+	 * @return bool True if topic exists
+	 */
+	static function hasTopic($topicName) {
+		return isset(self::$TOPICS[$topicName]);
+	}
+
 	static function load_topics() {
 		$topics = [];
 		foreach (glob("topic-*.inc.php") as $topic_file) {
@@ -91,12 +110,10 @@ class Telemetry {
 			$topic_data = FileTools::safely_load_php($topic_file);
 			if (!$topic_data) continue;
 			if ($topic_data['crunchers_load']) $topic_data['crunchers'] = self::load_topic_crunchers($topic_name); // if a topic has many crunchers for its subtypes
-			$topic_data = array_merge([
-				'name' => $topic_name,
-				'event' => $topic_name, // default event name is the same as topic name, can be overridden in topic-*.inc.php
-			], $topic_data);
-			$topics[$topic_name] = $topic_data;
-
+			
+			// Create Topic object instead of storing raw array
+			$topic = new Topic($topic_name, $topic_data);
+			$topics[$topic_name] = $topic;
 		}
 
 		self::$TOPICS = $topics;
@@ -418,8 +435,15 @@ class Telemetry {
 
 	static function call_hooks($hook,$args) {
 		//self::vlog("Hook: $hook calls starting.");
-		foreach (self::$TOPICS as $dp_name=>$dp_def)
-			if ($dp_def[$hook] && $dp_def['skip']!==false) { Logger::vlog(" - Calling $hook for $dp_name"); call_user_func_array($dp_def[$hook], $args); }
+		foreach (self::$TOPICS as $dp_name=>$topic) {
+			/** @var Topic $topic */
+			$hook_func = $topic[$hook];
+			$is_skipped = $topic['skip'] === false ? false : $topic['skip'];
+			if ($hook_func && !$is_skipped) { 
+				Logger::vlog(" - Calling $hook for $dp_name"); 
+				call_user_func_array($hook_func, $args); 
+			}
+		}
 		//self::vlog("Hook: $hook calls complete.");
 	}
 
