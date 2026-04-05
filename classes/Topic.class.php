@@ -4,7 +4,14 @@
  * Represents a telemetry topic loaded from topic-*.inc.php files
  */
 class Topic implements ArrayAccess {
-	private $data = [];
+	private $name;
+	private $eventtype;
+	private $scraper;
+	private $crunchers;
+	private $endpoint;
+	private $view;
+	private $skip;
+	private $customFields = []; // For any additional fields not explicitly defined
 
 	/**
 	 * Constructor
@@ -12,110 +19,199 @@ class Topic implements ArrayAccess {
 	 * @param array $data Topic configuration data
 	 */
 	public function __construct($name, array $data = []) {
-		$this->data = array_merge([
-			'name' => $name,
-			'eventtype' => $name, // default event name is the same as topic name, can be overridden
-			'scraper' => null,
-			'crunchers' => [],
-			'endpoint' => null,
-			'view' => null,
-			'skip' => false,
-		], $data);
+		$this->name = $name;
+		$this->eventtype = isset($data['eventtype']) ? $data['eventtype'] : $name; // default event name is the same as topic name, can be overridden
+		$this->scraper = isset($data['scraper']) ? $data['scraper'] : null;
+		$this->crunchers = isset($data['crunchers']) ? $data['crunchers'] : [];
+		$this->endpoint = isset($data['endpoint']) ? $data['endpoint'] : null;
+		$this->view = isset($data['view']) ? $data['view'] : null;
+		$this->skip = isset($data['skip']) ? $data['skip'] : false;
+		
+		// Store any additional fields not explicitly defined
+		$definedFields = ['name', 'eventtype', 'scraper', 'crunchers', 'endpoint', 'view', 'skip'];
+		foreach ($data as $key => $value) {
+			if (!in_array($key, $definedFields)) {
+				$this->customFields[$key] = $value;
+			}
+		}
 	}
 
 	/**
 	 * Get topic name
 	 */
 	public function getName() {
-		return $this->data['name'];
+		return $this->name;
 	}
 
 	/**
 	 * Get event type name
 	 */
 	public function getEventType() {
-		return $this->data['eventtype'];
+		return $this->eventtype;
 	}
 
 	/**
 	 * Get scraper configuration
 	 */
 	public function getScraper() {
-		return $this->data['scraper'];
+		return $this->scraper;
 	}
 
 	/**
 	 * Get crunchers
 	 */
 	public function getCrunchers() {
-		return $this->data['crunchers'];
+		return $this->crunchers;
 	}
 
 	/**
 	 * Get endpoint configuration
 	 */
 	public function getEndpoint() {
-		return $this->data['endpoint'];
+		return $this->endpoint;
 	}
 
 	/**
 	 * Get view configuration
 	 */
 	public function getView() {
-		return $this->data['view'];
+		return $this->view;
 	}
 
 	/**
 	 * Check if topic should be skipped
 	 */
 	public function isSkipped() {
-		return $this->data['skip'] === false ? false : $this->data['skip'];
+		return $this->skip === false ? false : $this->skip;
 	}
 
 	/**
 	 * Get all data as array
 	 */
 	public function toArray() {
-		return $this->data;
+		return [
+			'name' => $this->name,
+			'eventtype' => $this->eventtype,
+			'scraper' => $this->scraper,
+			'crunchers' => $this->crunchers,
+			'endpoint' => $this->endpoint,
+			'view' => $this->view,
+			'skip' => $this->skip,
+		] + $this->customFields;
 	}
 
 	/**
-	 * Access properties like array
+	 * Access properties like array (magic getter)
 	 */
 	public function __get($name) {
-		return isset($this->data[$name]) ? $this->data[$name] : null;
+		switch ($name) {
+			case 'name':
+				return $this->name;
+			case 'eventtype':
+				return $this->eventtype;
+			case 'scraper':
+				return $this->scraper;
+			case 'crunchers':
+				return $this->crunchers;
+			case 'endpoint':
+				return $this->endpoint;
+			case 'view':
+				return $this->view;
+			case 'skip':
+				return $this->skip;
+			default:
+				return isset($this->customFields[$name]) ? $this->customFields[$name] : null;
+		}
 	}
 
 	/**
-	 * Set properties like array
+	 * Set properties like array (magic setter)
 	 */
 	public function __set($name, $value) {
-		$this->data[$name] = $value;
+		switch ($name) {
+			case 'name':
+				$this->name = $value;
+				break;
+			case 'eventtype':
+				$this->eventtype = $value;
+				break;
+			case 'scraper':
+				$this->scraper = $value;
+				break;
+			case 'crunchers':
+				$this->crunchers = $value;
+				break;
+			case 'endpoint':
+				$this->endpoint = $value;
+				break;
+			case 'view':
+				$this->view = $value;
+				break;
+			case 'skip':
+				$this->skip = $value;
+				break;
+			default:
+				$this->customFields[$name] = $value;
+				break;
+		}
 	}
 
 	/**
-	 * Check if property exists
+	 * Check if property exists (magic isset)
 	 */
 	public function __isset($name) {
-		return isset($this->data[$name]);
+		switch ($name) {
+			case 'name':
+			case 'eventtype':
+			case 'scraper':
+			case 'crunchers':
+			case 'endpoint':
+			case 'view':
+			case 'skip':
+				return true;
+			default:
+				return isset($this->customFields[$name]);
+		}
 	}
 
 	/**
-	 * Support array-style access
+	 * Support array-style access (ArrayAccess::offsetExists)
 	 */
 	public function offsetExists($offset) {
-		return isset($this->data[$offset]);
+		return $this->__isset($offset);
 	}
 
+	/**
+	 * Support array-style access (ArrayAccess::offsetGet)
+	 */
 	public function offsetGet($offset) {
-		return isset($this->data[$offset]) ? $this->data[$offset] : null;
+		return $this->__get($offset);
 	}
 
+	/**
+	 * Support array-style access (ArrayAccess::offsetSet)
+	 */
 	public function offsetSet($offset, $value) {
-		$this->data[$offset] = $value;
+		$this->__set($offset, $value);
 	}
 
+	/**
+	 * Support array-style access (ArrayAccess::offsetUnset)
+	 */
 	public function offsetUnset($offset) {
-		unset($this->data[$offset]);
+		switch ($offset) {
+			case 'name':
+			case 'eventtype':
+			case 'scraper':
+			case 'crunchers':
+			case 'endpoint':
+			case 'view':
+			case 'skip':
+				// Don't allow unsetting core fields, but silently ignore
+				break;
+			default:
+				unset($this->customFields[$offset]);
+				break;
+		}
 	}
 }
