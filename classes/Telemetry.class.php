@@ -13,6 +13,7 @@ class Telemetry {
 		'MAX_DAYS' => false,
 		'VERBOSE_FLAGS' => [],
 		'STATUS_INTERVAL' => 2,
+		'BATCH_SIZE' => 20,
 	];
 	/** @var Config */
 	static $CFG;
