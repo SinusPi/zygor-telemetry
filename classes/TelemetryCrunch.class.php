@@ -178,7 +178,7 @@ class TelemetryCrunch {
 
 			if (!$nonskips) return; // #f80
 
-			self::call_hooks("pre_dayfiles", []);
+			Telemetry::call_hooks("pre_dayfiles", []);
 
 			$DATA = array_fill_keys(array_keys($DEFS), []);
 
@@ -208,7 +208,7 @@ class TelemetryCrunch {
 				}
 			}
 
-			self::call_hooks("post_dayfiles", [$DATA]);
+			Telemetry::call_hooks("post_dayfiles", [$DATA]);
 
 			$datacount = array_sum(array_map(function($v) { return count($v); }, $DATA));
 			Logger::vlog("Data crunched. $num_read read, $num_crunched crunched: ".join(", ", array_map(function($k,$v) { return "$k=".count($v); }, array_keys($DATA), $DATA)));
@@ -274,19 +274,21 @@ class TelemetryCrunch {
 		foreach($topics as $name=>$topicObj) {
 			/** @var Topic $topicObj */
 
-				foreach($topicObj->crunchers as $num=>$cruncher) {
-			/** @var Cruncher $cruncher */
-			$subname = ($cruncher->name ?: "#".($num+1));
+			foreach($topicObj->crunchers as $num=>$cruncher) {
+				/** @var Cruncher $cruncher */
+				$subname = ($cruncher->name ?: "#".($num+1));
+				$colorname = "\x1b[38;5;148m{$name}\x1b[0m";
 				$colordashsubname = "-\x1b[38;5;118m".$subname."\x1b[0m";
 				Logger::vlog("Running cruncher {$colorname}{$colordashsubname}...");
 
 				// create if needed
-			if ($cruncher->table_schema !== null && $cruncher->table !== null) {
-				$table = $cruncher->table;
-				Tm::$db->query("SHOW CREATE TABLE {$table}");
-				if (Tm::$db->error()) {
-					Logger::vlog("\x1b[31;1mTable '{$table}' for cruncher '{$subname}' does not exist, creating...\x1b[0m");
-					$schema_sql = $cruncher->table_schema;
+				if ($cruncher->table_schema !== null && $cruncher->table !== null) {
+					$table = $cruncher->table;
+					Tm::$db->query("SHOW CREATE TABLE {$table}");
+					if (Tm::$db->error()) {
+						Logger::vlog("\x1b[31;1mTable '{$table}' for cruncher '{$subname}' does not exist, creating...\x1b[0m");
+						$schema_sql = $cruncher->table_schema;
+						$schema_sql = str_replace("<TABLE>",$table,$schema_sql);
 						Tm::$db->query($schema_sql);
 						if (Tm::$db->error()) 
 							throw new Exception("Failed to create table `{$table}`: ".Tm::$db->error());
@@ -297,7 +299,9 @@ class TelemetryCrunch {
 				// start fetching new events to process:
 
 				$flavnum = Tm::flavnum($flavour);
-			$type = $cruncher->eventtype ?: $name;
+				$type = $cruncher->eventtype ?: $name;
+				// get starting point
+				$max_id = Tm::$db->query_one(Tm::$db->qesc("SELECT IFNULL(MAX(event_id),0) FROM {$table} WHERE flavnum={d}",$flavnum)) ?: 0;
 				Logger::vlog("Processing {$type} events, starting with index {$max_id}...");
 
 				// get new events
@@ -317,6 +321,8 @@ class TelemetryCrunch {
 					//Logger::vlog("Processing ".strval($count)."/".strval($getrequest->num_rows));
 
 				$func = $cruncher->function;
+				$fields = $func($event);
+
 				if ($cruncher->action === "insert" && $cruncher->table !== null) {
 					$table = $cruncher->table;
 					$insertquery = Tm::$db->qarrayesc("INSERT INTO {$table} ({keys}) VALUES ({values})",$fields);
