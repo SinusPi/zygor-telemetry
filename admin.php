@@ -448,9 +448,13 @@
 						window.daymapCacheCruncher = cruncherName;
 
 						displayCalendar(topicName + ' - ' + (cruncherName || 'events'), response, currentYear);
-					} else {
+					} else if (response.error) {
 						alert('Error loading daymap: ' + (response.error || 'Unknown error') + 
 							(response.errcode ? ' (' + response.errcode + ')' : ''));
+					} else if (response.status == "EXCEPTION") {
+						alert(`Exception occurred: ${response.type || 'Unknown'} - ${response.message || 'No message'} ${response.file ? 'in ' + response.file : ''} ${response.line ? 'at line ' + response.line : ''}`);
+					} else {
+						alert('Failed to load daymap data');
 					}
 				},
 				error: function(xhr, status, error) {
@@ -474,12 +478,71 @@
 			});
 		}
 
-		function displayCalendar(topicName, daymapObj, year) {
-			var html = '<div class="calendar-header">' + escapeHtml(topicName) + '</div>';
+		function applyDaymapData() {
+			var daymap = window.currentDaymap || {};
+			var maxCount = window.currentMaxCount || 1;
+			var totalCount = window.currentTotalCount || 0;
+			var yearTotals = window.currentYearTotals || {};
+
+			$(".calendar-header").text(window.currentDaymapTopic + ' - Yearly Total: ' + (yearTotals[$('#year-select').val()] || 0) + ' / Overall Total: ' + totalCount);
 			
-			// Extract data and max_count
+			$('.calendar-day').each(function() {
+				var dateStr = $(this).data('date');
+				if (!dateStr) return;
+				var count = daymap[dateStr] || 0;
+				var heatLevel = 0;
+				
+				if (count > 0 && maxCount > 0) {
+					var ratio = count / maxCount;
+					heatLevel = Math.ceil(ratio * 10);
+					if (heatLevel > 10) heatLevel = 10;
+				}
+				
+				$(this).attr('title', count);
+				$(this).removeClass(function(index, css) {
+					return (css.match(/heat-\d+/g) || []).join(' ');
+				});
+				if (heatLevel > 0) {
+					$(this).addClass('heat-' + heatLevel);
+				}
+			});
+		}
+
+		function populateCalendarGrid(year) {
+			$('.month-calendar').each(function() {
+				var month = parseInt($(this).data('month'));
+				var firstDate = new Date(year, month, 1);
+				var firstDay = firstDate.getDay();
+				var daysInMonth = new Date(year, month + 1, 0).getDate();
+				
+				var cells = $(this).find('.calendar-day');
+				cells.each(function(index) {
+					var $cell = $(this);
+					// clear out
+					$cell.removeClass().addClass('calendar-day').data("date",null).attr('title', '0').text('');
+					
+					if (index < firstDay) {
+						// Padding cell before month starts
+						$cell.addClass('padding-cell');
+					} else if (index - firstDay < daysInMonth) {
+						// Actual day of month
+						var day = index - firstDay + 1;
+						var dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+						$cell.text(day).data('date', dateStr);
+					} else {
+						// Padding cell after month ends
+						$cell.addClass('padding-cell');
+					}
+				});
+			});
+		}
+
+		function displayCalendar(topicName, daymapObj, year) {
+			// Extract data and metadata
 			var daymap = daymapObj.data || daymapObj;
-			var maxCount = daymapObj.max_count || 1;
+			var maxCount = daymapObj.count_max || 1;
+			var totalCount = daymapObj.count_total || 0;
+			var yearTotals = daymapObj.year_totals || {};
 			
 			// Extract years that have data
 			var yearsWithData = {};
@@ -501,76 +564,37 @@
 				}
 			}
 			
-			// Year selector
-			html += '<div class="year-selector">';
-			html += '<button onclick="changeYear(this, -1)" id="prev-year-btn">← Prev Year</button>';
-			html += '<select id="year-select" onchange="changeYear(this, 0)">';
+			// Store available years, year range, and daymap for navigation
+			window.availableYears = availableYears;
+			window.yearRange = yearRange;
+			window.currentDaymap = daymap;
+			window.currentMaxCount = maxCount;
+			window.currentTotalCount = totalCount;
+			window.currentYearTotals = yearTotals;
 			
+			// Set calendar header and title
+			$('.calendar-header').text(topicName);
+			
+			// Populate year selector
+			var yearSelect = $('#year-select');
+			yearSelect.empty();
 			if (yearRange.length === 0) {
-				html += '<option>No data available</option>';
+				yearSelect.append('<option>No data available</option>');
 			} else {
 				$.each(yearRange, function(idx, y) {
-					html += '<option value="' + y + '"' + (parseInt(y) === year ? ' selected' : '') + '>' + y + '</option>';
+					yearSelect.append('<option value="' + y + '"' + (parseInt(y) === year ? ' selected' : '') + '>' + y + '</option>');
 				});
 			}
 			
-			html += '</select>';
-			html += '<button onclick="changeYear(this, 1)" id="next-year-btn">Next Year →</button>';
-			html += '</div>';
+			// Populate grid with day numbers for the selected year
+			populateCalendarGrid(year);		
+			// Apply daymap data (counts and heat levels)
+			applyDaymapData();
 			
-			html += '<div class="months-grid">';
-			
-			var monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-				'July', 'August', 'September', 'October', 'November', 'December'];
-			
-			// Iterate through each month
-			for (var month = 0; month < 12; month++) {
-				html += '<div class="month-block">';
-				html += '<div class="month-name">' + monthNames[month] + '</div>';
-				html += '<div class="month-calendar">';
-				
-				// Calculate padding for first day of month
-				var firstDay = new Date(year, month, 1).getDay();
-				var padding = firstDay;
-				
-				// Add padding
-				for (var p = 0; p < padding; p++) {
-					html += '<div class="calendar-day padding-cell"></div>';
-				}
-				
-				// Add days of the month
-				var daysInMonth = new Date(year, month + 1, 0).getDate();
-				for (var day = 1; day <= daysInMonth; day++) {
-					var dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
-					var count = daymap[dateStr] || 0;
-					var heatLevel = 0;
-					if (count > 0 && maxCount > 0) {
-						var ratio = count / maxCount;
-						heatLevel = Math.ceil(ratio * 10);
-						if (heatLevel > 10) heatLevel = 10;
-					}
-					var heatClass = count > 0 ? ' heat-' + heatLevel : '';
-					html += '<div class="calendar-day' + heatClass + '" title="' + count + '"></div>';
-				}
-				
-				html += '</div>';
-				html += '</div>';
-			}
-			
-			html += '</div>';
-			html += '<div class="calendar-close"><button onclick="closeCalendar()">Close</button></div>';
-			
-			$('#calendar-modal .calendar-content').html(html);
 			$('#calendar-modal').addClass('active');
-			
-			// Store available years and year range for navigation
-			window.availableYears = availableYears;
-			window.yearRange = yearRange;
 		}
 
 		function changeYear(element, direction) {
-			var currentTopic = window.currentDaymapTopic;
-			var currentCruncher = window.currentDaymapCruncher;
 			var yearRange = window.yearRange || [];
 			var currentYearSelect = parseInt($('#year-select').val());
 			var newYear;
@@ -585,14 +609,18 @@
 				
 				// Prevent navigation outside year range
 				if (newIndex < 0 || newIndex >= yearRange.length) {
+					console.log("Year out of range");
 					return;
 				}
 				newYear = parseInt(yearRange[newIndex]);
+
+				// Update dropdown to reflect new year
+				$('#year-select').val(newYear);
 			}
 			
-			if (currentTopic && yearRange.indexOf(String(newYear)) !== -1) {
-				showDaymap(currentTopic, currentCruncher, newYear);
-			}
+			// Populate grid with new year and apply data
+			populateCalendarGrid(newYear);
+			applyDaymapData();
 		}
 
 		function closeCalendar() {
@@ -678,7 +706,35 @@
 	</template>
 
 	<div id="calendar-modal" class="calendar-modal">
-		<div class="calendar-content"></div>
+		<div class="calendar-content">
+			<div class="calendar-header"></div>
+			<div class="year-selector">
+				<button onclick="changeYear(this, -1)" id="prev-year-btn">← Prev Year</button>
+				<select id="year-select" onchange="changeYear(this, 0)"></select>
+				<button onclick="changeYear(this, 1)" id="next-year-btn">Next Year →</button>
+			</div>
+			<div class="months-grid">
+				<?php
+				$monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+					'July', 'August', 'September', 'October', 'November', 'December'];
+				
+				for ($month = 0; $month < 12; $month++):
+				?>
+				<div class="month-block">
+					<div class="month-name"><?php echo $monthNames[$month]; ?></div>
+					<div class="month-calendar" data-month="<?php echo $month; ?>">
+						<?php
+						// Create 42 empty cells (6 weeks × 7 days)
+						for ($cell = 0; $cell < 42; $cell++):
+						?>
+						<div class="calendar-day"></div>
+						<?php endfor; ?>
+					</div>
+				</div>
+				<?php endfor; ?>
+			</div>
+			<div class="calendar-close"><button onclick="closeCalendar()">Close</button></div>
+		</div>
 	</div>
 </body>
 </html>

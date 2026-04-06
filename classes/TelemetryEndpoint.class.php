@@ -226,9 +226,12 @@ class TelemetryEndpoint {
 			// Fill in actual counts from query results
 			foreach ($result as $row) {
 				$daymap[$row['day']] = intval($row['cnt']);
+				$year = intval(substr($row['day'], 0, 4));
+				$year_totals[$year] = ($year_totals[$year] ?: 0) + intval($row['cnt']);
 			}
-			
-			self::response(["success" => true,"code" => 200,"data" => $daymap,"max_count" => max(array_values($daymap)),"query" => Tm::$db->LAST_QUERY]);
+			$max = $daymap ? max(array_values($daymap)) : 0;
+			$total = array_sum($daymap);
+			self::response(["success" => true,"code" => 200,"data" => $daymap,"count_max" => $max,"count_total" => $total, "year_totals" => $year_totals, "query" => Tm::$db->LAST_QUERY]);
 		} catch (Exception $e) {
 			self::response(["success" => false,"code" => 500,"error" => "Exception while processing daymap for topic " . $topicObj->name . ": " . $e->getMessage()]);
 		}
