@@ -149,9 +149,9 @@ class Telemetry {
 			if (!is_array($crunch)) continue; // allow empty files
 			if (!$crunch['name']) $crunch['name'] = preg_replace("/.*topic-{$topic_name}-([^.]+)\.inc\.php$/","$1",$crunch_file);
 			$crunch = array_merge([
-				'name' => $crunch['name'] ?: "unknown",
+				'name' => $crunch['name'],
 				'input' => "event",
-				'eventtype' => $topic_name,
+				'eventtype' => $crunch['eventtype'],
 			], $crunch);
 			$crunchers[] = $crunch;
 		}

@@ -6,9 +6,9 @@
 class Cruncher {
 	public $name;
 	public $input = "event";
-	public $eventtype;
+	public $eventtype; // = $name
 	public $function;
-	public $table;
+	public $table; // = $name
 	public $table_schema;
 	public $action;
 	public $output_mode;
@@ -17,8 +17,9 @@ class Cruncher {
 	/**
 	 * Constructor
 	 * @param array $data Cruncher configuration data
+	 * @param Topic|null $topicObj Parent topic object (for defaults)
 	 */
-	public function __construct(array $data = []) {
+	public function __construct(array $data = [], $topicObj = null) {
 		foreach ($data as $key => $value) {
 			if (property_exists($this, $key) && $key !== 'customFields') {
 				$this->$key = $value;
@@ -26,6 +27,8 @@ class Cruncher {
 				$this->customFields[$key] = $value;
 			}
 		}
+		if (!$this->eventtype) $this->eventtype = $topicObj ? $topicObj->name : $this->name;
+		if (!$this->table) $this->table = $this->name;
 	}
 
 	/**

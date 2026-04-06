@@ -24,25 +24,28 @@ class Topic implements ArrayAccess {
 		
 		foreach ($data as $key => $value) {
 			if ($key === 'crunchers') {
-				// Special handling for crunchers conversion
-				if (is_array($value)) {
-					foreach ($value as $cruncher_data) {
-						if (is_array($cruncher_data)) {
-							$this->crunchers[] = new Cruncher($cruncher_data);
-						} elseif ($cruncher_data instanceof Cruncher) {
-							$this->crunchers[] = $cruncher_data;
-						}
-					}
-				}
+				// handle at the end to ensure we have values available for defaults
 			} elseif (property_exists($this, $key) && $key !== 'customFields' && $key !== 'name') {
 				$this->$key = $value;
 			} else {
 				$this->customFields[$key] = $value;
 			}
 		}
-		
+
 		// Set defaults for unset fields
-		if (!$data['eventtype']) $this->eventtype = $name;
+		if (!$this->eventtype) $this->eventtype = $name;
+
+		// Handle crunchers separately to apply defaults
+		if (isset($data['crunchers']) && is_array($data['crunchers'])) {
+			foreach ($data['crunchers'] as $cruncher_data) {
+				if (is_array($cruncher_data)) {
+					$this->crunchers[] = new Cruncher($cruncher_data, $this);
+				} elseif ($cruncher_data instanceof Cruncher) {
+					$this->crunchers[] = $cruncher_data;
+				}
+			}
+		}
+		
 	}
 
 	/**
