@@ -267,74 +267,90 @@ class TelemetryCrunch {
 		}
 	}
 
-	static function crunch_flavour($flavour) {
+	static function crunch_flavour($flavour, $crunchersSelected=[]) {
 		$topics = Telemetry::$TOPICS;
 
-		Logger::vlog("Running crunchers for flavour \x1b[38;5;78m{$flavour}\x1b[0m...");
-		foreach($topics as $name=>$topicObj) {
+		// get all crunchers from all topics that match the selected crunchers (if any)
+		$crunchers = [];
+		foreach ($topics as $name=>$topicObj) {
 			/** @var Topic $topicObj */
-
-			foreach($topicObj->crunchers as $num=>$cruncher) {
+			foreach ($topicObj->crunchers as $num=>$cruncher) {
 				/** @var Cruncher $cruncher */
-				$subname = ($cruncher->name ?: "#".($num+1));
-				$colorname = "\x1b[38;5;148m{$name}\x1b[0m";
-				$colordashsubname = "-\x1b[38;5;118m".$subname."\x1b[0m";
-				Logger::vlog("Running cruncher {$colorname}{$colordashsubname}...");
+				$subname = $cruncher->name ?: ($num+1);
+				$fullcrunchername = "{$name}/{$subname}";
+				if (in_array($fullcrunchername, $crunchersSelected)) {
+					$crunchers[] = [
+						'topic' => $name,
+						'subname' => $subname,
+						'obj' => $cruncher,
+					];
+				}
+			}
+		}
 
-				// create if needed
-				if ($cruncher->table_schema !== null && $cruncher->table !== null) {
+		Logger::vlog("Running crunchers for flavour \x1b[38;5;78m{$flavour}\x1b[0m...");
+		foreach($crunchers as $cruncherInfo) {
+			/** @var Cruncher $cruncher */
+			$cruncher = $cruncherInfo['obj'];
+			$name = $cruncherInfo['topic'];
+			$subname = $cruncherInfo['subname'];
+			$colorname = "\x1b[38;5;148m{$name}\x1b[0m";
+			$colordashsubname = "-\x1b[38;5;118m".$subname."\x1b[0m";
+			Logger::vlog("Running cruncher {$colorname}{$colordashsubname}...");
+
+			// create if needed
+			if ($cruncher->table_schema !== null && $cruncher->table !== null) {
+				$table = $cruncher->table;
+				Tm::$db->query("SHOW CREATE TABLE {$table}");
+				if (Tm::$db->error()) {
+					Logger::vlog("\x1b[31;1mTable '{$table}' for cruncher '{$subname}' does not exist, creating...\x1b[0m");
+					$schema_sql = $cruncher->table_schema;
+					$schema_sql = str_replace("<TABLE>",$table,$schema_sql);
+					Tm::$db->query($schema_sql);
+					if (Tm::$db->error()) 
+						throw new Exception("Failed to create table `{$table}`: ".Tm::$db->error());
+					Logger::vlog("Table '{$table}' created.");
+				}
+			}
+
+			// start fetching new events to process:
+
+			$flavnum = Tm::flavnum($flavour);
+			$type = $cruncher->eventtype ?: $name;
+			// get starting point
+			$max_id = Tm::$db->query_one(Tm::$db->qesc("SELECT IFNULL(MAX(event_id),0) FROM {$table} WHERE flavnum={d}",$flavnum)) ?: 0;
+			Logger::vlog("Processing {$type} events, starting with index {$max_id}...");
+
+			// get new events
+			$getquery = Tm::$db->qesc("SELECT * FROM events WHERE flavnum={d} AND type={s} AND id>{d}",$flavnum,$type,$max_id);
+			//Logger::vlog("DEBUG: getquery: $getquery");
+			$getrequest = Tm::$db->query($getquery);
+
+			if ($getrequest->num_rows==0) {
+				Logger::vlog("No new {$name}-{$subname} events to process.");
+				continue;
+			}
+			Logger::vlog("Found ".strval($getrequest->num_rows)." records, processing...");
+			
+			$count = 0;
+			while ($event = $getrequest->fetch_assoc()) {
+				$count++;
+				//Logger::vlog("Processing ".strval($count)."/".strval($getrequest->num_rows));
+
+				$func = $cruncher->function;
+				$fields = $func($event);
+
+				if ($cruncher->action === "insert" && $cruncher->table !== null) {
 					$table = $cruncher->table;
-					Tm::$db->query("SHOW CREATE TABLE {$table}");
-					if (Tm::$db->error()) {
-						Logger::vlog("\x1b[31;1mTable '{$table}' for cruncher '{$subname}' does not exist, creating...\x1b[0m");
-						$schema_sql = $cruncher->table_schema;
-						$schema_sql = str_replace("<TABLE>",$table,$schema_sql);
-						Tm::$db->query($schema_sql);
-						if (Tm::$db->error()) 
-							throw new Exception("Failed to create table `{$table}`: ".Tm::$db->error());
-						Logger::vlog("Table '{$table}' created.");
-					}
+					$insertquery = Tm::$db->qarrayesc("INSERT INTO {$table} ({keys}) VALUES ({values})",$fields);
+					$insertrequest = Tm::$db->query($insertquery);
+					if (Tm::$db->affected_rows()!=1) throw new Exception("FAILED to insert crunched event id {$event['id']} into {$table}");
+					if (Tm::$db->error()) throw new Exception("ERROR inserting event id {$event['id']} into {$table}: ".Tm::$db->error());
 				}
+			}
 
-				// start fetching new events to process:
-
-				$flavnum = Tm::flavnum($flavour);
-				$type = $cruncher->eventtype ?: $name;
-				// get starting point
-				$max_id = Tm::$db->query_one(Tm::$db->qesc("SELECT IFNULL(MAX(event_id),0) FROM {$table} WHERE flavnum={d}",$flavnum)) ?: 0;
-				Logger::vlog("Processing {$type} events, starting with index {$max_id}...");
-
-				// get new events
-				$getquery = Tm::$db->qesc("SELECT * FROM events WHERE flavnum={d} AND type={s} AND id>{d}",$flavnum,$type,$max_id);
-				//Logger::vlog("DEBUG: getquery: $getquery");
-				$getrequest = Tm::$db->query($getquery);
-
-				if ($getrequest->num_rows==0) {
-					Logger::vlog("No new {$name}-{$subname} events to process.");
-					continue;
-				}
-				Logger::vlog("Found ".strval($getrequest->num_rows)." records, processing...");
-				
-				$count = 0;
-				while ($event = $getrequest->fetch_assoc()) {
-					$count++;
-					//Logger::vlog("Processing ".strval($count)."/".strval($getrequest->num_rows));
-
-					$func = $cruncher->function;
-					$fields = $func($event);
-
-					if ($cruncher->action === "insert" && $cruncher->table !== null) {
-						$table = $cruncher->table;
-						$insertquery = Tm::$db->qarrayesc("INSERT INTO {$table} ({keys}) VALUES ({values})",$fields);
-						$insertrequest = Tm::$db->query($insertquery);
-						if (Tm::$db->affected_rows()!=1) throw new Exception("FAILED to insert crunched event id {$event['id']} into {$table}");
-						if (Tm::$db->error()) throw new Exception("ERROR inserting event id {$event['id']} into {$table}: ".Tm::$db->error());
-					}
-				}
-
-				if ($cruncher->action === "insert") {
-					Logger::vlog("Added ".strval($count)." new {$name}-{$subname} records.");
-				}
+			if ($cruncher->action === "insert") {
+				Logger::vlog("Added ".strval($count)." new {$name}-{$subname} records.");
 			}
 		}
 		Logger::vlog("Crunchers for flavour \x1b[38;5;78m{$flavour}\x1b[0m complete.");

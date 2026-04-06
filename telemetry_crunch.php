@@ -19,7 +19,16 @@ require_once "includes/shell.class.php";
 
 //pcntl_signal(SIGINT,function() { write_error_to_status(E_ERROR,"Terminated",__FILE__,__LINE__); die(); return true; });
 
-Telemetry::config();
+Telemetry::startup();
+
+// build array of crunchers in format "topic/crunchername" for better_getopt validation
+$valid_crunchers = array_merge(...array_values(array_map(
+	function($topic) {
+		return array_map(
+			function($cruncher,$idx) use ($topic) { return $topic->name."/".($cruncher->name?:($idx+1)); },
+			$topic->crunchers, array_keys($topic->crunchers)
+		);
+	}, Telemetry::$TOPICS)));
 
 $OPTS = \Zygor\Shell::better_getopt([
 	['f:','flavour:',      array_keys(Telemetry::$CFG['WOW_FLAVOUR_DATA'])],
@@ -30,17 +39,22 @@ $OPTS = \Zygor\Shell::better_getopt([
 	['',  'debug',         false],
 	['',  'debug-lua',     false],
 	['v', 'verbose',       false],
+	['c:','crunchers:',    $valid_crunchers], // which crunchers to run (format: topic/crunchername or topic/number), default all
 	['',  'verboseflags:', []],
 ]);
 $FLAVOURS = (array)$OPTS['f'];
 if (substr($OPTS['start-day'],0,1)=="-") $OPTS['start-day']=date("Ymd",strtotime($OPTS['start-day']." days"));
 $OPTS["MAX_DAYS"]=$OPTS['maxdays'];
 
+$crunchers = (array)$OPTS['crunchers'];
+if (array_diff($crunchers,$valid_crunchers)) {
+	throw new ErrorException("Invalid cruncher specified (".implode(",",$crunchers)."). Valid crunchers are: ".implode(", ",$valid_crunchers));
+}
+
 Telemetry::startup($OPTS);
 Telemetry::dump_config();
-TelemetryScrape::startup();
 
-foreach ($FLAVOURS as $flav) TelemetryCrunch::crunch_flavour($flav);
+foreach ($FLAVOURS as $flav) TelemetryCrunch::crunch_flavour($flav,$crunchers);
 
 
 
