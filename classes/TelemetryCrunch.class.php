@@ -320,19 +320,19 @@ class TelemetryCrunch {
 					$count++;
 					//Logger::vlog("Processing ".strval($count)."/".strval($getrequest->num_rows));
 
-				$func = $cruncher->function;
-				$fields = $func($event);
+					$func = $cruncher->function;
+					$fields = $func($event);
 
-				if ($cruncher->action === "insert" && $cruncher->table !== null) {
-					$table = $cruncher->table;
-					$insertquery = Tm::$db->qarrayesc("INSERT INTO {$table} ({keys}) VALUES ({values})",$fields);
-					$insertrequest = Tm::$db->query($insertquery);
-					if (Tm::$db->affected_rows()!=1) throw new Exception("FAILED to insert crunched event id {$event['id']} into {$table}");
-					if (Tm::$db->error()) throw new Exception("ERROR inserting event id {$event['id']} into {$table}: ".Tm::$db->error());
+					if ($cruncher->action === "insert" && $cruncher->table !== null) {
+						$table = $cruncher->table;
+						$insertquery = Tm::$db->qarrayesc("INSERT INTO {$table} ({keys}) VALUES ({values})",$fields);
+						$insertrequest = Tm::$db->query($insertquery);
+						if (Tm::$db->affected_rows()!=1) throw new Exception("FAILED to insert crunched event id {$event['id']} into {$table}");
+						if (Tm::$db->error()) throw new Exception("ERROR inserting event id {$event['id']} into {$table}: ".Tm::$db->error());
+					}
 				}
-			}
 
-			if ($cruncher->action === "insert") {
+				if ($cruncher->action === "insert") {
 					Logger::vlog("Added ".strval($count)." new {$name}-{$subname} records.");
 				}
 			}
