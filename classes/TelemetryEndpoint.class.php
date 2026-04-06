@@ -272,6 +272,7 @@ class TelemetryEndpoint {
 				"code" => 200,
 				"id" => intval(isset($_REQUEST['id']) ? $_REQUEST['id'] : 0),
 				"data" => $daymap,
+				"max_count" => max(array_values($daymap)),
 				"query" => Tm::$db->LAST_QUERY,
 			]);
 		} catch (Exception $e) {

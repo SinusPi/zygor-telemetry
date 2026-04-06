@@ -449,10 +449,16 @@ tr.topic-row {
 								background:transparent;
 							}
 
-							&.has-data {
-								background-color: #4caf50;
-								
-							}
+							&.heat-1 { background-color: #e8f5e9; }
+							&.heat-2 { background-color: #c8e6c9; }
+							&.heat-3 { background-color: #a5d6a7; }
+							&.heat-4 { background-color: #81c784; }
+							&.heat-5 { background-color: #66bb6a; }
+							&.heat-6 { background-color: #4caf50; }
+							&.heat-7 { background-color: #43a047; }
+							&.heat-8 { background-color: #388e3c; }
+							&.heat-9 { background-color: #2e7d32; }
+							&.heat-10 { background-color: #1b5e20; }
 						}
 					}
 				}

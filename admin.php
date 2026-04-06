@@ -439,9 +439,9 @@
 				success: function(response) {
 					if (response.success) {
 						// Cache the response for future year selections
-						window.daymapCache = response.data;
+						window.daymapCache = response;
 						window.daymapCacheTopic = topicName;
-						displayCalendar(topicName, response.data, currentYear);
+						displayCalendar(topicName, response, currentYear);
 					} else {
 						alert('Error loading daymap: ' + (response.error || 'Unknown error') + 
 							(response.errcode ? ' (' + response.errcode + ')' : ''));
@@ -468,8 +468,12 @@
 			});
 		}
 
-		function displayCalendar(topicName, daymap, year) {
+		function displayCalendar(topicName, daymapObj, year) {
 			var html = '<div class="calendar-header">' + escapeHtml(topicName) + '</div>';
+			
+			// Extract data and max_count
+			var daymap = daymapObj.data || daymapObj;
+			var maxCount = daymapObj.max_count || 1;
 			
 			// Extract years that have data
 			var yearsWithData = {};
@@ -532,8 +536,15 @@
 				var daysInMonth = new Date(year, month + 1, 0).getDate();
 				for (var day = 1; day <= daysInMonth; day++) {
 					var dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
-					var hasData = daymap[dateStr] && daymap[dateStr] > 0;
-					html += '<div class="calendar-day' + (hasData ? ' has-data' : '') + '" title="' + day + '">'+day+'</div>';
+					var count = daymap[dateStr] || 0;
+					var heatLevel = 0;
+					if (count > 0 && maxCount > 0) {
+						var ratio = count / maxCount;
+						heatLevel = Math.ceil(ratio * 10);
+						if (heatLevel > 10) heatLevel = 10;
+					}
+					var heatClass = count > 0 ? ' heat-' + heatLevel : '';
+					html += '<div class="calendar-day' + heatClass + '" title="' + count + '"></div>';
 				}
 				
 				html += '</div>';
