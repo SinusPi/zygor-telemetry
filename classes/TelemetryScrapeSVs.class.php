@@ -283,7 +283,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		Logger::log("Starting scrape of flavour '\x1b[38;5;78m{$flavour}\x1b[0m' in \x1b[33;1m{$sync_path}\x1b[0m.");
 
 		// get svfiles that may have fresh data for the topics listed
-		$gen_fresh_svfiles = self::get_fresh_files_gen(array_keys($topics_sv), $sync_path, self::$CFG['filemask'], __CLASS__.'::file_path_to_slug', "sv", self::$CFG['BATCH_SIZE']);
+		$gen_fresh_svfiles = self::get_fresh_files_gen(array_keys($topics_sv), $sync_path, self::$CFG['filemask'], [__CLASS__,'file_path_to_slug'], "sv", self::$CFG['BATCH_SIZE']);
 
 		// narrow down per configuration
 		$gen_narrowed_svfiles_1 = Telemetry::filter_gen($gen_fresh_svfiles, function($file) {
@@ -402,7 +402,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 
 			// DB STORE TIME!
 
-			$inserted = Telemetry::$db->store_datapoints($flavour,$file->id,$extracted['datapoints']);
+			$inserted = Telemetry::$db->store_datapoints(Telemetry::flavnum($flavour),$file->id,$extracted['datapoints']);
 			Logger::vlog("Datapoints inserted into DB: $inserted");
 
 			$totals['inserted_datapoints'] += $inserted;
