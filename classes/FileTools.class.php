@@ -11,18 +11,32 @@ class FileTools {
 		$recursiveDir = function($dir, $depthlimit) use (&$recursiveDir, $afterPattern) {
 			if (!is_dir($dir)) return;
 			
-			$files = glob("$dir/$afterPattern", GLOB_NOSORT);
-			foreach ($files as $file) {
-				if (is_file($file)) yield $file;
-			}
+			$handle = @opendir($dir);
+			if (!$handle) return;
 			
-			if ($depthlimit <= 0) return; // don't go deeper
-			$subdirs = glob("$dir/*", GLOB_ONLYDIR | GLOB_NOSORT);
-			foreach ($subdirs as $subdir) {
-				foreach ($recursiveDir($subdir, $depthlimit - 1) as $file) {
-					yield $file;
+			$subdirs = [];
+			
+			// Scan directory: yield matching files, collect subdirectories for recursion
+			while (false !== ($entry = readdir($handle))) {
+				if ($entry === '.' || $entry === '..') continue;
+				
+				$fullPath = $dir . DIRECTORY_SEPARATOR . $entry;
+				if (is_file($fullPath)) {
+					if (fnmatch($afterPattern, $entry)) {
+						yield $fullPath;
+					}
+				} elseif (is_dir($fullPath)) {
+					// Recurse into subdirectories
+					if ($depthlimit > 0) {
+						foreach ($recursiveDir($fullPath, $depthlimit - 1) as $file) {
+							yield $file;
+						}
+					}
 				}
 			}
+			
+			closedir($handle);
+			
 		};
 		
 		foreach ($recursiveDir($startfolder, $depthlimit) as $file) {
