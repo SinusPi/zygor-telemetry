@@ -512,7 +512,6 @@
 			
 			var monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
 				'July', 'August', 'September', 'October', 'November', 'December'];
-			var dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 			
 			// Iterate through each month
 			for (var month = 0; month < 12; month++) {
@@ -520,18 +519,13 @@
 				html += '<div class="month-name">' + monthNames[month] + '</div>';
 				html += '<div class="month-calendar">';
 				
-				// Day headers
-				$.each(dayNames, function(idx, day) {
-					html += '<div class="calendar-day header">' + day + '</div>';
-				});
-				
-				// Get the first day of the month and padding
-				var firstDay = new Date(year, month, 1);
-				var padding = firstDay.getDay();
+				// Calculate padding for first day of month
+				var firstDay = new Date(year, month, 1).getDay();
+				var padding = firstDay;
 				
 				// Add padding
 				for (var p = 0; p < padding; p++) {
-					html += '<div class="calendar-day"></div>';
+					html += '<div class="calendar-day padding-cell"></div>';
 				}
 				
 				// Add days of the month
@@ -539,7 +533,7 @@
 				for (var day = 1; day <= daysInMonth; day++) {
 					var dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
 					var hasData = daymap[dateStr] && daymap[dateStr] > 0;
-					html += '<div class="calendar-day' + (hasData ? ' has-data' : '') + '">' + day + '</div>';
+					html += '<div class="calendar-day' + (hasData ? ' has-data' : '') + '" title="' + day + '">'+day+'</div>';
 				}
 				
 				html += '</div>';
@@ -586,6 +580,14 @@
 		function closeCalendar() {
 			$('#calendar-modal').removeClass('active');
 		}
+
+		// Close modal when clicking outside the content area
+		$(document).on('click', function(e) {
+			var $modal = $('#calendar-modal');
+			if ($modal.hasClass('active') && e.target.id === 'calendar-modal') {
+				closeCalendar();
+			}
+		});
 	</script>
 
 	<!-- HTML Templates for table rows -->
