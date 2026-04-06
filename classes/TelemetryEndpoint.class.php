@@ -71,6 +71,8 @@ class TelemetryEndpoint {
 					$table = $cruncher->table;
 					$crunchers_list[] = [
 						'index' => $idx,
+						'name' => $cruncher->name,
+						'input' => $cruncher->input,
 						'eventtype' => $eventtype,
 						'table' => $table,
 					];

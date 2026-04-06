@@ -17,7 +17,7 @@
 				<thead>
 					<tr>
 						<th>Topic Name</th>
-						<th>Scraper Source</th>
+						<th>Scraper</th>
 						<th>Crunchers</th>
 						<th>Endpoint</th>
 						<th>View</th>
@@ -267,10 +267,14 @@
 					
 					// Add sub-rows for each cruncher
 					if (topic.crunchers_list && topic.crunchers_list.length > 0) {
+						// Add header row for crunchers batch
+						var headerTemplate = document.querySelector('#cruncher-header-template');
+						tbody.append(headerTemplate.content.cloneNode(true));
+						
 						$.each(topic.crunchers_list, function(idx, cruncher) {
 							var crunRow = crunTemplate.content.cloneNode(true);
-							$(crunRow).find('[data-field="label"]').text('↳ Cruncher ' + cruncher.index);
-							$(crunRow).find('[data-field="eventtype"]').text(cruncher.eventtype);
+							$(crunRow).find('[data-field="label"]').text('↳ ' + (cruncher.name || (idx+1)));
+							$(crunRow).find('[data-field="input"]').text(cruncher.input=="event" ? `Event '${cruncher.eventtype}'` : escapeHtml(cruncher.input));
 							$(crunRow).find('[data-field="table"]').html(cruncher.table ? escapeHtml(cruncher.table) : '<em>N/A</em>');
 							tbody.append(crunRow);
 						});
@@ -615,8 +619,16 @@
 	<template id="cruncher-row-template">
 		<tr class="cruncher-sub-row">
 			<td class="cruncher-indent" data-field="label"></td>
-			<td><code data-field="eventtype"></code></td>
+			<td><code data-field="input"></code></td>
 			<td colspan="4"><code class="table-name" data-field="table"></code></td>
+		</tr>
+	</template>
+
+	<template id="cruncher-header-template">
+		<tr class="cruncher-header-row">
+			<td class="cruncher-header" style="font-weight: bold; padding: 8px 4px 4px 20px;">Cruncher</td>
+			<td class="cruncher-header" style="font-weight: bold;">Source</td>
+			<td class="cruncher-header" colspan="4" style="font-weight: bold;">Dest. Table</td>
 		</tr>
 	</template>
 
