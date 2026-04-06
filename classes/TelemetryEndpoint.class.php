@@ -172,9 +172,7 @@ class TelemetryEndpoint {
 		$topicendpoint = $topicObj ? $topicObj->endpoint : null;
 		$variant = isset($_REQUEST['variant']) ? $_REQUEST['variant'] : null;
 		if ($variant === 'daymap') { // doesn't need queryfunc
-			$crunchers = $topicObj->crunchers;
-			$cruncher = isset($_REQUEST['cruncher']) ? $_REQUEST['cruncher'] : 0;
-			$cruncherObj = isset($crunchers[$cruncher]) ? $crunchers[$cruncher] : null;
+			$cruncherObj = isset($_REQUEST['cruncher']) ? $topicObj->getCruncher($_REQUEST['cruncher']) : null;
 			return self::serveDataRequestDaymap($topicObj, $cruncherObj, $from, $to, $flavnum);
 		}
 		if (!$topicendpoint || !is_callable($topicendpoint[$variant])) {
@@ -190,10 +188,14 @@ class TelemetryEndpoint {
 	}
 
 	static function serveDataRequestDaymap($topicObj, $cruncherObj=null, $from, $to, $flavnum) {
-		$table = isset($cruncherObj) ? $cruncherObj->table : "events"; // default to "events" if no specific cruncher provided
-
-		if (!$table) {
-			self::response(["success" => false,"code" => 400,"error" => "Cruncher does not have a database table configured","errcode" => "NO_TABLE"]);
+		if (isset($cruncherObj)) {
+			if (!$cruncherObj->table) 
+				self::response(["success" => false,"code" => 400,"error" => "Cruncher does not have a database table configured","errcode" => "NO_TABLE"]);
+			$table = $cruncherObj->table;
+			$andtype = "";
+		} else {
+			$table = "events"; // will default to "events" in the query if not specified
+			$andtype = " AND `type`='" . Telemetry::$db->escape($topicObj->name) . "'";
 		}
 
 		try {
@@ -203,7 +205,7 @@ class TelemetryEndpoint {
 				$query = Telemetry::$db->query(
 					"SELECT FROM_UNIXTIME(`time`, '%Y-%m-%d') as day, COUNT(*) as cnt
 					FROM $table
-					WHERE `flavnum`={d} AND `time`>={d} AND `time`<{d}
+					WHERE `flavnum`={d} AND `time`>={d} AND `time`<{d} $andtype
 					GROUP BY day
 					ORDER BY day ASC",
 					$flavnum, $from, $to

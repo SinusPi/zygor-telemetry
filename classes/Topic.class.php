@@ -177,4 +177,13 @@ class Topic implements ArrayAccess {
 				break;
 		}
 	}
+
+	public function getCruncher($nameOrIndex) {
+		foreach ($this->crunchers as $idx => $cruncher) {
+			if ($cruncher->name === $nameOrIndex || $idx === intval($nameOrIndex)-1) {
+				return $cruncher;
+			}
+		}
+		return null;
+	}
 }

@@ -277,7 +277,8 @@
 							$(crunRow).find('[data-field="input"]').text(cruncher.input=="event" ? `Event '${cruncher.eventtype}'` : escapeHtml(cruncher.input));
 							$(crunRow).find('[data-field="table"]').html(cruncher.table ? escapeHtml(cruncher.table) : '<em>N/A</em>');
 							$(crunRow).find('[data-field="actions"]')
-								.on('click', function() { showDaymap(topic.name, cruncher.name || idx); })
+								.on('click', function() { showDaymap(topic.name, cruncher.name || (idx+1)); })
+								.attr('title', `Show daymap for ${topic.name} - ${cruncher.name || ('Cruncher #' + (idx+1))}`)
 								.text('daymap');
 							tbody.append(crunRow);
 						});
@@ -421,10 +422,13 @@
 			
 			// Fetch full history from 2000 to current year on first load
 			// If we already have cached data, use that instead
+
+			/*
 			if (window.daymapCache && window.daymapCacheTopic === topicName && window.daymapCacheCruncher === cruncherName) {
 				displayCalendar(topicName, window.daymapCache, currentYear);
 				return;
 			}
+			*/
 			
 			var fromDate = new Date(2000, 0, 1).toISOString().split('T')[0];
 			var toDate = new Date(currentYear, 11, 31).toISOString().split('T')[0];
@@ -434,6 +438,7 @@
 				type: 'GET',
 				data: {
 					topic: topicName,
+					cruncher: cruncherName,
 					from: fromDate,
 					to: toDate,
 					flavour: 'wow',
