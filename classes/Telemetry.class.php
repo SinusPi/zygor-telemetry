@@ -103,7 +103,6 @@ class Telemetry {
 	}
 
 	static function load_topics() {
-		$topics = [];
 		foreach (glob("topic-*.inc.php") as $topic_file) {
 			$topic_name = preg_replace("/^.*topic-(.*)\\.inc\\.php$/","$1",$topic_file);
 			if (preg_match("/[^a-z0-9_]/i",$topic_name)) continue;
@@ -111,14 +110,9 @@ class Telemetry {
 			if (!$topic_data) continue;
 			if ($topic_data['crunchers_load']) $topic_data['crunchers'] = self::load_topic_crunchers($topic_name); // if a topic has many crunchers for its subtypes
 			
-			// Create Topic object instead of storing raw array
-			$topic = new Topic($topic_name, $topic_data);
-			$topics[$topic_name] = $topic;
+			self::$TOPICS[$topic_name] = new Topic($topic_name, $topic_data);
 		}
-
-		self::$TOPICS = $topics;
-
-		return $topics;
+		return self::$TOPICS;
 	}
 
 	static function dump_topics() {

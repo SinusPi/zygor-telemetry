@@ -22,6 +22,7 @@ require_once "includes/shell.class.php";
 //pcntl_signal(SIGINT,function() { write_error_to_status(E_ERROR,"Terminated",__FILE__,__LINE__); die(); return true; });
 
 Telemetry::config();
+Telemetry::load_topics();
 
 $OPTS = (array)\Zygor\Shell::better_getopt([
 	['f:','flavour:',      array_keys(Telemetry::$CFG['WOW_FLAVOUR_DATA'])],
@@ -35,6 +36,7 @@ $OPTS = (array)\Zygor\Shell::better_getopt([
 	['',  'today-too',     false],
 	['v', 'verbose',       false],
 	['i:','input:',        $valid_inputs=array_keys(TelemetryScrape::list_scrapers())], // which sources to scrape (e.g. sv, packagerlog, etc.)
+	['t:','topics:',	   $valid_topics=array_keys(Telemetry::$TOPICS)], // which topics to scrape (default all) - format: topic1,topic2 or topic1/* for all crunchers within a topic
 	['',  'verboseflags:', []],
 ]);
 $FLAVOURS = $OPTS['f'];
@@ -46,15 +48,19 @@ Telemetry::dump_config();
 TelemetryScrape::startup();
 
 $inputs = $OPTS['input'];
+$topics = $OPTS['topics'];
 
 try {
 	if (array_diff($inputs,$valid_inputs)) {
 		throw new ErrorException("Invalid input type specified (".implode(",",$inputs)."). Valid types are: ".implode(", ",$valid_inputs));
 	}
+	if (array_diff($topics,$valid_topics)) {
+		throw new ErrorException("Invalid topic specified (".implode(",",$topics)."). Valid topics are: ".implode(", ",$valid_topics));
+	}
 	if (in_array("sv",$inputs)) {
 		try	{
 			echo "*** Scraping source: SVs\n";
-			foreach ($FLAVOURS as $flav) TelemetryScrapeSVs::scrape($flav);
+			foreach ($FLAVOURS as $flav) TelemetryScrapeSVs::scrape($flav,$topics);
 			echo "*** Done scraping SVs.\n";
 		} catch (MinorError $e) {
 			echo "Failed: ".$e->getMessage()."\n";
@@ -63,7 +69,7 @@ try {
 	if (in_array("packagerlog",$inputs)) {
 		try {
 			echo "*** Scraping source: Packager Logs\n";
-			TelemetryScrapePackagerLog::scrape();
+			TelemetryScrapePackagerLog::scrape($topics);
 		} catch (MinorError $e) {
 			echo "Failed: ".$e->getMessage()."\n";
 		}

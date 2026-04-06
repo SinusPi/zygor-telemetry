@@ -84,10 +84,11 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 	/**
 	 * Grab data from SVs, store into db
 	 * @param string $flavour
+	 * @param string[] $topics
 	 */
-	static function scrape($flavour) {
+	static function scrape($flavour, $topics_selected=[]) {
 		if (!Telemetry::is_ready()) throw new Exception("Telemetry core not initialized");
-		return self::scrape2($flavour); // new scrape method with generator for files, but keep old one for now for comparison and safety
+		return self::scrape2($flavour, $topics_selected); // new scrape method with generator for files, but keep old one for now for comparison and safety
 
 		// THE REST IS DEPRECATED
 
@@ -100,14 +101,14 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			return;
 		}
 
+		/** @var Topic[] $topics */
 		$topics = Telemetry::$TOPICS;
-		$topics = array_filter($topics, function($t) { 
-			/** @var Topic $t */
-			return (isset($t->scraper['input']) ? $t->scraper['input'] : "") == "sv"; 
-		});
+		if ($topics_selected) $topics = array_filter($topics, function($t,$name) use ($topics_selected) { return in_array($name, $topics_selected); }, ARRAY_FILTER_USE_BOTH);
+		$topics = array_filter($topics, function($t) { return (isset($t->scraper['input']) && $t->scraper['input'] == "sv"); });
+
 		$sync_path = Tm::cfgstr('SV_STORAGE_FLAVOUR_PATH',["FLAVOUR"=>$flavour]);
 
-		Logger::log("Starting scrape of flavour '\x1b[38;5;78m{$flavour}\x1b[0m' in \x1b[33;1m{$sync_path}\x1b[0m.");
+		Logger::log("Starting scrape of flavour '\x1b[38;5;78m{$flavour}\x1b[0m' topics ".implode(", ", array_map(function($t) { return $t->name; }, $topics))." in \x1b[33;1m{$sync_path}\x1b[0m.");
 
 		TmSt::stat(['status'=>"ENUMERATING",'stage'=>1,'stageof'=>2,'flavour'=>$flavour,'progress'=>[],'time_started'=>time(),'time_started_hr'=>date("Y-m-d H:i:s")]);		
 
@@ -264,7 +265,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 	 * Grab data from SVs, store into db
 	 * @param string $flavour
 	 */
-	static function scrape2($flavour) {
+	static function scrape2($flavour, $topics_selected=[]) {
 		if (!in_array($flavour,array_keys(self::$CFG['WOW_FLAVOUR_DATA']))) throw new ErrorException("Unsupported flavour '{$flavour}' (supported: ".join(", ",array_keys(self::$CFG['WOW_FLAVOUR_DATA'])).")");
 
 		self::$logtag = "SCRAPE-".strtoupper(str_replace("-","_", $flavour));
@@ -274,13 +275,13 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			return;
 		}
 
-		$topics_sv = array_filter(Telemetry::$TOPICS, function($t) { 
-			/** @var Topic $t */
-			return (isset($t->scraper['input']) ? $t->scraper['input'] : "") == "sv"; 
-		});
+		/** @var Topic[] $topics_sv */
+		$topics_sv = array_filter(Telemetry::$TOPICS, function($t) { return (isset($t->scraper['input']) && $t->scraper['input'] == "sv"); }, ARRAY_FILTER_USE_BOTH);
+		if ($topics_selected) $topics_sv = array_filter($topics_sv, function($t,$name) use ($topics_selected) { return in_array($name, $topics_selected); }, ARRAY_FILTER_USE_BOTH);
+
 		$sync_path = Tm::cfgstr('SV_STORAGE_FLAVOUR_PATH',["FLAVOUR"=>$flavour]);
 
-		Logger::log("Starting scrape of flavour '\x1b[38;5;78m{$flavour}\x1b[0m' in \x1b[33;1m{$sync_path}\x1b[0m.");
+		Logger::log("Starting scrape of flavour '\x1b[38;5;78m{$flavour}\x1b[0m' topics ".implode(", ", array_map(function($t) { return "'".$t->name."'"; }, $topics_sv))." in \x1b[33;1m{$sync_path}\x1b[0m.");
 
 		// get svfiles that may have fresh data for the topics listed
 		$gen_fresh_svfiles = self::get_fresh_files_gen(array_keys($topics_sv), $sync_path, self::$CFG['filemask'], [__CLASS__,'file_path_to_slug'], "sv", self::$CFG['BATCH_SIZE']);
