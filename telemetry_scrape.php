@@ -29,6 +29,7 @@ $OPTS = (array)\Zygor\Shell::better_getopt([
 	['',  'maxdays:',      999999], // use to limit how far back to scrape, for debugging only
 	['',  'ignore-mtimes', false], // that is: limit by maxdays... or even not at all
 	['',  'start-day:',    "20000101"], // similar to maxdays, but explicit date
+	['',  'end-day:',      date("Ymd")],
 	['',  'limit:',        null], // stop after N files
 	['',  'debug',         false],
 	['',  'debug-lua',     false],

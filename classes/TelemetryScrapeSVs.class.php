@@ -287,16 +287,29 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		$gen_fresh_svfiles = self::get_fresh_files_gen(array_keys($topics_sv), $sync_path, self::$CFG['filemask'], [__CLASS__,'file_path_to_slug'], "sv", self::$CFG['BATCH_SIZE']);
 
 		// narrow down per configuration
-		$gen_narrowed_svfiles_1 = Telemetry::filter_gen($gen_fresh_svfiles, function($file) {
-			return (isset(self::$CFG['TELEMETRY_FILE_AGE']) && (time() - $file->mtime > self::$CFG['TELEMETRY_FILE_AGE']*DAY) ? false : true);
+		$gen_narrowed_svfiles = Telemetry::filter_gen($gen_fresh_svfiles, function($file) {
+			// too old, excluded
+			if (isset(self::$CFG['TELEMETRY_FILE_AGE']) && (time() - $file->mtime > self::$CFG['TELEMETRY_FILE_AGE']*DAY)) {
+				Logger::vlog("-- ".$file->fullpath.": too old for TELEMETRY_FILE_AGE");
+				return false;
+			}
+			// skip today's files if not explicitly included
+			if (!self::$CFG['today-too'] && date("Ymd", $file->mtime) == date("Ymd", time())) {
+				Logger::vlog("-- ".$file->fullpath.": mtime today, but --today-too is off");
+				return false;
+			}
+			// too old to possibly contain newer data
+			// NO. Still need to mark as scraped, even if we ignore data within.
+			/*
+			if (isset(self::$CFG['start-day']) && $file->mtime < strtotime(self::$CFG['start-day'])) {
+				Logger::vlog("-- ".$file->fullpath.": too old for --start-day");
+				return false;
+			}
+			*/
+			return true;
 		});
 
-		// skip today's files if not explicitly included
-		$gen_narrowed_svfiles_2	= Telemetry::filter_gen($gen_narrowed_svfiles_1, function($file) {
-			return (!self::$CFG['today-too'] || date("Ymd", $file->mtime) != date("Ymd", time()));
-		});
-
-		foreach ($gen_narrowed_svfiles_2 as $n => $file) {
+		foreach ($gen_narrowed_svfiles as $n => $file) {
 			$fresh_topics_in_file = array_filter($topics_sv, function($topic,$name) use ($file) { return $file->topics[$name]['fresh']; },ARRAY_FILTER_USE_BOTH);
 			self::process_single_sv_file($flavour, $file, $fresh_topics_in_file, $totals);
 
@@ -391,7 +404,19 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			$times = $extracted['times'];
 			Logger::vlog("Datapoints extracted by type: " . join(", ", array_map(function ($item, $key) use ($times) { return "\x1b[38;5;72m$key\x1b[0m:{$item} ({$times[$key]}s)"; }, array_values($counts), array_keys($counts))));
 
+			// strip old data
 			$extracted['datapoints'] = array_values(array_filter($extracted['datapoints'], function ($dp) use ($file) {  return $dp['time'] > $file->topics[$dp['type']]['last_event_time'];  })); // only new events
+			
+			// strip by start-day
+			if (isset(self::$CFG['start-day'])) {
+				$extracted['datapoints'] = array_values(array_filter($extracted['datapoints'], function ($dp) { return $dp['time'] >= strtotime(self::$CFG['start-day']); })); // only new events
+				//Logger::vlog("+ removing older than ".strtotime(self::$CFG['start-day']));
+			}
+			if (isset(self::$CFG['end-day'])) {
+				$extracted['datapoints'] = array_values(array_filter($extracted['datapoints'], function ($dp) { return $dp['time'] < strtotime(self::$CFG['end-day']+86400); })); // only new events
+				//Logger::vlog("+ removing newer than ".strtotime(self::$CFG['end-day']));
+			}
+
 			$newest_per_topic = array_reduce($extracted['datapoints'], function($carry, $dp) {
 				if (!isset($carry[$dp['type']]) || $dp['time'] > $carry[$dp['type']]) {
 					$carry[$dp['type']] = $dp['time'];
@@ -542,11 +567,10 @@ ENDLUA;
 		$lua = $lua_head . $lua_extractors . $lua_foot;
 
 		$lua = preg_replace_callback("/%([A-Z_]+)%/",function($s) use ($flavour) { return self::$CFG['WOW_FLAVOUR_DATA'][$flavour][$s[1]]; },$lua);
-		if (self::$CFG['debug_lua']) {
-			echo $lua;
+		if (self::$CFG['debug-lua']) {
 			file_put_contents("last_lua.lua",$sv_raw);
 			file_put_contents("last_lua.lua",$lua,FILE_APPEND);
-			self::$CFG->add(['debug_lua'=>false],999,"disable debug_lua after one use");
+			self::$CFG->add(['debug-lua'=>false],999,"disable debug-lua after one use");
 		}
 
 		if (Telemetry::is_linux()) {
@@ -582,13 +606,11 @@ ENDLUA;
 	}
 
 	static function execute_lua_procopen($sv_raw, $extraction_code) {
-		$stderr_filename = "last_lua_err__".uniqid().".log";
 		$descriptorspec = [
 			0 => ["pipe", "r"],  // stdin is a pipe that the child will read from
 			1 => ["pipe", "w"],  // stdout is a pipe that the child will write to
 			2 => ["pipe", "w"] // stderr is a pipe to write to
 		];
-
 		$process = proc_open(self::$CFG['LUA_PATH'], $descriptorspec, $pipes, null, []);
 		if (!is_resource($process))
 			return [-1, "", "Failed to start Lua process"];
@@ -600,18 +622,21 @@ ENDLUA;
 
 		//echo "Waiting for Lua process to finish...";
 
+		/*
 		$mt = microtime(true);
 		for ($i=0;$i<10000;$i++) { // wait for process to finish, but not forever
 			$status = proc_get_status($process);
-			//echo ".";
+			echo ".".serialize($status);
 			if (!$status['running']) break;
 			usleep(100000); // 0.1s
 		}
 		//echo microtime(true)-$mt . "s\n";
 		if ($i>=9999) {
+			echo "terminating";
 			proc_terminate($process);
 			return [-1, "", "Lua process timeout"];
 		}
+		*/
 		//echo "\n";
 
 		//echo "Lua process finished, getting output...\n";
