@@ -192,10 +192,13 @@ class TelemetryEndpoint {
 			if (!$cruncherObj->table) 
 				self::response(["success" => false,"code" => 400,"error" => "Cruncher does not have a database table configured","errcode" => "NO_TABLE"]);
 			$table = $cruncherObj->table;
-			$andtype = "";
+			$andeventlist = "";
 		} else {
 			$table = "events"; // will default to "events" in the query if not specified
-			$andtype = " AND `type`='" . Telemetry::$db->escape($topicObj->name) . "'";
+			$crunchers = $topicObj->crunchers ?: [];
+			$types = array_map(function($c) { return $c->eventtype ?: 'unknown'; }, $crunchers);
+			$andeventlist = " AND `type` IN (" . join(",", array_map(function($t) { return "'" . Telemetry::$db->escape($t) . "'"; }, $types)) . ")";
+			//$andtype = " AND `type`='" . Telemetry::$db->escape($topicObj->name) . "'";
 		}
 
 		try {
@@ -205,7 +208,7 @@ class TelemetryEndpoint {
 				$query = Telemetry::$db->query(
 					"SELECT FROM_UNIXTIME(`time`, '%Y-%m-%d') as day, COUNT(*) as cnt
 					FROM $table
-					WHERE `flavnum`={d} AND `time`>={d} AND `time`<{d} $andtype
+					WHERE `flavnum`={d} AND `time`>={d} AND `time`<{d} $andeventlist
 					GROUP BY day
 					ORDER BY day ASC",
 					$flavnum, $from, $to
