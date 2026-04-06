@@ -47,11 +47,7 @@ class TelemetryEndpoint {
 		}
 
 		// Handle other requests here
-		self::response([
-			"success" => false,
-			"code" => 400,
-			"error" => "Invalid request parameters",
-		]);
+		self::response(["success" => false, "code" => 400, "error" => "Invalid request parameters"]);
 	}
 
 	static function serveListTopics() {
@@ -88,11 +84,7 @@ class TelemetryEndpoint {
 				'view' => $has_view,
 			];
 		}
-		self::response([
-			"success" => true,
-			"code" => 200,
-			"topics" => $topics,
-		]);
+		self::response(["success" => true, "code" => 200, "topics" => $topics]);
 	}
 
 	static function serveListSources() {
@@ -137,11 +129,7 @@ class TelemetryEndpoint {
 			]);
 		}
 		
-		self::response([
-			"success" => true,
-			"code" => 200,
-			"sources" => $sources,
-		]);
+		self::response(["success" => true, "code" => 200, "sources" => $sources]);
 	}
 
 	static function serveGetStatus() {
@@ -159,17 +147,9 @@ class TelemetryEndpoint {
 				$statuses[] = $row;
 			}
 
-			self::response([
-				"success" => true,
-				"code" => 200,
-				"statuses" => $statuses,
-			]);
+			self::response(["success" => true, "code" => 200, "statuses" => $statuses]);
 		} catch (Exception $e) {
-			self::response([
-				"success" => false,
-				"code" => 500,
-				"error" => "Exception while fetching status records: " . $e->getMessage(),
-			]);
+			self::response(["success" => false, "code" => 500, "error" => "Exception while fetching status records: " . $e->getMessage()]);
 		}
 	}
 
@@ -183,73 +163,54 @@ class TelemetryEndpoint {
 			$from = Tm::parse_date($_REQUEST['from']);
 			$to = Tm::parse_date($_REQUEST['to']);
 		} catch (Exception $e) {
-			self::response([
-				"success" => false,
-				"code" => 400,
-				"error" => "Invalid date in from/to parameters: " . $e->getMessage(),
-				"errcode" => "BAD_DATE",
-			]);
+			self::response(["success" => false,"code" => 400,"error" => "Invalid date in from/to parameters: " . $e->getMessage(),"errcode" => "BAD_DATE"]);
 		}
 
 		$topicObj = Telemetry::getTopic($topic);
+		if (!$topicObj) self::response(["success" => false,"code" => 400,"error" => "Topic not found","topic" => $topic,"errcode" => "TOPIC_NOT_FOUND"]);
+	
 		$topicendpoint = $topicObj ? $topicObj->endpoint : null;
-		if (!$topicendpoint || !is_callable($topicendpoint['queryfunc'])) {
-			self::response([
-				"success" => false,
-				"code" => 400,
-				"error" => "Invalid topic parameter, or no endpoint defined for topic",
-				"topic" => $topic,
-				"errcode" => "BAD_TOPIC",
-			]);
-		}
-
 		$variant = isset($_REQUEST['variant']) ? $_REQUEST['variant'] : null;
-		if ($variant === 'daymap') {
-			return self::serveDataRequestDaymap($topic, $from, $to, $flavnum);
+		if ($variant === 'daymap') { // doesn't need queryfunc
+			$crunchers = $topicObj->crunchers;
+			$cruncher = isset($_REQUEST['cruncher']) ? $_REQUEST['cruncher'] : 0;
+			$cruncherObj = isset($crunchers[$cruncher]) ? $crunchers[$cruncher] : null;
+			return self::serveDataRequestDaymap($topicObj, $cruncherObj, $from, $to, $flavnum);
+		}
+		if (!$topicendpoint || !is_callable($topicendpoint[$variant])) {
+			self::response(["success" => false,"code" => 400,"error" => "No endpoint "+$variant+" defined for topic","topic" => $topic,"errcode" => "NO_ENDPOINT"]);
 		}
 
 		try {
 			$data = call_user_func($topicendpoint['queryfunc'], $from, $to, $flavnum);
-			self::response([
-				"success" => true,
-				"code" => 200,
-				"id" => intval(isset($_REQUEST['id']) ? $_REQUEST['id'] : 0),
-				"data" => $data,
-				"query" => Tm::$db->LAST_QUERY,
-			]);
+			self::response(["success" => true,"code" => 200,"data" => $data,"query" => Tm::$db->LAST_QUERY]);
 		} catch (Exception $e) {
-			self::response([
-				"success" => false,
-				"code" => 500,
-				"error" => "Exception while processing topic " . $topic . ": " . $e->getMessage(),
-			]);
+			self::response(["success" => false,"code" => 500,"error" => "Exception while processing topic " . $topic . ": " . $e->getMessage()]);
 		}
 	}
 
-	static function serveDataRequestDaymap($topic, $from, $to, $flavnum) {
-		$topicObj = Telemetry::getTopic($topic);
-		$topicendpoint = $topicObj ? $topicObj->endpoint : null;
-		$crunchers = $topicObj ? $topicObj->crunchers : [];
-		$table = isset($crunchers[0]) ? $crunchers[0]->table : null;
+	static function serveDataRequestDaymap($topicObj, $cruncherObj=null, $from, $to, $flavnum) {
+		$table = isset($cruncherObj) ? $cruncherObj->table : "events"; // default to "events" if no specific cruncher provided
 
 		if (!$table) {
-			self::response([
-				"success" => false,
-				"code" => 400,
-				"error" => "Topic does not have a database table configured for daymap variant",
-				"errcode" => "NO_TABLE",
-			]);
+			self::response(["success" => false,"code" => 400,"error" => "Cruncher does not have a database table configured","errcode" => "NO_TABLE"]);
 		}
 
 		try {
 			// Build daymap for entire range in one query
-			$query = Telemetry::$db->query(Telemetry::$db->qesc(
-				"SELECT FROM_UNIXTIME(`time`, '%Y-%m-%d') as day, COUNT(*) as cnt FROM `$table`
-				WHERE `flavnum`={d} AND `time`>={d} AND `time`<{d}
-				GROUP BY day
-				ORDER BY day ASC",
-				$flavnum, $from, $to
-			));
+			try {
+				$table = Telemetry::$db->escape($table);
+				$query = Telemetry::$db->query(
+					"SELECT FROM_UNIXTIME(`time`, '%Y-%m-%d') as day, COUNT(*) as cnt
+					FROM $table
+					WHERE `flavnum`={d} AND `time`>={d} AND `time`<{d}
+					GROUP BY day
+					ORDER BY day ASC",
+					$flavnum, $from, $to
+				);
+			} catch (Exception $e) {
+				throw new Exception("Database query failed: " . $e->getMessage() . " - Query: " . Telemetry::$db->LAST_QUERY);
+			}
 			$result = $query->fetch_all(MYSQLI_ASSOC);
 			
 			$daymap = [];
@@ -267,20 +228,9 @@ class TelemetryEndpoint {
 				$daymap[$row['day']] = intval($row['cnt']);
 			}
 			
-			self::response([
-				"success" => true,
-				"code" => 200,
-				"id" => intval(isset($_REQUEST['id']) ? $_REQUEST['id'] : 0),
-				"data" => $daymap,
-				"max_count" => max(array_values($daymap)),
-				"query" => Tm::$db->LAST_QUERY,
-			]);
+			self::response(["success" => true,"code" => 200,"data" => $daymap,"max_count" => max(array_values($daymap)),"query" => Tm::$db->LAST_QUERY]);
 		} catch (Exception $e) {
-			self::response([
-				"success" => false,
-				"code" => 500,
-				"error" => "Exception while processing daymap for topic " . $topic . ": " . $e->getMessage(),
-			]);
+			self::response(["success" => false,"code" => 500,"error" => "Exception while processing daymap for topic " . $topicObj->name . ": " . $e->getMessage()]);
 		}
 	}
 

@@ -261,7 +261,7 @@
 					$(row).find('[data-field="endpoint"]').text(topic.endpoint ? '✓' : '—').toggleClass('disabled', !topic.endpoint);
 					$(row).find('[data-field="view"]').text(topic.view ? '✓' : '—').toggleClass('disabled', !topic.view);
 					$(row).find('[data-field="actions"]')
-						.attr('onclick', 'showDaymap(\'' + escapeHtml(topic.name) + '\')')
+						.on('click', function() { showDaymap(topic.name, null); })
 						.text('daymap');
 					tbody.append(row);
 					
@@ -276,6 +276,9 @@
 							$(crunRow).find('[data-field="label"]').text('↳ ' + (cruncher.name || (idx+1)));
 							$(crunRow).find('[data-field="input"]').text(cruncher.input=="event" ? `Event '${cruncher.eventtype}'` : escapeHtml(cruncher.input));
 							$(crunRow).find('[data-field="table"]').html(cruncher.table ? escapeHtml(cruncher.table) : '<em>N/A</em>');
+							$(crunRow).find('[data-field="actions"]')
+								.on('click', function() { showDaymap(topic.name, cruncher.name || idx); })
+								.text('daymap');
 							tbody.append(crunRow);
 						});
 					}
@@ -411,13 +414,14 @@
 			}
 		}
 
-		function showDaymap(topicName, selectedYear) {
+		function showDaymap(topicName, cruncherName=null, selectedYear) {
 			var currentYear = selectedYear || new Date().getFullYear();
 			window.currentDaymapTopic = topicName;
+			window.currentDaymapCruncher = cruncherName;
 			
 			// Fetch full history from 2000 to current year on first load
 			// If we already have cached data, use that instead
-			if (window.daymapCache && window.daymapCacheTopic === topicName) {
+			if (window.daymapCache && window.daymapCacheTopic === topicName && window.daymapCacheCruncher === cruncherName) {
 				displayCalendar(topicName, window.daymapCache, currentYear);
 				return;
 			}
@@ -441,7 +445,9 @@
 						// Cache the response for future year selections
 						window.daymapCache = response;
 						window.daymapCacheTopic = topicName;
-						displayCalendar(topicName, response, currentYear);
+						window.daymapCacheCruncher = cruncherName;
+
+						displayCalendar(topicName + ' - ' + (cruncherName || 'events'), response, currentYear);
 					} else {
 						alert('Error loading daymap: ' + (response.error || 'Unknown error') + 
 							(response.errcode ? ' (' + response.errcode + ')' : ''));
@@ -564,6 +570,7 @@
 
 		function changeYear(element, direction) {
 			var currentTopic = window.currentDaymapTopic;
+			var currentCruncher = window.currentDaymapCruncher;
 			var yearRange = window.yearRange || [];
 			var currentYearSelect = parseInt($('#year-select').val());
 			var newYear;
@@ -584,7 +591,7 @@
 			}
 			
 			if (currentTopic && yearRange.indexOf(String(newYear)) !== -1) {
-				showDaymap(currentTopic, newYear);
+				showDaymap(currentTopic, currentCruncher, newYear);
 			}
 		}
 
@@ -633,7 +640,8 @@
 		<tr class="cruncher-sub-row">
 			<td class="cruncher-indent" data-field="label"></td>
 			<td><code data-field="input"></code></td>
-			<td colspan="4"><code class="table-name" data-field="table"></code></td>
+			<td colspan="3"><code class="table-name" data-field="table"></code></td>
+			<td><a class="action-link" data-field="actions"></a></td>
 		</tr>
 	</template>
 
