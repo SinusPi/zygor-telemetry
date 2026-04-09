@@ -28,8 +28,8 @@ $OPTS = (array)\Zygor\Shell::better_getopt([
 	['f:','flavour:',      array_keys(Telemetry::$CFG['WOW_FLAVOUR_DATA'])],
 	['',  'maxdays:',      999999], // use to limit how far back to scrape, for debugging only
 	['',  'ignore-mtimes', false], // that is: limit by maxdays... or even not at all
-	['',  'start-day:',    "20000101"], // similar to maxdays, but explicit date
-	['',  'end-day:',      date("Ymd")],
+	['',  'start-day:',    null], // similar to maxdays, but explicit date
+	['',  'end-day:',      null],
 	['',  'limit:',        null], // stop after N files
 	['',  'debug',         false],
 	['',  'debug-lua',     false],

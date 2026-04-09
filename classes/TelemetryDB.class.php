@@ -223,23 +223,21 @@ class TelemetryDB {
 	 */
 	function store_datapoints($flavnum, $file_id, $datapoints) {
 		if (!count($datapoints)) return 0;
-		$chunk_size = 100;
-		$values = [];
-		foreach ($datapoints as $dp) {
-			$time = intval($dp['time'] ?: 0);
-			unset($dp['time']);
-			$type = $dp['type'] ?: '?';
-			unset($dp['type']);
-			if ($type == "ui") {
-				$type = "ui_" . ($dp['event'] ?: '?');
-				unset($dp['event']);
-			}
-			$values[] = $this->qesc("({d},{d},{d},{s},{s})", $flavnum, $file_id, $time, $type, json_encode($dp));
-		}
-		$chunks = array_chunk($values, $chunk_size);
 		$inserted = 0;
-		foreach ($chunks as $chunk) {
-			$q = "INSERT INTO events (flavnum,file_id,time,type,data) VALUES " . join(",", $chunk);
+		$chunk_size = 100;
+		// process data in batches of $chunk_size
+		for ($i = 0; $i < count($datapoints); $i += $chunk_size) {
+			$chunk = array_slice($datapoints, $i, $chunk_size);
+			$values = [];
+			foreach ($chunk as $dp) {
+				$time = intval($dp['time'] ?: 0);	unset($dp['time']);
+				$type = $dp['type'] ?: '?';			unset($dp['type']);
+				if (isset($dp['dbtype'])) {
+					$type = $dp['dbtype'];			unset($dp['dbtype']);
+				}
+				$values[] = $this->qesc("({d},{d},{d},{s},{s})", $flavnum, $file_id, $time, $type, json_encode($dp));
+			}
+			$q = "INSERT INTO events (flavnum,file_id,time,type,data) VALUES " . join(",", $values);
 			$r = $this->conn->query($q);
 			if (!$r) throw new Exception("DB error: " . $this->error());
 			$inserted += $this->affected_rows();

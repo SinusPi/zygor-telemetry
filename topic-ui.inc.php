@@ -9,7 +9,8 @@ return [
 					if telemetry then
 						for _,ev in ipairs(telemetry) do
 							if count>0 then print(",") end
-							ev.type="ui"
+							ev.dbtype="ui_"..(ev.event or "?")
+							ev.event=nil
 							print(json:encode(ev))
 							--[[
 							local c=0
@@ -29,6 +30,8 @@ return [
 				end
 			end
 ENDLUA
+,
+		'description'=>"Get various variables stored in ZGV.db.char[x].telemetry",
 	],
 	'crunchers' => [],
 	'crunchers_load' => true

@@ -405,16 +405,19 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			Logger::vlog("Datapoints extracted by type: " . join(", ", array_map(function ($item, $key) use ($times) { return "\x1b[38;5;72m$key\x1b[0m:{$item} ({$times[$key]}s)"; }, array_values($counts), array_keys($counts))));
 
 			// strip old data
-			$extracted['datapoints'] = array_values(array_filter($extracted['datapoints'], function ($dp) use ($file) {  return $dp['time'] > $file->topics[$dp['type']]['last_event_time'];  })); // only new events
+			{
+				$extracted['datapoints'] = array_values(array_filter($extracted['datapoints'], function ($dp) use ($file) {  return $dp['time'] > $file->topics[$dp['type']]['last_event_time'];  })); // only new events
+				Logger::vlog("+ removing older than last scraped ".serialize($file->topics).", left ".count($extracted['datapoints']));
+			}
 			
 			// strip by start-day
 			if (isset(self::$CFG['start-day'])) {
 				$extracted['datapoints'] = array_values(array_filter($extracted['datapoints'], function ($dp) { return $dp['time'] >= strtotime(self::$CFG['start-day']); })); // only new events
-				//Logger::vlog("+ removing older than ".strtotime(self::$CFG['start-day']));
+				Logger::vlog("+ removing older than start-day ".strtotime(self::$CFG['start-day']).", left ".count($extracted['datapoints']));
 			}
 			if (isset(self::$CFG['end-day'])) {
 				$extracted['datapoints'] = array_values(array_filter($extracted['datapoints'], function ($dp) { return $dp['time'] < strtotime(self::$CFG['end-day']+86400); })); // only new events
-				//Logger::vlog("+ removing newer than ".strtotime(self::$CFG['end-day']));
+				Logger::vlog("+ removing newer than end-day ".strtotime(self::$CFG['end-day']+86400).", left ".count($extracted['datapoints']));
 			}
 
 			$newest_per_topic = array_reduce($extracted['datapoints'], function($carry, $dp) {
@@ -423,7 +426,9 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 				}
 				return $carry;
 			}, array_map(function($topic) { return $topic['last_event_time'] ?: 0; }, $file->topics));
+			
 			$last_event_time = max(array_column($extracted['datapoints'],'time')) ?: 0;
+			
 			Logger::vlog("Datapoints after filtering out old: ".count($extracted['datapoints']));
 
 			// DB STORE TIME!

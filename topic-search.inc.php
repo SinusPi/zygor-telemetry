@@ -17,6 +17,7 @@ return [
 
 ENDLUA
 		,
+		'description'=>"Get guide search queries from ZGV.db.char.searchhistory",
 		//'event'=>"search"
 	],
 	'crunchers'=>[
