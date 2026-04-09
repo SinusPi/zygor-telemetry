@@ -317,12 +317,17 @@ class TelemetryCrunch {
 
 			$flavnum = Tm::flavnum($flavour);
 			$type = $cruncher->eventtype ?: $name;
+
 			// get starting point
 			$max_id = Tm::$db->query_one(Tm::$db->qesc("SELECT IFNULL(MAX(event_id),0) FROM {$table} WHERE flavnum={d}",$flavnum)) ?: 0;
-			Logger::vlog("Processing {$type} events, starting with index {$max_id}...");
+			Logger::vlog("Processing {$type} events, starting with index ".($max_id+1)."...");
 
 			// get new events
-			$getquery = Tm::$db->qesc("SELECT * FROM events WHERE flavnum={d} AND type={s} AND id>{d}",$flavnum,$type,$max_id);
+			if ($cruncher->eventsubtype) {
+				$getquery = Tm::$db->qesc("SELECT * FROM events WHERE flavnum={d} AND type={s} AND subtype={s} AND id>{d}",$flavnum,$type,$cruncher->eventsubtype,$max_id);
+			} else {
+				$getquery = Tm::$db->qesc("SELECT * FROM events WHERE flavnum={d} AND type={s} AND id>{d}",$flavnum,$type,$max_id);
+			}
 			//Logger::vlog("DEBUG: getquery: $getquery");
 			$getrequest = Tm::$db->query($getquery);
 

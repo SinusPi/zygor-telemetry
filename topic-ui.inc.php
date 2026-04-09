@@ -9,7 +9,8 @@ return [
 					if telemetry then
 						for _,ev in ipairs(telemetry) do
 							if count>0 then print(",") end
-							ev.dbtype="ui_"..(ev.event or "?")
+							ev.type="ui"
+							ev.subtype=ev.event
 							ev.event=nil
 							print(json:encode(ev))
 							--[[

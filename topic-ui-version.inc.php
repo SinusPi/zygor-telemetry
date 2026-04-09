@@ -6,7 +6,8 @@
  * When run, returns associative arrays with the extracted values, to be put into the 'table'.
  */
 return [
-	"eventtype" => "ui_VERSION",
+	"eventtype" => "ui",
+	"eventsubtype" => "VERSION",
 	"function" => function($line) {
 		$unpacked = json_decode($line["data"], true);
 		$line = $unpacked + $line;

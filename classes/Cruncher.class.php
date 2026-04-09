@@ -7,6 +7,7 @@ class Cruncher {
 	public $name;
 	public $input = "event";
 	public $eventtype; // = $name
+	public $eventsubtype;
 	public $function;
 	public $table; // = $name
 	public $table_schema;
@@ -28,6 +29,7 @@ class Cruncher {
 			}
 		}
 		if (!$this->eventtype) $this->eventtype = $topicObj ? $topicObj->name : $this->name;
+		if (!$this->eventsubtype) $this->eventsubtype = $this->eventtype;
 		if (!$this->table) $this->table = $this->name;
 	}
 

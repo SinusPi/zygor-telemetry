@@ -232,12 +232,11 @@ class TelemetryDB {
 			foreach ($chunk as $dp) {
 				$time = intval($dp['time'] ?: 0);	unset($dp['time']);
 				$type = $dp['type'] ?: '?';			unset($dp['type']);
-				if (isset($dp['dbtype'])) {
-					$type = $dp['dbtype'];			unset($dp['dbtype']);
-				}
-				$values[] = $this->qesc("({d},{d},{d},{s},{s})", $flavnum, $file_id, $time, $type, json_encode($dp));
+				$subtype = $dp['subtype'] ?: null;	unset($dp['subtype']);
+				
+				$values[] = $this->qesc("({d},{d},{d},{s},{sn},{s})", $flavnum, $file_id, $time, $type, $subtype, json_encode($dp));
 			}
-			$q = "INSERT INTO events (flavnum,file_id,time,type,data) VALUES " . join(",", $values);
+			$q = "INSERT INTO events (flavnum,file_id,time,type,subtype,data) VALUES " . join(",", $values);
 			$r = $this->conn->query($q);
 			if (!$r) throw new Exception("DB error: " . $this->error());
 			$inserted += $this->affected_rows();

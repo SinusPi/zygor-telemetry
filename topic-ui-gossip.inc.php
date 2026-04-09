@@ -8,7 +8,8 @@
 return [
 	//'input'=>"event",
 	//'event'=>"ui", // these defaults are taken from file names, unless overridden
-	"eventtype" => "ui_GOSSIP_MINED",
+	"eventtype" => "ui",
+	"eventsubtype" => "GOSSIP_MINED",
 	"function" => function($line) {
 		$unpacked = json_decode($line["data"], true);
 		foreach($unpacked as $field=>$value) {
