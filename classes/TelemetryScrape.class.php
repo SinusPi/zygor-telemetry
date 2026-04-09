@@ -164,12 +164,12 @@ class TelemetryScrape {
 				}
 
 				if (!$file->any_fresh) {
-					Logger::vlog("- File {$file->slug} is NOT fresh for any of the topics (mtimes: ".join(", ", array_map(function($t) use ($file) { return "$t=".($file->topics[$t]['scrape_time'] ?: 0); }, $topics))."), skipping.");
+					Logger::vlog("- File {$file->slug} is NOT fresh for any of the topics (mtime: ".Tm::dt($file->mtime).", scraped: ".join(", ", array_map(function($t) use ($file) { return "$t=".Tm::dt($file->topics[$t]['scrape_time'] ?: 0); }, $topics))."), skipping.");
 				} else {
 					// list fresh topics with mtimes
 					$fresh_topics = array_filter($topics, function($t) use ($file) { return $file->topics[$t]['fresh']; });
 					$mtime = $file->mtime;
-					Logger::vlog("- File {$file->slug} ($mtime) is fresh for topics: ".join(", ", array_map(function($t) use ($file) { return "$t (mtime: ".($file->topics[$t]['scrape_time'] ?: 0).")"; }, $fresh_topics)));
+					Logger::vlog("- File {$file->slug} (".Tm::dt($mtime).") is fresh for topics: ".join(", ", array_map(function($t) use ($file) { return "$t (".Tm::dt($file->topics[$t]['scrape_time'] ?: 0).")"; }, $fresh_topics)));
 					
 					yield $file;
 				}
@@ -180,7 +180,7 @@ class TelemetryScrape {
 
 	/**
 	 * Get scrape times for multiple files and topics in one query, returning an array of scrape times grouped by file_id
-	 * @return array [ file_id => [ 'topics' => [ topic:string => scrape_time:int ], 'newest_scrape_time' => int ] ]
+	 * @return array [ file_id => [ 'topics' => [ topic:string => [last_event_time:int, scrape_time:int] ], 'newest_scrape_time' => int ] ]
 	 */
 	static function get_file_scrapetimes_batch($topics, $ids) {
 		$r = Tm::$db->query($_q="SELECT * FROM `topic_scrapetimes` WHERE `topic` IN ({sa}) AND `file_id` IN ({sa})", $topics, $ids);

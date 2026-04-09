@@ -289,8 +289,9 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		// narrow down per configuration
 		$gen_narrowed_svfiles = Telemetry::filter_gen($gen_fresh_svfiles, function($file) {
 			// too old, excluded
-			if (isset(self::$CFG['TELEMETRY_FILE_AGE']) && (time() - $file->mtime > self::$CFG['TELEMETRY_FILE_AGE']*DAY)) {
-				Logger::vlog("-- ".$file->fullpath.": too old for TELEMETRY_FILE_AGE");
+			$age = time() - $file->mtime;
+			if (isset(self::$CFG['TELEMETRY_FILE_AGE']) && ($age > self::$CFG['TELEMETRY_FILE_AGE']*DAY)) {
+				Logger::vlog("-- ".$file->fullpath.": too old (".floor($age/DAY)." days, TELEMETRY_FILE_AGE=".self::$CFG['TELEMETRY_FILE_AGE'].")");
 				return false;
 			}
 			// skip today's files if not explicitly included
@@ -413,11 +414,13 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			// strip by start-day
 			if (isset(self::$CFG['start-day'])) {
 				$extracted['datapoints'] = array_values(array_filter($extracted['datapoints'], function ($dp) { return $dp['time'] >= strtotime(self::$CFG['start-day']); })); // only new events
-				Logger::vlog("+ removing older than start-day ".strtotime(self::$CFG['start-day']).", left ".count($extracted['datapoints']));
+				$count = count($extracted['datapoints']);
+				Logger::vlog("+ removing older than start-day ".Telemetry::dt(strtotime(self::$CFG['start-day'])).", left $count");
 			}
 			if (isset(self::$CFG['end-day'])) {
 				$extracted['datapoints'] = array_values(array_filter($extracted['datapoints'], function ($dp) { return $dp['time'] < strtotime(self::$CFG['end-day']+86400); })); // only new events
-				Logger::vlog("+ removing newer than end-day ".strtotime(self::$CFG['end-day']+86400).", left ".count($extracted['datapoints']));
+				$count = count($extracted['datapoints']);
+				Logger::vlog("+ removing newer than end-day ".Telemetry::dt(strtotime(self::$CFG['end-day']+86400)).", left $count");
 			}
 
 			$newest_per_topic = array_reduce($extracted['datapoints'], function($carry, $dp) {
@@ -429,7 +432,8 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			
 			$last_event_time = max(array_column($extracted['datapoints'],'time')) ?: 0;
 			
-			Logger::vlog("Datapoints after filtering out old: ".count($extracted['datapoints']));
+			$count = count($extracted['datapoints']);
+			Logger::vlog("Datapoints after filtering out old: $count");
 
 			// DB STORE TIME!
 

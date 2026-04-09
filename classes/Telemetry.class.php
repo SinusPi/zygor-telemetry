@@ -523,6 +523,11 @@ class Telemetry {
 		return $formatted;
 	}
 
+	static function dt($time) {
+		if (!$time) return "N/A";
+		return date("Y-m-d H:i:s", $time);
+	}
+
 }
 
 
