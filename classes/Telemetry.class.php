@@ -542,6 +542,10 @@ class MinorError extends Exception {
 	// Custom exception for error messages
 }
 
+class SkipException extends Exception {
+	// just a skip, not an error
+}
+
 class File {
 	public $id;
 	public $fullpath;

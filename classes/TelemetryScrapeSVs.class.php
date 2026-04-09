@@ -374,7 +374,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 
 			Logger::vlog(" - :. reading SV file...");
 
-			Telemetry::$db->begin_transaction(); // need to start here to lock the DB record for this file
+			//Telemetry::$db->begin_transaction(); // need to start here to lock the DB record for this file   // or do we? flock/dblock is above
 
 			$sv_raw = self::read_raw_sv($filename_full);
 
@@ -405,42 +405,53 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			$times = $extracted['times'];
 			Logger::vlog("Datapoints extracted by type: " . join(", ", array_map(function ($item, $key) use ($times) { return "\x1b[38;5;72m$key\x1b[0m:{$item} ({$times[$key]}s)"; }, array_values($counts), array_keys($counts))));
 
-			// strip old data
-			{
-				$extracted['datapoints'] = array_values(array_filter($extracted['datapoints'], function ($dp) use ($file) {  return $dp['time'] > $file->topics[$dp['type']]['last_event_time'];  })); // only new events
-				Logger::vlog("+ removing older than last scraped ".serialize($file->topics).", left ".count($extracted['datapoints']));
-			}
+			$count = 0;
+			try {
+				$count = count($extracted['datapoints']);
+				if (!$count) throw new SkipException();
 			
-			// strip by start-day
-			if (isset(self::$CFG['start-day'])) {
-				$extracted['datapoints'] = array_values(array_filter($extracted['datapoints'], function ($dp) { return $dp['time'] >= strtotime(self::$CFG['start-day']); })); // only new events
-				$count = count($extracted['datapoints']);
-				Logger::vlog("+ removing older than start-day ".Telemetry::dt(strtotime(self::$CFG['start-day'])).", left $count");
-			}
-			if (isset(self::$CFG['end-day'])) {
-				$extracted['datapoints'] = array_values(array_filter($extracted['datapoints'], function ($dp) { return $dp['time'] < strtotime(self::$CFG['end-day']+86400); })); // only new events
-				$count = count($extracted['datapoints']);
-				Logger::vlog("+ removing newer than end-day ".Telemetry::dt(strtotime(self::$CFG['end-day']+86400)).", left $count");
-			}
-
-			$newest_per_topic = array_reduce($extracted['datapoints'], function($carry, $dp) {
-				if (!isset($carry[$dp['type']]) || $dp['time'] > $carry[$dp['type']]) {
-					$carry[$dp['type']] = $dp['time'];
+				// strip old data
+				{
+					$extracted['datapoints'] = array_values(array_filter($extracted['datapoints'], function ($dp) use ($file) {  return $dp['time'] > $file->topics[$dp['type']]['last_event_time'];  })); // only new events
+					$count = count($extracted['datapoints']);
+					Logger::vlog("- removing older than last scraped ".join(",", array_map(function($topicdata,$topicname) { return $topicname."=".Telemetry::dt($topicdata['last_event_time']); }, $file->topics, array_keys($file->topics))).", left $count");
+					if (!$count) throw new SkipException();						
 				}
-				return $carry;
-			}, array_map(function($topic) { return $topic['last_event_time'] ?: 0; }, $file->topics));
-			
-			$last_event_time = max(array_column($extracted['datapoints'],'time')) ?: 0;
-			
-			$count = count($extracted['datapoints']);
-			Logger::vlog("Datapoints after filtering out old: $count");
+				
+				// strip by start-day
+				if (isset(self::$CFG['start-day'])) {
+					$extracted['datapoints'] = array_values(array_filter($extracted['datapoints'], function ($dp) { return $dp['time'] >= strtotime(self::$CFG['start-day']); })); // only new events
+					$count = count($extracted['datapoints']);
+					Logger::vlog("- removing older than start-day ".Telemetry::dt(strtotime(self::$CFG['start-day'])).", left $count");
+					if (!$count) throw new SkipException();
+				}
+				if (isset(self::$CFG['end-day'])) {
+					$extracted['datapoints'] = array_values(array_filter($extracted['datapoints'], function ($dp) { return $dp['time'] < strtotime(self::$CFG['end-day']+86400); })); // only new events
+					$count = count($extracted['datapoints']);
+					Logger::vlog("- removing newer than end-day ".Telemetry::dt(strtotime(self::$CFG['end-day']+86400)).", left $count");
+					if (!$count) throw new SkipException();
+				}
 
+				$newest_per_topic = array_reduce($extracted['datapoints'], function($carry, $dp) {
+					if (!isset($carry[$dp['type']]) || $dp['time'] > $carry[$dp['type']]) {
+						$carry[$dp['type']] = $dp['time'];
+					}
+					return $carry;
+				}, array_map(function($topic) { return $topic['last_event_time'] ?: 0; }, $file->topics));
+			} catch (SkipException $e) {
+			}
+				
+			//$last_event_time = max(array_column($extracted['datapoints'],'time')) ?: 0;
+			
 			// DB STORE TIME!
 
-			$inserted = Telemetry::$db->store_datapoints(Telemetry::flavnum($flavour),$file->id,$extracted['datapoints']);
-			Logger::vlog("Datapoints inserted into DB: $inserted");
+			Telemetry::$db->begin_transaction(); // need to start here to lock the DB record for this file   // or do we? flock/dblock is above
 
-			$totals['inserted_datapoints'] += $inserted;
+			if ($count) {
+				$inserted = Telemetry::$db->store_datapoints(Telemetry::flavnum($flavour),$file->id,$extracted['datapoints']);
+				Logger::vlog("Datapoints inserted into DB: $inserted");
+				$totals['inserted_datapoints'] += $inserted;
+			}
 
 			// $last_event_data = array_filter($extracted['datapoints'], function($dp) use ($last_event_time) { return $dp['time'] == $last_event_time; });
 			// print_r($last_event_data);

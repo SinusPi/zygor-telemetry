@@ -164,7 +164,7 @@ class TelemetryScrape {
 				}
 
 				if (!$file->any_fresh) {
-					Logger::vlog("- File {$file->slug} is NOT fresh for any of the topics (mtime: ".Tm::dt($file->mtime).", scraped: ".join(", ", array_map(function($t) use ($file) { return "$t=".Tm::dt($file->topics[$t]['scrape_time'] ?: 0); }, $topics))."), skipping.");
+					Logger::vlog("- File {$file->slug} is NOT fresh for any topic (mtime: ".Tm::dt($file->mtime)."), skipping.");
 				} else {
 					// list fresh topics with mtimes
 					$fresh_topics = array_filter($topics, function($t) use ($file) { return $file->topics[$t]['fresh']; });
@@ -296,7 +296,7 @@ class TelemetryScrape {
 					Tm::$db->query("UPDATE `topic_scrapetimes` SET `scrape_time` = UNIX_TIMESTAMP(), `last_event_time` = UNIX_TIMESTAMP() WHERE `topic` IN ({sa})", $OPTS['topics']);
 					if (Tm::$db->error())
 						throw new ErrorException("Failed to update topic_scrapetimes table: ".Tm::$db->error());
-					echo("Updated ".Tm::$db->affected_rows()." topic_scrapetimes entries for topics: ".implode(",", $OPTS['topics']).".\n");
+					echo("Set ".Tm::$db->affected_rows()." topic_scrapetimes entries to current time for topics: ".implode(",", $OPTS['topics']).".\n");
 				}
 			],
 			"help" => [
