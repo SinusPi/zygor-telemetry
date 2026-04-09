@@ -39,6 +39,8 @@ $OPTS = (array)\Zygor\Shell::better_getopt([
 	['i:','input:',        $valid_inputs=array_keys(TelemetryScrape::list_scrapers())], // which sources to scrape (e.g. sv, packagerlog, etc.)
 	['t:','topics:',	   $valid_topics=array_keys(Telemetry::$TOPICS)], // which topics to scrape (default all) - format: topic1,topic2 or topic1/* for all crunchers within a topic
 	['',  'verboseflags:', []],
+	['',  'maintenance::', false],
+	['',  'sure',         false], // for maintenance tasks that are potentially destructive, require --sure to be passed as well
 ]);
 $FLAVOURS = $OPTS['f'];
 if (substr($OPTS['start-day'],0,1)=="-") $OPTS['start-day']=date("Ymd",strtotime($OPTS['start-day']." days"));
@@ -52,12 +54,16 @@ $inputs = $OPTS['input'];
 $topics = $OPTS['topics'];
 
 try {
-	if (array_diff($inputs,$valid_inputs)) {
-		throw new ErrorException("Invalid input type specified (".implode(",",$inputs)."). Valid types are: ".implode(", ",$valid_inputs));
+	if (array_diff($inputs,$valid_inputs)) throw new ErrorException("Invalid input type specified (".implode(",",$inputs)."). Valid types are: ".implode(", ",$valid_inputs));
+	if (array_diff($topics,$valid_topics)) throw new ErrorException("Invalid topic specified (".implode(",",$topics)."). Valid topics are: ".implode(", ",$valid_topics));
+	
+	if ($OPTS['maintenance']) {
+		TelemetryScrape::perform_maintenance($OPTS['maintenance'],$OPTS);
+		exit;
 	}
-	if (array_diff($topics,$valid_topics)) {
-		throw new ErrorException("Invalid topic specified (".implode(",",$topics)."). Valid topics are: ".implode(", ",$valid_topics));
-	}
+
+	// let's get scraping
+	
 	if (in_array("sv",$inputs)) {
 		try	{
 			echo "*** Scraping source: SVs\n";
@@ -66,6 +72,8 @@ try {
 		} catch (MinorError $e) {
 			echo "Failed: ".$e->getMessage()."\n";
 		}
+	} else {
+		echo "*** Skipping SV scraping.\n";
 	}
 	if (in_array("packagerlog",$inputs)) {
 		try {
@@ -74,6 +82,8 @@ try {
 		} catch (MinorError $e) {
 			echo "Failed: ".$e->getMessage()."\n";
 		}
+	} else {
+		echo "*** Skipping Packager Log scraping.\n";
 	}
 } catch (ErrorException $e) {
 	echo "ERROR: ".$e->getMessage()."\n";

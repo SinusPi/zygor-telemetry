@@ -266,7 +266,62 @@ class TelemetryScrape {
 		if ($result && $result['status'] === 'migrated') Logger::vlog("DB: 'topic_scrapetimes' table created or migrated to version ".$result['target_version']);
 	}
 
+	static function perform_maintenance($task,$OPTS) {
+		$maint_tasks=[];
+		$maint_tasks = [
+			"clear-files" => [
+				"description" => "Clear scrape times of input files, as if never scraped before  (set topics using -t, default: all)",
+				"action" => function() use ($OPTS) {
+					if (!$OPTS['sure']) {
+						$q = Tm::$db->query("SELECT count(1) FROM `topic_scrapetimes` WHERE `topic` IN ({sa}) AND `scrape_time` IS NOT NULL", $OPTS['topics']);
+						$count = $q ? $q->fetch_row()[0] : 0;
+						echo "This will clear $count entries from topic_scrapetimes for topics: ".implode(",", $OPTS['topics']).". If you're sure, run again with --sure flag.\n";
+						return;
+					}
+					Tm::$db->query("UPDATE `topic_scrapetimes` SET `scrape_time` = NULL, `last_event_time` = NULL WHERE `topic` IN ({sa})", $OPTS['topics']);
+					if (Tm::$db->error())
+						throw new ErrorException("Failed to clear topic_scrapetimes table: ".Tm::$db->error());
+					echo("Cleared ".Tm::$db->affected_rows()." topic_scrapetimes entries for topics: ".implode(",", $OPTS['topics']).".\n");
+				}
+			],
+			"flush-files" => [
+				"description" => "Set scrape_time and last_event_time of input files to current time, as if just scraped  (set topics using -t, default: all)",
+				"action" => function() use ($OPTS) {
+					if (!$OPTS['sure']) {
+						$q = Tm::$db->query("SELECT count(1) FROM `topic_scrapetimes` WHERE `topic` IN ({sa})", $OPTS['topics']);
+						$count = $q ? $q->fetch_row()[0] : 0;
+						echo "This will set scrape_time and last_event_time to current time for $count entries in topic_scrapetimes for topics: ".implode(",", $OPTS['topics']).". If you're sure, run again with --sure flag.\n";
+						return;
+					}
+					Tm::$db->query("UPDATE `topic_scrapetimes` SET `scrape_time` = UNIX_TIMESTAMP(), `last_event_time` = UNIX_TIMESTAMP() WHERE `topic` IN ({sa})", $OPTS['topics']);
+					if (Tm::$db->error())
+						throw new ErrorException("Failed to update topic_scrapetimes table: ".Tm::$db->error());
+					echo("Updated ".Tm::$db->affected_rows()." topic_scrapetimes entries for topics: ".implode(",", $OPTS['topics']).".\n");
+				}
+			],
+			"help" => [
+				"description" => "you're reading this right now :)",
+				"action" => function() use (&$maint_tasks) {
+					echo "Available maintenance tasks:\n";
+					foreach ($maint_tasks as $key => $task) {
+						echo " - $key: {$task['description']}\n";
+					}
+				}
+			],
+		];
+
+		if ($task===true) $task="help"; // if maintenance is set but no specific task, show help
+		if (!isset($maint_tasks[$task])) {
+			echo "Unknown maintenance task: $task\n";
+			$task="help";
 		}
+		try {
+			$maint_tasks[$task]['action']();
+		} catch (Exception $e) {
+			echo "Error performing maintenance task '$task': ".$e->getMessage()."\n";
+			exit(1);
+		}
+
 	}
 
 }
