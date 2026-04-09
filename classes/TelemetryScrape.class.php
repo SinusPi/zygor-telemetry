@@ -209,20 +209,20 @@ class TelemetryScrape {
 	/**
 	 * Update scrape times for multiple topics on a file
 	 */
-	static function db_set_file_scrapetimes($topics, $file_id, $last_events_per_topic=[], $scrape_time=null) {
-		$values_sql = join(", ", array_map(function($topic) use ($file_id, $scrape_time, $last_events_per_topic) {
-			return Tm::$db->qesc("({s},{d},{d},{d})", $topic, $file_id, $scrape_time ?: time(), $last_events_per_topic[$topic] ?: null);
+	static function db_set_file_scrapetimes ($topics, $file_id, $last_events_per_topic=[], $scrape_time=null) {
+		$values_sql = join(", ", array_map(function($topic) use ($file_id, $last_events_per_topic, $scrape_time) {
+			return Tm::$db->qesc("({s},{d},{d},{d})", $topic, $file_id, $last_events_per_topic[$topic] ?: null, $scrape_time ?: time());
 		}, $topics));
-		$r = Tm::$db->query($_q="INSERT INTO `topic_scrapetimes` (topic, file_id, scrape_time, last_event_time) VALUES $values_sql ON DUPLICATE KEY UPDATE scrape_time=VALUES(scrape_time), last_event_time=VALUES(last_event_time)");
+		$r = Tm::$db->query($_q="INSERT INTO `topic_scrapetimes` (topic, file_id, last_event_time, scrape_time) VALUES $values_sql ON DUPLICATE KEY UPDATE last_event_time=VALUES(last_event_time), scrape_time=VALUES(scrape_time)");
 		if (!$r) throw new ErrorException("DB error, query $_q: ".Tm::$db->error());
-		Logger::vlog("Updated scrape times for file_id $file_id and topics: scrape time $scrape_time, ".join(", ",array_map(function($t) use ($last_events_per_topic) { return $t."=".$last_events_per_topic[$t] ?: 0; }, $topics)));
+		Logger::vlog("Updated scrape times for file_id $file_id and topics: scrape time ".Tm::dt($scrape_time).", ".join(", ",array_map(function($t) use ($last_events_per_topic) { return $t."=".Tm::dt($last_events_per_topic[$t] ?: 0); }, $topics)));
 	}
 
 	/**
 	 * Update one topic scrape time for a file
 	 */
-	static function db_set_file_scrapetime($topic, $file_id, $scrape_time=null, $last_event_time=null) {
-		$q = Tm::$db->qesc($_q="INSERT INTO `topic_scrapetimes` (topic, file_id, scrape_time, last_event_time) VALUES ({s}, {d}, {d}, {d}) ON DUPLICATE KEY UPDATE scrape_time=VALUES(scrape_time), last_event_time=VALUES(last_event_time)", $topic, $file_id, $scrape_time ?: time(), $last_event_time ?: null);
+	static function db_set_file_scrapetime ($topic, $file_id, $last_event_time=null, $scrape_time=null) {
+		$q = Tm::$db->qesc($_q="INSERT INTO `topic_scrapetimes` (topic, file_id, last_event_time, scrape_time) VALUES ({s}, {d}, {d}, {d}) ON DUPLICATE KEY UPDATE scrape_time=VALUES(scrape_time), last_event_time=VALUES(last_event_time)", $topic, $file_id, $last_event_time ?: null, $scrape_time ?: time());
 		$r = Tm::$db->query($q);
 		if (!$r) throw new ErrorException("DB error, query $_q: ".Tm::$db->error());
 	}
@@ -250,10 +250,8 @@ class TelemetryScrape {
 	 */
 
 	private static function db_create_topic_scrapetimes() {
-		Tm::$db->query("SHOW CREATE TABLE topic_scrapetimes;");
-		if (Tm::$db->error()) {
-			$schema_sql =
-				"CREATE TABLE `topic_scrapetimes` (
+		$result = (new SchemaManager(Tm::$db->conn))->manageTable("topic_scrapetimes",[
+			'1'=> "CREATE TABLE `topic_scrapetimes` (
 					`topic` char(10) NOT NULL,
 					`file_id` int(10) NOT NULL,
 					`scrape_time` int(11) DEFAULT NULL,
@@ -263,12 +261,11 @@ class TelemetryScrape {
 				ENGINE=InnoDB
 				DEFAULT CHARSET=latin1
 				COLLATE=latin1_swedish_ci
-				COMMENT='used to mark which files have been processed and when';
-			";
-			Tm::$db->query($schema_sql);
-			if (Tm::$db->error())
-				throw new ErrorException("Failed to create table `topic_scrapetimes`: ".Tm::$db->error());
-			Logger::vlog("DB table `topic_scrapetimes` created.");
+				COMMENT='used to mark which files have been processed and when'"
+			]);
+		if ($result && $result['status'] === 'migrated') Logger::vlog("DB: 'topic_scrapetimes' table created or migrated to version ".$result['target_version']);
+	}
+
 		}
 	}
 
