@@ -48,7 +48,7 @@ class Shell {
 	 */
 
 	static function better_getopt($opts) {
-		$shorts = [];
+		$shorts = "";
 		$longs = [];
 		$defaults = [];
 		$same = [];
