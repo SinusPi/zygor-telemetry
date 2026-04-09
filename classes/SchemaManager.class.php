@@ -56,6 +56,11 @@ class SchemaManager {
 		// Get current version
 		$current_version = $this->getCurrentVersion($table_name);
 
+		if ($current_version === -1) {
+			$current_version = 1;
+			$this->updateVersion($table_name, $current_version);
+		}
+
 		if ($current_version > $this->max_version)
 			throw new Exception("Current version $current_version of table '$table_name' exceeds maximum defined migration version $this->max_version");
 		if ($current_version < 0)
@@ -170,7 +175,7 @@ class SchemaManager {
 		$result = $this->conn->query($query);
 
 		if (!$result || $result->num_rows === 0)
-			return ''; // Table doesn't exist
+			return null; // Table doesn't exist
 
 		$row = $result->fetch_assoc();
 		return isset($row['TABLE_COMMENT']) ? $row['TABLE_COMMENT'] : '';
@@ -179,16 +184,19 @@ class SchemaManager {
 	/**
 	 * Get the current version of a table from its comment
 	 * @param string $table_name Table name
-	 * @return int Current version (0 if table doesn't exist)
+	 * @return int Current version (0 if table doesn't exist, -1 if it exists without a valid version marker)
 	 */
 	private function getCurrentVersion($table_name) {
 		$comment = $this->getComment($table_name);
+
+		if ($comment === null)
+			return 0; // Table doesn't exist, treat as version 0
 
 		// Extract version from comment
 		if (preg_match('/' . self::COMMENT_VERSION_MARKER . '(\d+)/', $comment, $matches))
 			return (int)$matches[1];
 
-		return 0;
+		return -1; // Invalid version (marker not found)
 	}
 
 	/**
