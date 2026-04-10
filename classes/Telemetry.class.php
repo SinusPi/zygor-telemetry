@@ -362,6 +362,7 @@ class Telemetry {
 		self::db_create_status_table();
 		self::db_create_files_table();
 		self::db_create_events_table();
+		self::db_create_vars_table();
 	}
 
 	static function db_create_status_table() {
@@ -441,6 +442,28 @@ class Telemetry {
 			)",
 		]);
 		if ($result && $result['status'] === 'migrated') Logger::vlog("DB: 'events' table created or migrated to version ".$result['target_version']);
+	}
+
+	static function db_create_vars_table() {
+		$result = (new SchemaManager(self::$db->conn))->manageTable("vars", [
+			// v1 reset point: initial vars table schema
+			"1" => "CREATE TABLE `vars` (
+				`var` char(40) NOT NULL,
+				`value` varchar(2048) NOT NULL,
+				UNIQUE KEY `var` (`var`)
+			) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_swedish_ci"
+		]);
+		if ($result && $result['status'] === 'migrated') Logger::vlog("DB: 'vars' table created or migrated to version ".$result['target_version']);
+	}
+
+	static function db_get_var($var) {
+		$q = self::$db->query("SELECT `value` FROM `vars` WHERE `var` = {s}", $var);
+		$row = $q->fetch_array();
+		return $row ? $row[0] : null;
+	}
+
+	static function db_set_var($var, $value) {
+		return self::$db->query("INSERT INTO `vars` (`var`, `value`) VALUES ({s}, {s}) ON DUPLICATE KEY UPDATE `value` = {s}", $var, $value, $value);
 	}
 
 	static function call_hooks($hook,$args) {
