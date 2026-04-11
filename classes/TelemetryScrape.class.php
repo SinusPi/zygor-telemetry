@@ -272,10 +272,13 @@ class TelemetryScrape {
 			"clear-files" => [
 				"description" => "Clear scrape times of input files, as if never scraped before  (set topics using -t, default: all)",
 				"action" => function() use ($OPTS) {
+					//$flavor_likes = join(" OR ",array_map(function($t) { return '`slugname` LIKE "'.$t.'/%"'; }, $OPTS['flavour']));
+					$flavor_likes = ""; // it's a different table ffs
 					if (!$OPTS['sure']) {
 						$q = Tm::$db->query("SELECT count(1) FROM `topic_scrapetimes` WHERE `topic` IN ({sa}) AND `scrape_time` IS NOT NULL", $OPTS['topics']);
 						$count = $q ? $q->fetch_row()[0] : 0;
 						echo "This will clear $count entries from topic_scrapetimes for topics: ".implode(",", $OPTS['topics']).". If you're sure, run again with --sure flag.\n";
+						echo Tm::$db->LAST_QUERY;
 						return;
 					}
 					Tm::$db->query("UPDATE `topic_scrapetimes` SET `scrape_time` = NULL, `last_event_time` = NULL WHERE `topic` IN ({sa})", $OPTS['topics']);
@@ -287,6 +290,8 @@ class TelemetryScrape {
 			"flush-files" => [
 				"description" => "Set scrape_time and last_event_time of input files to current time, as if just scraped  (set topics using -t, default: all)",
 				"action" => function() use ($OPTS) {
+					//$flavor_likes = join(" OR ",array_map(function($t) { return '`slugname` LIKE "'.$t.'/%"'; }, $OPTS['flavour']));
+					$flavor_likes = ""; // it's a different table ffs
 					if (!$OPTS['sure']) {
 						$q = Tm::$db->query("SELECT count(1) FROM `topic_scrapetimes` WHERE `topic` IN ({sa})", $OPTS['topics']);
 						$count = $q ? $q->fetch_row()[0] : 0;

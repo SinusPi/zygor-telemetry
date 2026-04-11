@@ -283,6 +283,9 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 
 		Logger::log("Starting scrape of flavour '\x1b[38;5;78m{$flavour}\x1b[0m' topics ".implode(", ", array_map(function($t) { return "'".$t->name."'"; }, $topics_sv))." in \x1b[33;1m{$sync_path}\x1b[0m.");
 
+		//$file_count_total = Tm::$db->query_one("SELECT COUNT(*) FROM files WHERE filetype='sv' AND slugname LIKE {s}", $flavour."/%") ?: 0;
+		// add progress later; will involve decreasing total as we filter out unchanged files, and increasing current as we process them
+
 		// get svfiles that may have fresh data for the topics listed
 		$gen_fresh_svfiles = self::get_fresh_files_gen(array_keys($topics_sv), $sync_path, self::$CFG['filemask'], [__CLASS__,'file_path_to_slug'], "sv", self::$CFG['BATCH_SIZE']);
 
@@ -779,6 +782,7 @@ ENDLUA;
 
 	/** Convert full file path to flavour/account/filename slug. */
 	static function file_path_to_slug($path) {
+		$path = str_replace("\\", "/", $path); // normalize slashes
 		if (preg_match("/([^\/]+)\/([^\/]+)\/([^\/]+)--SavedVariables--Zygor.*$/", $path, $matches)) {
 			$flavour = $matches[1];
 			$user = $matches[2];
