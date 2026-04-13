@@ -50,11 +50,15 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 		}
 	}
 
+	static function run($flavours, $topics) {
+		self::scrape($topics);
+	}
+	
 	/**
 	 * Grab data from packager logs
 	 * @param string $flavour
 	 */
-	static function scrape() {
+	static function scrape($topics=null) {
 		if (self::$config_errors) {
 			Logger::log("Cannot start Packager Log scrape due to configuration errors: ".join("; ", self::$config_errors));
 			throw new MinorError("Configuration errors: ".join("; ", self::$config_errors));

@@ -43,7 +43,6 @@ $OPTS = (array)\Zygor\Shell::better_getopt([
 	['',  'sure',          false], // for maintenance tasks that are potentially destructive, require --sure to be passed as well
 	['',  'onlycount',     false], // for maintenance tasks that only count files without processing them
 ]);
-$FLAVOURS = $OPTS['f'];
 if (substr($OPTS['start-day'],0,1)=="-") $OPTS['start-day']=date("Ymd",strtotime($OPTS['start-day']." days"));
 $OPTS["MAX_DAYS"]=$OPTS['maxdays'];
 
@@ -51,6 +50,7 @@ Telemetry::startup($OPTS);
 Telemetry::dump_config();
 TelemetryScrape::startup();
 
+$flavours = $OPTS['flavour'];
 $inputs = $OPTS['input'];
 $topics = $OPTS['topics'];
 
@@ -64,28 +64,21 @@ try {
 	}
 
 	// let's get scraping
+	$scrapers = TelemetryScrape::list_scrapers();
+	foreach ($scrapers as $input => $scraper) {
+		if (!in_array($input, $inputs)) {
+			echo "*** Scraping source: $input - not selected.\n";
+			continue;
+		}
+		$scraper = $scrapers[$input] ?: null;
+		if (!$scraper)
+			throw new ErrorException("No scraper found for input type '$input'. Skipping.");
+		
+		$scraper['class']::run($flavours,$topics);
+		
+		echo "*** Done scraping source: $input.\n";
+	}
 	
-	if (in_array("sv",$inputs)) {
-		try	{
-			echo "*** Scraping source: SVs\n";
-			foreach ($FLAVOURS as $flav) TelemetryScrapeSVs::scrape($flav,$topics);
-			echo "*** Done scraping SVs.\n";
-		} catch (MinorError $e) {
-			echo "Failed: ".$e->getMessage()."\n";
-		}
-	} else {
-		echo "*** Skipping SV scraping.\n";
-	}
-	if (in_array("packagerlog",$inputs)) {
-		try {
-			echo "*** Scraping source: Packager Logs\n";
-			TelemetryScrapePackagerLog::scrape($topics);
-		} catch (MinorError $e) {
-			echo "Failed: ".$e->getMessage()."\n";
-		}
-	} else {
-		echo "*** Skipping Packager Log scraping.\n";
-	}
 } catch (ErrorException $e) {
 	echo "ERROR: ".$e->getMessage()."\n";
 }

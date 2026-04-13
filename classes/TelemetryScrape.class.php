@@ -351,4 +351,8 @@ class TelemetryScrape {
 
 	}
 
+	static function run($flavours, $topics) {
+		throw new ErrorException("Base TelemetryScrape class does not implement run(). This method should be implemented in each scraper subclass to perform the actual scraping.");
+	}
+
 }

@@ -80,6 +80,12 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			return filemtime($f) >= $time_limit;
 		}));
 	}
+
+	static function run($flavours, $topics) {
+		foreach ($flavours as $flavour) {
+			self::scrape($flavour, $topics);
+		}
+	}
 	
 	/**
 	 * Grab data from SVs, store into db
