@@ -7,6 +7,7 @@
 class TelemetryDB {
 	/** @var mysqli */
 	public $conn = null;
+	public $query_mode = MYSQLI_STORE_RESULT;
 
 	public $LAST_QUERY = null;
 
@@ -50,7 +51,7 @@ class TelemetryDB {
 			$query = $this->qesc($query, ...$args);
 		}
 		$this->LAST_QUERY = $query;
-		return $this->conn->query($query);
+		return $this->conn->query($query, $this->query_mode);
 	}
 
 	/**
@@ -237,7 +238,7 @@ class TelemetryDB {
 				$values[] = $this->qesc("({d},{d},{d},{s},{sn},{s})", $flavnum, $file_id, $time, $type, $subtype, json_encode($dp));
 			}
 			$q = "INSERT INTO events (flavnum,file_id,time,type,subtype,data) VALUES " . join(",", $values);
-			$r = $this->conn->query($q);
+			$r = $this->query($q);
 			if (!$r) throw new Exception("DB error: " . $this->error());
 			$inserted += $this->affected_rows();
 		}

@@ -577,6 +577,7 @@ class Telemetry {
 			throw new Exception("dedupe-events needs a file id range, --from=1 --to=$max_file_id.");
 		}
 		$flavnum = self::flavnum($OPTS['flavour']);
+		self::$db->query_mode = MYSQLI_USE_RESULT;
 		$q = self::$db->query("SELECT `id`,`file_id`, `time`, `type`,`subtype`,`data` 
 		  FROM `events`
 		  WHERE
