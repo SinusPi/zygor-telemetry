@@ -287,7 +287,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		// add progress later; will involve decreasing total as we filter out unchanged files, and increasing current as we process them
 
 		// get svfiles that may have fresh data for the topics listed
-		$gen_fresh_svfiles = self::get_fresh_files_gen(array_keys($topics_sv), $sync_path, self::$CFG['filemask'], [__CLASS__,'file_path_to_slug'], "sv", self::$CFG['BATCH_SIZE']);
+		$gen_fresh_svfiles = self::get_fresh_files_gen(array_keys($topics_sv), $sync_path, self::$CFG['filemask'], [__CLASS__,'file_path_to_slug'], "sv", self::$CFG['BATCH_SIZE'], Telemetry::flavnum($flavour));
 
 		// narrow down per configuration
 		$gen_narrowed_svfiles = Telemetry::filter_gen($gen_fresh_svfiles, function($file) {

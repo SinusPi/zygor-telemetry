@@ -171,7 +171,7 @@ class TelemetryDB {
 	 * @param bool $do_insert_missing whether to insert missing slugnames
 	 * @return File[] array of File objects in the same order as $slugnames
 	 */
-	function get_files($slugnames, $filetype, $do_insert_missing = true) {
+	function get_files($slugnames, $filetype, $do_insert_missing = true, $flavnum = null) {
 		$r = $this->query("SELECT * FROM files WHERE slugname in ({sa}) AND filetype={s}", $slugnames, $filetype);
 		if ($this->error()) throw new ErrorException("DB error getting files '" . join(", ", array_slice($slugnames, 0, 5)) . "...': " . $this->error());
 		if ($r && $r->num_rows) $file_rows = $r->fetch_all(MYSQLI_ASSOC);
@@ -180,7 +180,7 @@ class TelemetryDB {
 		$files_not_found = array_diff($slugnames, $files_found);
 		if ($do_insert_missing && count($files_not_found)) {
 			foreach ($files_not_found as $nf) {
-				$this->query("INSERT INTO files (slugname, filetype) VALUES ({s}, {s}) ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)", $nf, $filetype);
+				$this->query("INSERT INTO files (slugname, filetype, flavnum) VALUES ({s}, {s}, {dn}) ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)", $nf, $filetype, $flavnum);
 				if ($this->error()) throw new ErrorException("DB error inserting file '$nf': " . $this->error());
 				$file_rows[] = ['id' => $this->insert_id(), 'slugname' => $nf]; // mock entry
 			}
