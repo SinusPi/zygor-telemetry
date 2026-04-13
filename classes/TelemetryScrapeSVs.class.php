@@ -313,6 +313,8 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			return true;
 		});
 
+		$GLOBALS['processed_files'] = 0;
+
 		foreach ($gen_narrowed_svfiles as $n => $file) {
 			$fresh_topics_in_file = array_filter($topics_sv, function($topic,$name) use ($file) { return $file->topics[$name]['fresh']; },ARRAY_FILTER_USE_BOTH);
 			self::process_single_sv_file($flavour, $file, $fresh_topics_in_file, $totals);
@@ -337,6 +339,9 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		if (count($totals['files_without_zgvs'])/(count($freshfiles_to_process)-$totals['files_skipped'])>0.5)
 			Logger::log("Weird. Out of ".(count($freshfiles_to_process)-$totals['files_skipped'])." files read, ".count($totals['files_without_zgvs'])." had no ZGVs.");
 		*/
+
+		Logger::log("Scrape of $flavour complete; found ". $GLOBALS['total_files'] ." files, processed ". $GLOBALS['processed_files'] .".");
+		
 
 		TmSt::stat(['status'=>"IDLE"]);
 	}
@@ -465,6 +470,8 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			self::db_set_file_scrapetimes(array_keys($topics), $file->id, $newest_per_topic, $file->mtime);
 
 			Telemetry::$db->commit();
+
+			$GLOBALS['processed_files']++;
 
 		} catch (FileLockedException $e) {
 			Logger::vlog($e->getMessage()." - $filename_full");

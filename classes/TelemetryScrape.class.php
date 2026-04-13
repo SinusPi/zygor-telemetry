@@ -135,12 +135,17 @@ class TelemetryScrape {
 		Logger::vlog("Finding files in $startfolder matching $filemask...");
 		$files_gen = FileTools::rglob_gen($startfolder,$filemask,10);
 		$file_batches_gen = FileTools::batchify($files_gen, $batch_size);
+		$GLOBALS['total_files'] = 0;
 		foreach ($file_batches_gen as $batch) {
 			Logger::vlog("* Processing batch of ".count($batch)." files...");
 			// filenames in batch are full; need to shorten for DB
 			// add prefix to batch items, e.g. "flavour/filename"
+			$GLOBALS['total_files'] += count($batch);
+
 			$batch_slugs = array_map($cb_slugger,$batch);
 			$files = Tm::$db->get_files($batch_slugs,$filetype,true); // same order maintained
+			if (self::$CFG['onlycount']) continue;
+			
 			$ids = array_map(function($f) { return $f->id ?: null; }, $files);
 			if (self::$CFG['ignore-mtimes']) {
 				Logger::vlog("- Ignoring mtimes for freshness check (config ignore-mtimes=true)");
@@ -278,7 +283,6 @@ class TelemetryScrape {
 						$q = Tm::$db->query("SELECT count(1) FROM `topic_scrapetimes` WHERE `topic` IN ({sa}) AND `scrape_time` IS NOT NULL", $OPTS['topics']);
 						$count = $q ? $q->fetch_row()[0] : 0;
 						echo "This will clear $count entries from topic_scrapetimes for topics: ".implode(",", $OPTS['topics']).". If you're sure, run again with --sure flag.\n";
-						echo Tm::$db->LAST_QUERY;
 						return;
 					}
 					Tm::$db->query("UPDATE `topic_scrapetimes` SET `scrape_time` = NULL, `last_event_time` = NULL WHERE `topic` IN ({sa})", $OPTS['topics']);
@@ -302,6 +306,16 @@ class TelemetryScrape {
 					if (Tm::$db->error())
 						throw new ErrorException("Failed to update topic_scrapetimes table: ".Tm::$db->error());
 					echo("Set ".Tm::$db->affected_rows()." topic_scrapetimes entries to current time for topics: ".implode(",", $OPTS['topics']).".\n");
+				}
+			],
+			"count-files" => [
+				"description" => "Go through files and assign IDs and slugnames. Speeds up future operations, and counts files. (set topics using -t, default: all)",
+				"action" => function() use ($OPTS) {
+					foreach ($OPTS['flavour'] as $flav) {
+						echo "Counting flavour $flav...\n";
+						$files = self::get_fresh_files_gen($OPTS['topics'], Tm::cfgstr('SV_STORAGE_FLAVOUR_PATH',["FLAVOUR"=>$OPTS['flavour'][0]]), $OPTS['filemask'], function($f) use ($OPTS) { return $OPTS['flavour'][0]."/".Tm::split_filename($f)[1]; }, "svfile", 100);
+						echo "Total files for topics ".implode(",",$OPTS['topics']).": ".count($files)."\n";
+					}
 				}
 			],
 			"help" => [
