@@ -576,7 +576,16 @@ class Telemetry {
 			throw new Exception("dedupe-events needs a file id range, --from=1 --to=$max_file_id.");
 		}
 		$flavnum = self::flavnum($OPTS['flavour']);
-		$q = self::$db->query("SELECT `id`,`file_id`, `time`, `type`,`subtype`,`data` FROM `events` WHERE `flavnum` IN ({da}) AND `file_id` BETWEEN {d} AND {d} ORDER BY `file_id` ASC, `time` ASC", $flavnum, intval($OPTS['from']), intval($OPTS['to']));
+		$q = self::$db->query("SELECT `id`,`file_id`, `time`, `type`,`subtype`,`data` 
+		  FROM `events`
+		  WHERE
+		    `flavnum` IN ({da})
+		    `type` IN ({sa})
+		    AND `file_id` BETWEEN {d} AND {d}
+		  ORDER BY `file_id` ASC, `time` ASC",
+		  $flavnum,
+		  $OPTS['topics'],
+		  intval($OPTS['from']), intval($OPTS['to']));
 		if (!$q) throw new Exception("Database query failed: ".self::$db->error());
 
 		$seen = [];
