@@ -396,7 +396,9 @@ class Telemetry {
 					UNIQUE KEY `slugname` (`slugname`)
 				) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
 				COMMENT='list of all parsed files, for bookkeeping and reference from events';
-			"]);
+			",
+			'1>2' => "ALTER TABLE `files` ADD COLUMN `flavnum` int(1) NULL AFTER `filetype`",
+			]);
 		if ($result && $result['status'] === 'migrated') Logger::vlog("DB: 'files' table created or migrated to version ".$result['target_version']);
 	}
 

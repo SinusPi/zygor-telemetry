@@ -277,15 +277,21 @@ class TelemetryScrape {
 			"clear-files" => [
 				"description" => "Clear scrape times of input files, as if never scraped before  (set topics using -t, default: all)",
 				"action" => function() use ($OPTS) {
-					//$flavor_likes = join(" OR ",array_map(function($t) { return '`slugname` LIKE "'.$t.'/%"'; }, $OPTS['flavour']));
-					$flavor_likes = ""; // it's a different table ffs
 					if (!$OPTS['sure']) {
-						$q = Tm::$db->query("SELECT count(1) FROM `topic_scrapetimes` WHERE `topic` IN ({sa}) AND `scrape_time` IS NOT NULL", $OPTS['topics']);
+						$q = Tm::$db->query("SELECT count(1) FROM `topic_scrapetimes`
+						  WHERE `topic` IN ({sa})
+						    AND `flavnum` IN ({sa})
+						    AND `scrape_time` IS NOT NULL",
+						  $OPTS['topics'], $OPTS['flavour']);
 						$count = $q ? $q->fetch_row()[0] : 0;
 						echo "This will clear $count entries from topic_scrapetimes for topics: ".implode(",", $OPTS['topics']).". If you're sure, run again with --sure flag.\n";
 						return;
 					}
-					Tm::$db->query("UPDATE `topic_scrapetimes` SET `scrape_time` = NULL, `last_event_time` = NULL WHERE `topic` IN ({sa})", $OPTS['topics']);
+					Tm::$db->query("UPDATE `topic_scrapetimes`
+					  SET `scrape_time` = NULL, `last_event_time` = NULL
+					  WHERE `topic` IN ({sa})
+					    AND `flavnum` IN ({sa})",
+					  $OPTS['topics'], $OPTS['flavour']);
 					if (Tm::$db->error())
 						throw new ErrorException("Failed to clear topic_scrapetimes table: ".Tm::$db->error());
 					echo("Cleared ".Tm::$db->affected_rows()." topic_scrapetimes entries for topics: ".implode(",", $OPTS['topics']).".\n");
@@ -294,28 +300,16 @@ class TelemetryScrape {
 			"flush-files" => [
 				"description" => "Set scrape_time and last_event_time of input files to current time, as if just scraped  (set topics using -t, default: all)",
 				"action" => function() use ($OPTS) {
-					//$flavor_likes = join(" OR ",array_map(function($t) { return '`slugname` LIKE "'.$t.'/%"'; }, $OPTS['flavour']));
-					$flavor_likes = ""; // it's a different table ffs
 					if (!$OPTS['sure']) {
-						$q = Tm::$db->query("SELECT count(1) FROM `topic_scrapetimes` WHERE `topic` IN ({sa})", $OPTS['topics']);
+						$q = Tm::$db->query("SELECT count(1) FROM `topic_scrapetimes` WHERE `topic` IN ({sa}) AND `flavnum` IN ({sa})", $OPTS['topics'], $OPTS['flavour']);
 						$count = $q ? $q->fetch_row()[0] : 0;
 						echo "This will set scrape_time and last_event_time to current time for $count entries in topic_scrapetimes for topics: ".implode(",", $OPTS['topics']).". If you're sure, run again with --sure flag.\n";
 						return;
 					}
-					Tm::$db->query("UPDATE `topic_scrapetimes` SET `scrape_time` = UNIX_TIMESTAMP(), `last_event_time` = UNIX_TIMESTAMP() WHERE `topic` IN ({sa})", $OPTS['topics']);
+					Tm::$db->query("UPDATE `topic_scrapetimes` SET `scrape_time` = UNIX_TIMESTAMP(), `last_event_time` = UNIX_TIMESTAMP() WHERE `topic` IN ({sa}) AND `flavnum` IN ({sa})", $OPTS['topics'], $OPTS['flavour']);
 					if (Tm::$db->error())
 						throw new ErrorException("Failed to update topic_scrapetimes table: ".Tm::$db->error());
 					echo("Set ".Tm::$db->affected_rows()." topic_scrapetimes entries to current time for topics: ".implode(",", $OPTS['topics']).".\n");
-				}
-			],
-			"count-files" => [
-				"description" => "Go through files and assign IDs and slugnames. Speeds up future operations, and counts files. (set topics using -t, default: all)",
-				"action" => function() use ($OPTS) {
-					foreach ($OPTS['flavour'] as $flav) {
-						echo "Counting flavour $flav...\n";
-						$files = self::get_fresh_files_gen($OPTS['topics'], Tm::cfgstr('SV_STORAGE_FLAVOUR_PATH',["FLAVOUR"=>$OPTS['flavour'][0]]), $OPTS['filemask'], function($f) use ($OPTS) { return $OPTS['flavour'][0]."/".Tm::split_filename($f)[1]; }, "svfile", 100);
-						echo "Total files for topics ".implode(",",$OPTS['topics']).": ".count($files)."\n";
-					}
 				}
 			],
 			"help" => [
