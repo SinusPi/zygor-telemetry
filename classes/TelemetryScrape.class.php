@@ -286,7 +286,7 @@ class TelemetryScrape {
 						  	$OPTS['topics'], $OPTS['flavour']);
 						if (!$q) throw new ErrorException("DB error counting topic_scrapetimes entries: ".Tm::$db->error());
 						$count = $q ? $q->fetch_row()[0] : 0;
-						echo "This will clear $count entries from topic_scrapetimes for topics: ".implode(",", $OPTS['topics']).". If you're sure, run again with --sure flag.\n";
+						echo "This will clear $count entries from topic_scrapetimes for flavors ".implode(",", $OPTS['flavour'])." and topics: ".implode(",", $OPTS['topics']).". If you're sure, run again with --sure flag.\n";
 						return;
 					}
 					Tm::$db->query("UPDATE `topic_scrapetimes`
@@ -297,7 +297,7 @@ class TelemetryScrape {
 					  	$OPTS['topics'], $OPTS['flavour']);
 					if (Tm::$db->error())
 						throw new ErrorException("Failed to clear topic_scrapetimes table: ".Tm::$db->error());
-					echo("Cleared ".Tm::$db->affected_rows()." topic_scrapetimes entries for topics: ".implode(",", $OPTS['topics']).".\n");
+					echo("Cleared ".Tm::$db->affected_rows()." topic_scrapetimes entries for flavors ".implode(",", $OPTS['flavour'])." and topics: ".implode(",", $OPTS['topics']).".\n");
 				}
 			],
 			"flush-files" => [
@@ -311,7 +311,7 @@ class TelemetryScrape {
 						  	$OPTS['topics'], $OPTS['flavour']);
 						if (!$q) throw new ErrorException("DB error counting topic_scrapetimes entries: ".Tm::$db->error());
 						$count = $q ? $q->fetch_row()[0] : 0;
-						echo "This will set scrape_time and last_event_time to current time for $count entries in topic_scrapetimes for topics: ".implode(",", $OPTS['topics']).". If you're sure, run again with --sure flag.\n";
+						echo "This will set scrape_time and last_event_time to current time for $count entries in topic_scrapetimes for flavors ".implode(",", $OPTS['flavour'])." and topics: ".implode(",", $OPTS['topics']).". If you're sure, run again with --sure flag.\n";
 						return;
 					}
 					Tm::$db->query("UPDATE `topic_scrapetimes` JOIN `files` ON `topic_scrapetimes`.`file_id` = `files`.`id`
@@ -321,7 +321,7 @@ class TelemetryScrape {
 						$OPTS['topics'], $OPTS['flavour']);
 					if (Tm::$db->error())
 						throw new ErrorException("Failed to update topic_scrapetimes table: ".Tm::$db->error());
-					echo("Set ".Tm::$db->affected_rows()." topic_scrapetimes entries to current time for topics: ".implode(",", $OPTS['topics']).".\n");
+					echo("Set ".Tm::$db->affected_rows()." topic_scrapetimes entries to current time for flavors ".implode(",", $OPTS['flavour'])." and topics: ".implode(",", $OPTS['topics']).".\n");
 				}
 			],
 			"help" => [
