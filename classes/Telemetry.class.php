@@ -570,6 +570,7 @@ class Telemetry {
 		 * Search range should be limited (by file_id) as there could be thousands of events and comparing all of them would consume a lot of memory.
 		 */
 		if (!$OPTS['from'] || !$OPTS['to']) {
+			echo "Calculating file IDs for error response... :P\r";
 			$q = self::$db->query("SELECT MAX(`file_id`) FROM `events`");
 			if (!$q) throw new Exception("Database query failed: ".self::$db->error());
 			$max_file_id = $q->fetch_array()[0];
@@ -580,7 +581,7 @@ class Telemetry {
 		  FROM `events`
 		  WHERE
 		    `flavnum` IN ({da})
-		    `type` IN ({sa})
+		    AND `type` IN ({sa})
 		    AND `file_id` BETWEEN {d} AND {d}
 		  ORDER BY `file_id` ASC, `time` ASC",
 		  $flavnum,
