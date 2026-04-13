@@ -277,13 +277,14 @@ class TelemetryScrape {
 			"clear-files" => [
 				"description" => "Clear scrape times of input files, as if never scraped before  (set topics using -t, default: all)",
 				"action" => function() use ($OPTS) {
+					$flavnums = Telemetry::flavnum($OPTS['flavour']);
 					if (!$OPTS['sure']) {
 						$q = Tm::$db->query("SELECT count(1) FROM `topic_scrapetimes`,`files`
 						    WHERE `topic_scrapetimes`.`file_id` = `files`.`id`
 						      AND `topic_scrapetimes`.`topic` IN ({sa})
 						      AND `files`.`flavnum` IN ({sa})
 						      AND `topic_scrapetimes`.`scrape_time` IS NOT NULL",
-						  	$OPTS['topics'], $OPTS['flavour']);
+						  	$OPTS['topics'], $flavnums);
 						if (!$q) throw new ErrorException("DB error counting topic_scrapetimes entries: ".Tm::$db->error());
 						$count = $q ? $q->fetch_row()[0] : 0;
 						echo "This will clear $count entries from topic_scrapetimes for flavors ".implode(",", $OPTS['flavour'])." and topics: ".implode(",", $OPTS['topics']).". If you're sure, run again with --sure flag.\n";
@@ -294,7 +295,7 @@ class TelemetryScrape {
 					  	SET `scrape_time` = NULL, `last_event_time` = NULL
 					  	WHERE `topic` IN ({sa})
 					      AND `flavnum` IN ({sa})",
-					  	$OPTS['topics'], $OPTS['flavour']);
+					  	$OPTS['topics'], $flavnums);
 					if (Tm::$db->error())
 						throw new ErrorException("Failed to clear topic_scrapetimes table: ".Tm::$db->error());
 					echo("Cleared ".Tm::$db->affected_rows()." topic_scrapetimes entries for flavors ".implode(",", $OPTS['flavour'])." and topics: ".implode(",", $OPTS['topics']).".\n");
@@ -303,12 +304,13 @@ class TelemetryScrape {
 			"flush-files" => [
 				"description" => "Set scrape_time and last_event_time of input files to current time, as if just scraped  (set topics using -t, default: all)",
 				"action" => function() use ($OPTS) {
+					$flavnums = Telemetry::flavnum($OPTS['flavour']);
 					if (!$OPTS['sure']) {
 						$q = Tm::$db->query("SELECT count(1) FROM `topic_scrapetimes`
 							JOIN `files` ON `topic_scrapetimes`.`file_id` = `files`.`id`
 							WHERE `topic` IN ({sa})
 						      AND `flavnum` IN ({sa})",
-						  	$OPTS['topics'], $OPTS['flavour']);
+						  	$OPTS['topics'], $flavnums);
 						if (!$q) throw new ErrorException("DB error counting topic_scrapetimes entries: ".Tm::$db->error());
 						$count = $q ? $q->fetch_row()[0] : 0;
 						echo "This will set scrape_time and last_event_time to current time for $count entries in topic_scrapetimes for flavors ".implode(",", $OPTS['flavour'])." and topics: ".implode(",", $OPTS['topics']).". If you're sure, run again with --sure flag.\n";
@@ -318,7 +320,7 @@ class TelemetryScrape {
 						SET `scrape_time` = UNIX_TIMESTAMP(), `last_event_time` = UNIX_TIMESTAMP()
 						WHERE `topic` IN ({sa})
 					      AND `flavnum` IN ({sa})",
-						$OPTS['topics'], $OPTS['flavour']);
+						$OPTS['topics'], $flavnums);
 					if (Tm::$db->error())
 						throw new ErrorException("Failed to update topic_scrapetimes table: ".Tm::$db->error());
 					echo("Set ".Tm::$db->affected_rows()." topic_scrapetimes entries to current time for flavors ".implode(",", $OPTS['flavour'])." and topics: ".implode(",", $OPTS['topics']).".\n");
