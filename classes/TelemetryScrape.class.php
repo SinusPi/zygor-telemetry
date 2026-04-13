@@ -131,7 +131,7 @@ class TelemetryScrape {
 	 * @param string $prefix prefix replacing $startfolder in the file paths when looking up in DB
 	 * @yield File $file
 	 */
-	static function get_fresh_files_gen($topics, $startfolder, $filemask, $cb_slugger, $filetype, $batch_size=20) {
+	static function get_fresh_files_gen($topics, $startfolder, $filemask, $cb_slugger, $filetype, $batch_size=20, $flavnum=null) {
 		Logger::vlog("Finding files in $startfolder matching $filemask...");
 		$files_gen = FileTools::rglob_gen($startfolder,$filemask,10);
 		$file_batches_gen = FileTools::batchify($files_gen, $batch_size);
@@ -143,7 +143,7 @@ class TelemetryScrape {
 			$GLOBALS['total_files'] += count($batch);
 
 			$batch_slugs = array_map($cb_slugger,$batch);
-			$files = Tm::$db->get_files($batch_slugs,$filetype,true); // same order maintained
+			$files = Tm::$db->get_files($batch_slugs,$filetype,true,$flavnum); // same order maintained
 			if (self::$CFG['onlycount']) continue;
 			
 			$ids = array_map(function($f) { return $f->id ?: null; }, $files);
@@ -282,7 +282,7 @@ class TelemetryScrape {
 						$q = Tm::$db->query("SELECT count(1) FROM `topic_scrapetimes`,`files`
 						    WHERE `topic_scrapetimes`.`file_id` = `files`.`id`
 						      AND `topic_scrapetimes`.`topic` IN ({sa})
-						      AND `files`.`flavnum` IN ({sa})
+						      AND `files`.`flavnum` IN ({da})
 						      AND `topic_scrapetimes`.`scrape_time` IS NOT NULL",
 						  	$OPTS['topics'], $flavnums);
 						if (!$q) throw new ErrorException("DB error counting topic_scrapetimes entries: ".Tm::$db->error());
@@ -294,7 +294,7 @@ class TelemetryScrape {
 						JOIN `files` ON `topic_scrapetimes`.`file_id` = `files`.`id`
 					  	SET `scrape_time` = NULL, `last_event_time` = NULL
 					  	WHERE `topic` IN ({sa})
-					      AND `flavnum` IN ({sa})",
+					      AND `flavnum` IN ({da})",
 					  	$OPTS['topics'], $flavnums);
 					if (Tm::$db->error())
 						throw new ErrorException("Failed to clear topic_scrapetimes table: ".Tm::$db->error());
@@ -309,7 +309,7 @@ class TelemetryScrape {
 						$q = Tm::$db->query("SELECT count(1) FROM `topic_scrapetimes`
 							JOIN `files` ON `topic_scrapetimes`.`file_id` = `files`.`id`
 							WHERE `topic` IN ({sa})
-						      AND `flavnum` IN ({sa})",
+						      AND `flavnum` IN ({da})",
 						  	$OPTS['topics'], $flavnums);
 						if (!$q) throw new ErrorException("DB error counting topic_scrapetimes entries: ".Tm::$db->error());
 						$count = $q ? $q->fetch_row()[0] : 0;
@@ -319,7 +319,7 @@ class TelemetryScrape {
 					Tm::$db->query("UPDATE `topic_scrapetimes` JOIN `files` ON `topic_scrapetimes`.`file_id` = `files`.`id`
 						SET `scrape_time` = UNIX_TIMESTAMP(), `last_event_time` = UNIX_TIMESTAMP()
 						WHERE `topic` IN ({sa})
-					      AND `flavnum` IN ({sa})",
+					      AND `flavnum` IN ({da})",
 						$OPTS['topics'], $flavnums);
 					if (Tm::$db->error())
 						throw new ErrorException("Failed to update topic_scrapetimes table: ".Tm::$db->error());
