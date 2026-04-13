@@ -5,6 +5,7 @@ require_once __DIR__ . '/classes/Logger.class.php';
 require_once __DIR__ . '/classes/Cruncher.class.php';
 require_once __DIR__ . '/classes/Topic.class.php';
 require_once __DIR__ . '/classes/SchemaManager.class.php';
+require_once __DIR__ . '/classes/TelemetryStatus.class.php';
 require_once __DIR__ . '/classes/Telemetry.class.php';
 require_once __DIR__ . '/classes/TelemetryCrunch.class.php';
 require_once __DIR__ . '/classes/TelemetryDB.class.php';

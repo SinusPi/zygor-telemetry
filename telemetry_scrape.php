@@ -42,6 +42,7 @@ $OPTS = (array)\Zygor\Shell::better_getopt([
 	['',  'maintenance::', false],
 	['',  'sure',          false], // for maintenance tasks that are potentially destructive, require --sure to be passed as well
 	['',  'onlycount',     false], // for maintenance tasks that only count files without processing them
+	['p', 'progress',      false], // whether to show progress bar (enforces pre-count)
 ]);
 if (substr($OPTS['start-day'],0,1)=="-") $OPTS['start-day']=date("Ymd",strtotime($OPTS['start-day']." days"));
 $OPTS["MAX_DAYS"]=$OPTS['maxdays'];

@@ -292,6 +292,15 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		//$file_count_total = Tm::$db->query_one("SELECT COUNT(*) FROM files WHERE filetype='sv' AND slugname LIKE {s}", $flavour."/%") ?: 0;
 		// add progress later; will involve decreasing total as we filter out unchanged files, and increasing current as we process them
 
+		$total_files = 0;
+		if (self::$CFG['progress']) {
+			TmSt::stat(['status'=>"ENUMERATING",'stage'=>1,'stageof'=>2,'flavour'=>$flavour,'progress'=>['total_files'=>$total_files]]);
+			Logger::log("You want progress, eh? Enumerating SV files for flavour '\x1b[38;5;78m{$flavour}\x1b[0m'...");
+			$flavnum = Telemetry::flavnum($flavour);
+			$total_files = Tm::$db->query("SELECT COUNT(*) FROM files WHERE filetype='sv' AND flavnum='{$flavnum}'")->fetch_row()[0] ?: 0;
+			Logger::log("Total files known: $total_files");
+		}
+
 		// get svfiles that may have fresh data for the topics listed
 		$gen_fresh_svfiles = self::get_fresh_files_gen(array_keys($topics_sv), $sync_path, self::$CFG['filemask'], [__CLASS__,'file_path_to_slug'], "sv", self::$CFG['BATCH_SIZE'], Telemetry::flavnum($flavour));
 
@@ -332,7 +341,9 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			}
 
 			// update progress
-			//self::update_progress(self::$logtag,$n,count($gen_narrowed_svfiles_2),['totals'=>$totals],self::$CFG['verbose']);
+			if (self::$CFG['progress']) {
+				TmSt::update_progress(self::$logtag,$n,$total_files,['totals'=>$totals],self::$CFG['verbose']);
+			}
 		}
 
 		//self::write_intermediate_mtimes($flavour,$last_scrape_dates,true);
