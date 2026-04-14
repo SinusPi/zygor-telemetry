@@ -609,7 +609,7 @@ class Telemetry {
 				}
 			}
 			if ($OPTS['progress'] && ($found_total > $last_found || microtime(true) - $last_time > self::$CFG['STATUS_INTERVAL'])) {
-				Status::update_progress(self::$tag, $id_to-$id,$to-$from,['totals'=>($OPTS['sure']?['deleted'=>$deleted_total]:['found'=>$found_total]),'range_from'=>$id,'range_to'=>$id_to]);
+				Status::update_progress(self::$tag, $id-$from,$to-$from,['totals'=>($OPTS['sure']?['deleted'=>$deleted_total]:['found'=>$found_total]),'range_from'=>$id,'range_to'=>$id_to]);
 				$last_found = $found_total;
 				$last_time = microtime(true);
 			}
