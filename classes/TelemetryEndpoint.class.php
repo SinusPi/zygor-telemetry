@@ -1,7 +1,7 @@
 <?php
 namespace Zygor\Telemetry;
 
-use Telemetry as Tm;
+use Zygor\Telemetry\Telemetry as Tm;
 
 /**
  * Query the database for telemetry metrics and produce them in JSON form
@@ -117,7 +117,7 @@ class TelemetryEndpoint {
 				// Determine if scraper is configured based on whether paths exist
 				//$status = (count($source_paths) > 0 && $class::verifyConfiguredPaths()) ? 'configured' : 'not-configured';
 
-			} catch (Exception $e) {
+			} catch (\Exception $e) {
 				$error = $e->getMessage();
 			}
 			
@@ -139,7 +139,7 @@ class TelemetryEndpoint {
 			// Fetch all status records from the database
 			$query = Telemetry::$db->query("SELECT tag, status, updated_at FROM status ORDER BY tag ASC");
 			if (!$query) 
-				throw new Exception("Database query failed: " . Telemetry::$db->error());
+				throw new \Exception("Database query failed: " . Telemetry::$db->error());
 			$result = $query->fetch_all(MYSQLI_ASSOC);
 
 			$statuses = [];
@@ -149,7 +149,7 @@ class TelemetryEndpoint {
 			}
 
 			self::response(["success" => true, "code" => 200, "statuses" => $statuses]);
-		} catch (Exception $e) {
+		} catch (\Exception $e) {
 			self::response(["success" => false, "code" => 500, "error" => "Exception while fetching status records: " . $e->getMessage()]);
 		}
 	}
@@ -163,7 +163,7 @@ class TelemetryEndpoint {
 		try {
 			$from = Tm::parse_date($_REQUEST['from']);
 			$to = Tm::parse_date($_REQUEST['to']);
-		} catch (Exception $e) {
+		} catch (\Exception $e) {
 			self::response(["success" => false,"code" => 400,"error" => "Invalid date in from/to parameters: " . $e->getMessage(),"errcode" => "BAD_DATE"]);
 		}
 
@@ -183,7 +183,7 @@ class TelemetryEndpoint {
 		try {
 			$data = call_user_func($topicendpoint['queryfunc'], $from, $to, $flavnum);
 			self::response(["success" => true,"code" => 200,"data" => $data,"query" => Tm::$db->LAST_QUERY]);
-		} catch (Exception $e) {
+		} catch (\Exception $e) {
 			self::response(["success" => false,"code" => 500,"error" => "Exception while processing topic " . $topic . ": " . $e->getMessage()]);
 		}
 	}
@@ -214,8 +214,8 @@ class TelemetryEndpoint {
 					ORDER BY day ASC",
 					$flavnum, $from, $to
 				);
-			} catch (Exception $e) {
-				throw new Exception("Database query failed: " . $e->getMessage() . " - Query: " . Telemetry::$db->LAST_QUERY);
+			} catch (\Exception $e) {
+				throw new \Exception("Database query failed: " . $e->getMessage() . " - Query: " . Telemetry::$db->LAST_QUERY);
 			}
 			$result = $query->fetch_all(MYSQLI_ASSOC);
 			
@@ -238,7 +238,7 @@ class TelemetryEndpoint {
 			$max = $daymap ? max(array_values($daymap)) : 0;
 			$total = array_sum($daymap);
 			self::response(["success" => true,"code" => 200,"data" => $daymap,"count_max" => $max,"count_total" => $total, "year_totals" => $year_totals, "query" => Tm::$db->LAST_QUERY]);
-		} catch (Exception $e) {
+		} catch (\Exception $e) {
 			self::response(["success" => false,"code" => 500,"error" => "Exception while processing daymap for topic " . $topicObj->name . ": " . $e->getMessage()]);
 		}
 	}

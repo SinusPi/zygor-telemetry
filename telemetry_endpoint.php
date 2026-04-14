@@ -1,4 +1,7 @@
 <?php
+use Zygor\Telemetry\Telemetry;
+use Zygor\Telemetry\TelemetryEndpoint;
+
 if (!defined('WEBHOME')) define("WEBHOME","/home/zygordata/www");
 
 require_once __DIR__ . "/loader.inc.php";
