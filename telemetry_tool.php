@@ -37,6 +37,7 @@ $OPTS = (array)\Zygor\Shell::better_getopt([
 	['',  'do:',            ""],
 	['',  'from:',          ""],
 	['',  'to:',            ""],
+	['',  'progress',      false],
 ]);
 $FLAVOURS = $OPTS['f'];
 if (substr($OPTS['start-day'],0,1)=="-") $OPTS['start-day']=date("Ymd",strtotime($OPTS['start-day']." days"));

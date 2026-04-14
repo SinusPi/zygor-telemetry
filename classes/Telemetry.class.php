@@ -450,7 +450,8 @@ class Telemetry {
 				PARTITION `p_wowclassictbcanniv` VALUES LESS THAN (5) ENGINE = InnoDB
 			)",
 			"2>3" => "ALTER TABLE `events` CHANGE `subtype` `subtype` VARCHAR(40) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL DEFAULT NULL",
-			"3>4" => "ALTER TABLE `events` CHANGE `type` `type` VARCHAR(40) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL DEFAULT NULL"
+			"3>4" => "ALTER TABLE `events` CHANGE `type` `type` VARCHAR(40) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL DEFAULT NULL",
+			"4>5" => "ALTER TABLE `events` ADD KEY `file_id` (`file_id`) USING BTREE",
 		]);
 		if ($result && $result['status'] === 'migrated') Logger::vlog("DB: 'events' table created or migrated to version ".$result['target_version']);
 	}
