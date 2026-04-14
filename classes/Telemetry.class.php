@@ -575,14 +575,43 @@ class Telemetry {
 		/* Events can get duplicated if a scraper/cruncher is run multiple times on the same file, e.g. due to crashes or manual re-runs.
 		 * Search range should be limited (by file_id) as there could be thousands of events and comparing all of them would consume a lot of memory.
 		 */
-		if (!$OPTS['from'] || !$OPTS['to']) {
-			echo "Calculating file IDs for error response... :P\r";
-			$q = self::$db->query("SELECT MAX(`file_id`) FROM `events`");
+		$flavnums = self::flavnum($OPTS['flavour']);
+
+		if ((isset($OPTS['from']) && $OPTS['from']=="?") || (isset($OPTS['to']) && $OPTS['to']=="?")) {
+			echo "Calculating file ID range for deduplication...";
+			$q = self::$db->query("SELECT MIN(`file_id`), MAX(`file_id`) FROM `events` WHERE `flavnum` IN ({da})", $flavnums);
 			if (!$q) throw new \Exception("Database query failed: ".self::$db->error());
-			$max_file_id = $q->fetch_array()[0];
-			throw new \Exception("dedupe-events needs a file id range, --from=1 --to=$max_file_id.");
+			$row = $q->fetch_array();
+			$min_file_id = $row[0];
+			$max_file_id = $row[1];
+			die("File ID range: $min_file_id - $max_file_id\n");
 		}
-		$flavnum = self::flavnum($OPTS['flavour']);
+
+		// batchify if needed
+		$filebatchsize = 1000;
+		$from=intval($OPTS['from']);
+		$to=intval($OPTS['to']);
+		$found = 0;
+		$deleted = 0;
+		for ($id = $from; $id <= $to; $id += $filebatchsize) {
+			$dupes = self::doDedupeEvents_Find($id, min($id + $filebatchsize - 1, $to), $flavnums, $OPTS);
+			$found += count($dupes);
+			Logger::vlog("File ID range $id - ".min($id + $filebatchsize - 1, $to).": found ".count($dupes)." duplicate events.");
+			if ($OPTS['sure'] && $dupes) {
+				$deleted += self::doDedupeEvents_Delete($dupes);
+			}
+		}
+		if ($deleted > 0) {
+			Logger::log("Deduplication complete. Removed $deleted duplicate events.");
+			return $deleted;
+		} elseif ($OPTS['sure']) {
+			Logger::log("No duplicate events found to delete.");
+		} else {
+			Logger::log("Dry run complete, found $found duplicate events. Run with --sure to actually delete the found duplicate events.");
+		}
+	}
+
+	static function doDedupeEvents_Find($from, $to, $flavnums, $OPTS) {
 		self::$db->query_mode = MYSQLI_USE_RESULT;
 		$q = self::$db->query("SELECT `id`,`file_id`, `time`, `type`,`subtype`,`data` 
 		  FROM `events`
@@ -591,58 +620,62 @@ class Telemetry {
 		    AND `type` IN ({sa})
 		    AND `file_id` BETWEEN {d} AND {d}
 		  ORDER BY `file_id` ASC, `time` ASC",
-		  $flavnum,
+		  $flavnums,
 		  $OPTS['topics'],
-		  intval($OPTS['from']), intval($OPTS['to']));
+		  $from, $to);
 		if (!$q) throw new \Exception("Database query failed: ".self::$db->error());
 
-		$seen = [];
+		$one_file_events = function($q) {
+			$last_file_id = null;
+			$events = [];
+			while ($row = $q->fetch_assoc()) {
+				if ($last_file_id !== null && $row['file_id'] != $last_file_id) {
+					yield $events;
+					$events = [];
+				}
+				$events[] = $row;
+				$last_file_id = $row['file_id'];
+			}
+			if (!empty($events))
+				yield $events;
+		};
+
+		$last_time = microtime(true);
 		$dupes = [];
-		$last_id = null;
-		$progress = 0;
-		while ($row = $q->fetch_assoc()) {
-			// files are ordered; new file_id = reset hashes
-			if ($last_id != $row['file_id']) {
-				$last_id = $row['file_id'];
-				$seen = [];
+		foreach ($one_file_events($q) as $events) {
+			// process events for one file
+			$seen = [];
+			foreach ($events as $row) {
+				$data_str = $row['time'] . "|" . $row['type'] . "|" . $row['subtype'] . "|" . $row['data'];
+				$hash = $data_str; // screw hashing
+				$seen[$hash] = (isset($seen[$hash]) ? $seen[$hash] : 0) + 1;
+				if ($seen[$hash] > 1) {
+					$dupes[] = $row['id'];
+					if ($seen[$hash]==2)
+						Logger::vlog("Dupe: id={$row['id']} file_id={$row['file_id']} time={$row['time']} type={$row['type']} subtype={$row['subtype']} data=".substr($row['data'],0,100));
+				}
 			}
-			$data_str = $row['time'] . "|" . $row['type'] . "|" . $row['subtype'] . "|" . $row['data'];
-			$hash = md5($data_str);
-			if (isset($seen[$hash])) {
-				$dupes[] = $row['id'];
-				$seen[$hash]++;
-				if ($seen[$hash]==2)
-					Logger::vlog("Dupe: id={$row['id']} file_id={$row['file_id']} time={$row['time']} type={$row['type']} subtype={$row['subtype']} data=".substr($row['data'],0,100));
-			} else {
-				$seen[$hash]=1;
-			}
-			$progress++;
-			if ($progress % 1000 == 0) {
-				echo "Checked $progress events, found ".count($dupes)." duplicates so far...\n";
+
+			if ($OPTS['progress'] && microtime(true) - $last_time > self::$CFG['STATUS_INTERVAL']) {
+				$last_time = microtime(true);
+				echo "File range $from-$to: found ".count($dupes)." duplicates so far...\n";
 			}
 		}
 		$q->free();
+		return $dupes;
+	}
 
-		if (count($dupes) > 0) {
-			if (!$OPTS['sure']) {
-				echo "Found ".count($dupes)." duplicate events. Run with --sure to actually delete them.\n";
-				return;
-			} else {
-				// batches of 100
-				$batch_size = 100;
-				$deleted = 0;
-				echo "Deleting ".count($dupes)." duplicate events in batches of $batch_size...\n";
-				for ($i = 0; $i < count($dupes); $i += $batch_size) {
-					$batch = array_slice($dupes, $i, $batch_size);
-					self::$db->query("DELETE FROM `events` WHERE `id` IN (" . join(',',$batch) . ")");
-					$deleted += self::$db->affected_rows();
-					echo ".";
-				}
-				echo "\nDeduplication complete. Removed ".$deleted." duplicate events.\n";
-			}
-		} else {
-			echo "Checked $progress events, found no duplicates.\n";
+	static function doDedupeEvents_Delete($dupes) {
+		// batches of 100
+		$batch_size = 100;
+		$deleted = 0;
+		Logger::vlog("Deleting ".count($dupes)." duplicate events in ". ceil(count($dupes)/$batch_size) ." batches of $batch_size...");
+		for ($i = 0; $i < count($dupes); $i += $batch_size) {
+			$batch = array_slice($dupes, $i, $batch_size);
+			self::$db->query("DELETE FROM `events` WHERE `id` IN (" . join(',',$batch) . ")");
+			$deleted += self::$db->affected_rows();
 		}
+		return $deleted;
 	}
 }
 
