@@ -62,6 +62,8 @@ class TelemetryStatus {
 			$tot1=array_filter($extra['totals'] ?: [],function($v) { return is_numeric($v); });
 			$tots=array_map(function($k,$v) { return "$k=$v"; }, array_keys($tot1), array_values($tot1));
 
+			$digits=strlen($total);
+
 			$progress = [
 				'progress'=>[
 					'progress_raw'=>$n+1,
@@ -79,7 +81,7 @@ class TelemetryStatus {
 			//print_r(self::get_last_status());
 			//die();
 			echo sprintf(
-				"Progress: [%s] %2d%% (%5d/%5d) - %ds elapsed, %ds remaining; totals: %s\n",
+				"Progress: [%{$bar_length}s] %3d%% (%{$digits}d/%{$digits}d) - %ds elapsed, %ds remaining; totals: %s\n",
 				$progress['progress']['progress_bar'],
 				$progress['progress']['progress_percent'],
 				$progress['progress']['progress_raw'],
