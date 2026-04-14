@@ -595,6 +595,7 @@ class Telemetry {
 		$found = 0;
 		$deleted = 0;
 		$last_found = 0;
+		$last_time = microtime(true);
 		for ($id = $from; $id <= $to; $id += $filebatchsize) {
 			$id_to = min($id + $filebatchsize - 1, $to);
 			$dupes = self::doDedupeEvents_Find($id, $id_to, $flavnums, $OPTS);
@@ -603,7 +604,7 @@ class Telemetry {
 			if ($OPTS['sure'] && $dupes) {
 				$deleted += self::doDedupeEvents_Delete($dupes);
 			}
-			if ($OPTS['progress'] && $found > $last_found) {//} && microtime(true) - $last_time > self::$CFG['STATUS_INTERVAL']) {
+			if ($OPTS['progress'] && ($found > $last_found || microtime(true) - $last_time > self::$CFG['STATUS_INTERVAL'])) {
 				echo "File range $from-$to: querying ".$id." - ".$id_to.", found ".$found." duplicates".($deleted > 0 ? ", deleted $deleted" : "")."...\n";
 				$last_found = $found;
 			}
