@@ -26,11 +26,11 @@ class Status {
 		$testtag="TEST";
 		self::status($testtag,['status'=>"TESTING1", 'foo'=>"bar"]);
 		$status = self::get_status($testtag);
-		if ($status['status']!="TESTING1" || $status['foo']!="bar") throw new Exception("Status test failed 1: ".print_r($status,true));
+		if ($status['status']!="TESTING1" || $status['foo']!="bar") throw new \Exception("Status test failed 1: ".print_r($status,true));
 
 		self::status($testtag,['status'=>"TESTING2"], true);
 		$status = self::get_status($testtag);
-		if ($status['status']!="TESTING2" || $status['foo']!="bar") throw new Exception("Status test failed 2: ".print_r($status,true));
+		if ($status['status']!="TESTING2" || $status['foo']!="bar") throw new \Exception("Status test failed 2: ".print_r($status,true));
 
 		Telemetry::$db->delete_status($testtag);
 	}
@@ -49,7 +49,7 @@ class Status {
 
 		if ((time()-$time_last_status >= Telemetry::$CFG['STATUS_INTERVAL']) || $force) {
 			$mitime = microtime(true);
-			$time_elapsed = $mitime-TelemetryStatus::get_status($tag)['time_started'];
+			$time_elapsed = $mitime-self::get_status($tag)['time_started'];
 			$last_time = $mitime-$time_last_status;
 			$last_progress = $n-$n_last;
 			$speed = $last_progress/$last_time;
