@@ -9,6 +9,8 @@ ini_set("max_execution_time",3600);
 define("DAY",86400);
 
 require_once __DIR__ . "/loader.inc.php";
+use Zygor\Telemetry\Telemetry;
+use Zygor\Telemetry\TelemetryScrape;
 
 require_once "includes/shell.class.php";
 \Zygor\Shell::run_only_in_shell();
