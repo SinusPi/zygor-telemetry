@@ -449,6 +449,8 @@ class Telemetry {
 				PARTITION `p_wowclassictbc` VALUES LESS THAN (4) ENGINE = InnoDB,
 				PARTITION `p_wowclassictbcanniv` VALUES LESS THAN (5) ENGINE = InnoDB
 			)",
+			"2>3" => "ALTER TABLE `events` CHANGE `subtype` `subtype` VARCHAR(40) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL DEFAULT NULL",
+			"3>4" => "ALTER TABLE `events` CHANGE `type` `type` VARCHAR(40) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL DEFAULT NULL"
 		]);
 		if ($result && $result['status'] === 'migrated') Logger::vlog("DB: 'events' table created or migrated to version ".$result['target_version']);
 	}
