@@ -137,8 +137,10 @@ class TelemetryScrape {
 		$files_gen = FileTools::rglob_gen($startfolder,$filemask,10);
 		$file_batches_gen = FileTools::batchify($files_gen, $batch_size);
 		$GLOBALS['total_files'] = 0;
+		$n = 0;
 		foreach ($file_batches_gen as $batch) {
-			Logger::vlog("* Processing batch of ".count($batch)." files...");
+			$n++;
+			Logger::vlog("* Processing #$n batch of ".count($batch)." files...");
 			// filenames in batch are full; need to shorten for DB
 			// add prefix to batch items, e.g. "flavour/filename"
 			$GLOBALS['total_files'] += count($batch);
