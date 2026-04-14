@@ -607,6 +607,7 @@ class Telemetry {
 			if ($OPTS['progress'] && ($found > $last_found || microtime(true) - $last_time > self::$CFG['STATUS_INTERVAL'])) {
 				echo "File range $from-$to: querying ".$id." - ".$id_to.", found ".$found." duplicates".($deleted > 0 ? ", deleted $deleted" : "")."...\n";
 				$last_found = $found;
+				$last_time = microtime(true);
 			}
 		}
 		if ($deleted > 0) {
