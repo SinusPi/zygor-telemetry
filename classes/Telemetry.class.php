@@ -603,7 +603,7 @@ class Telemetry {
 				$deleted += self::doDedupeEvents_Delete($dupes);
 			}
 			if ($OPTS['progress']) {//} && microtime(true) - $last_time > self::$CFG['STATUS_INTERVAL']) {
-				echo "File range $from-$to: querying ".$id." - ".$id_to.", found ".count($dupes)." duplicates so far...\n";
+				echo "File range $from-$to: querying ".$id." - ".$id_to.", found ".$found." duplicates so far...\n";
 			}
 		}
 		if ($deleted > 0) {
