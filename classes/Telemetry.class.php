@@ -595,11 +595,15 @@ class Telemetry {
 		$found = 0;
 		$deleted = 0;
 		for ($id = $from; $id <= $to; $id += $filebatchsize) {
-			$dupes = self::doDedupeEvents_Find($id, min($id + $filebatchsize - 1, $to), $flavnums, $OPTS);
+			$id_to = min($id + $filebatchsize - 1, $to);
+			$dupes = self::doDedupeEvents_Find($id, $id_to, $flavnums, $OPTS);
 			$found += count($dupes);
-			Logger::vlog("File ID range $id - ".min($id + $filebatchsize - 1, $to).": found ".count($dupes)." duplicate events.");
+			Logger::vlog("File ID range $id - $id_to: found ".count($dupes)." duplicate events.");
 			if ($OPTS['sure'] && $dupes) {
 				$deleted += self::doDedupeEvents_Delete($dupes);
+			}
+			if ($OPTS['progress']) {//} && microtime(true) - $last_time > self::$CFG['STATUS_INTERVAL']) {
+				echo "File range $from-$to: querying ".$id." - ".$id_to.", found ".count($dupes)." duplicates so far...\n";
 			}
 		}
 		if ($deleted > 0) {
@@ -641,7 +645,6 @@ class Telemetry {
 				yield $events;
 		};
 
-		$last_time = microtime(true);
 		$dupes = [];
 		foreach ($one_file_events($q) as $events) {
 			// process events for one file
@@ -655,11 +658,6 @@ class Telemetry {
 					if ($seen[$hash]==2)
 						Logger::vlog("Dupe: id={$row['id']} file_id={$row['file_id']} time={$row['time']} type={$row['type']} subtype={$row['subtype']} data=".substr($row['data'],0,100));
 				}
-			}
-
-			if ($OPTS['progress'] && microtime(true) - $last_time > self::$CFG['STATUS_INTERVAL']) {
-				$last_time = microtime(true);
-				echo "File range $from-$to: found ".count($dupes)." duplicates so far...\n";
 			}
 		}
 		$q->free();
