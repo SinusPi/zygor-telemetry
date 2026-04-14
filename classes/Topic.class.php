@@ -1,9 +1,10 @@
 <?php
+namespace Zygor\Telemetry;
 
 /**
  * Represents a telemetry topic loaded from topic-*.inc.php files
  */
-class Topic implements ArrayAccess {
+class Topic implements \ArrayAccess {
 	public $name;
 	public $eventtype;
 	public $scraper;

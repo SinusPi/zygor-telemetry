@@ -1,7 +1,8 @@
 <?php
+namespace Zygor\Telemetry;
 
-use Telemetry as Tm;
-use TelemetryStatus as TmSt;
+use Zygor\Telemetry\Telemetry as Tm;
+use Zygor\Telemetry\Status as TmSt;
 
 /**
  * Set of utilities to extract data from packager logs.
@@ -45,7 +46,7 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 				$paths[] = self::$CFG['PACKAGERLOG_PATH'];
 			}
 			return $paths;
-		} catch (Exception $e) {
+		} catch (\Exception $e) {
 			return [];
 		}
 	}
@@ -65,7 +66,7 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 		}
 
 		$tag = "SCRAPEPACKLOG";
-		$status = TelemetryStatus::get_status($tag, true);
+		$status = Status::get_status($tag, true);
 		if ($status['status']=="SCRAPING") throw new MinorError("Another scrape of packager logs is already in progress, aborting.");
 
 		// TODO : go through log-<Y>-<M>-<D> files, bzipped or not, extract flavour update lines, treat them similarly to "ui-VERSION" type events (but store them separately!). Remember which logs were parsed.
@@ -302,7 +303,7 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 				Logger::vlog($e->getMessage()." - $filename_full");
 				Telemetry::$db->rollback();
 				continue;
-			} catch (Exception $e) {
+			} catch (\Exception $e) {
 				Logger::log(microtime(true)." ERROR processing $filename_full: " . $e->getMessage());
 				throw $e;
 			} finally {
@@ -348,7 +349,7 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 			return ++$totals['tmfiles_empty'];
 		$scrape_folder = Telemetry::cfgstr('SCRAPES_PATH',['FLAVOUR'=>$flavour,'DAY'=>$day]);
 		mkdir($scrape_folder,0777,true);
-		if (!is_dir($scrape_folder)) throw new ErrorException("Failed to create/access scrape folder at $scrape_folder");
+		if (!is_dir($scrape_folder)) throw new \ErrorException("Failed to create/access scrape folder at $scrape_folder");
 		$scrape_file = "{$user}@{$acct}.json";
 		$scrape_filepath = $scrape_folder."/".$scrape_file;
 		if (file_exists($scrape_filepath))
@@ -370,7 +371,7 @@ class TelemetryScrapePackagerLog extends TelemetryScrape {
 		if ($force || time()-$time_last_mtimes >= self::$CFG['MTIMES_WRITE_INTERVAL']) {
 			$mtimes_cache_filename = Telemetry::cfgstr('FLAVOUR_PATH',['FLAVOUR'=>$flavour])."/".self::$CFG['MTIMES_CACHE_FILENAME'];
 			$f=file_put_contents($mtimes_cache_filename,json_encode($last_scrape_dates),LOCK_EX);
-			if (!$f) throw new ErrorException("Cannot write mtimes cache");
+			if (!$f) throw new \ErrorException("Cannot write mtimes cache");
 			$time_last_mtimes = time();
 		}
 	}

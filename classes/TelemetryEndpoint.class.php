@@ -1,4 +1,5 @@
 <?php
+namespace Zygor\Telemetry;
 
 use Telemetry as Tm;
 

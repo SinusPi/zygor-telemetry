@@ -1,7 +1,8 @@
 <?php
+namespace Zygor\Telemetry;
 
-use Telemetry as Tm;
-use TelemetryStatus as TmSt;
+use Zygor\Telemetry\Telemetry as Tm;
+use Zygor\Telemetry\Status as TmSt;
 
 /**
  * Set of utilities to comb through user-supplied SV files for telemetry data.
@@ -69,7 +70,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 				$paths[] = self::$CFG['SV_STORAGE_DATA_PATH'];
 			}
 			return $paths;
-		} catch (Exception $e) {
+		} catch (\Exception $e) {
 			return [];
 		}
 	}
@@ -93,12 +94,12 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 	 * @param string[] $topics
 	 */
 	static function scrape($flavour, $topics_selected=[]) {
-		if (!Telemetry::is_ready()) throw new Exception("Telemetry core not initialized");
+		if (!Telemetry::is_ready()) throw new \Exception("Telemetry core not initialized");
 		return self::scrape2($flavour, $topics_selected); // new scrape method with generator for files, but keep old one for now for comparison and safety
 
 		// THE REST IS DEPRECATED
 
-		if (!in_array($flavour,array_keys(self::$CFG['WOW_FLAVOUR_DATA']))) throw new ErrorException("Unsupported flavour '{$flavour}' (supported: ".join(", ",array_keys(self::$CFG['WOW_FLAVOUR_DATA'])).")");
+		if (!in_array($flavour,array_keys(self::$CFG['WOW_FLAVOUR_DATA']))) throw new \ErrorException("Unsupported flavour '{$flavour}' (supported: ".join(", ",array_keys(self::$CFG['WOW_FLAVOUR_DATA'])).")");
 
 		self::$logtag = "SCRAPE-".strtoupper(str_replace("-","_", $flavour));
 		$status = TmSt::get_status(self::$logtag, true);
@@ -151,7 +152,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		$dupes = array_filter($counts,function($c) { return $c>1; });
 		if (count($dupes)) {
 			TmSt::stat(['status'=>"ERROR",'error'=>"Duplicate files found, see log."]);
-			throw new ErrorException(count($dupes)." duplicate files found (same name in different folders): ".join(", ",array_keys($dupes)).". They will be processed only once.");
+			throw new \ErrorException(count($dupes)." duplicate files found (same name in different folders): ".join(", ",array_keys($dupes)).". They will be processed only once.");
 		}
 
 		TmSt::stat(['status'=>"EXTRACTING",'files_fresh'=>count($freshfiles),'files_skipped'=>0,'tmfiles_skipped'=>0,'tmfiles_written'=>0,'tmfiles_last'=>"",'file_last'=>"",'not_files'=>0,'broken_lua'=>0]);
@@ -248,7 +249,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			// obey limit
 			if (isset(self::$CFG['limit']) && $n>=self::$CFG['limit']-1) {
 				Telemetry::$db->commit();
-				throw new ErrorException("Limit ".self::$CFG['limit']." hit, aborting.\n");
+				throw new \ErrorException("Limit ".self::$CFG['limit']." hit, aborting.\n");
 			}
 
 			// update progress
@@ -272,7 +273,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 	 * @param string $flavour
 	 */
 	static function scrape2($flavour, $topics_selected=[]) {
-		if (!in_array($flavour,array_keys(self::$CFG['WOW_FLAVOUR_DATA']))) throw new ErrorException("Unsupported flavour '{$flavour}' (supported: ".join(", ",array_keys(self::$CFG['WOW_FLAVOUR_DATA'])).")");
+		if (!in_array($flavour,array_keys(self::$CFG['WOW_FLAVOUR_DATA']))) throw new \ErrorException("Unsupported flavour '{$flavour}' (supported: ".join(", ",array_keys(self::$CFG['WOW_FLAVOUR_DATA'])).")");
 
 		self::$logtag = "SCRAPE-".strtoupper(str_replace("-","_", $flavour));
 		$status = TmSt::get_status(self::$logtag, true);
@@ -337,7 +338,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			// obey limit
 			if (isset(self::$CFG['limit']) && $n>=self::$CFG['limit']-1) {
 				Telemetry::$db->commit();
-				throw new ErrorException("Limit ".self::$CFG['limit']." hit, aborting.\n");
+				throw new \ErrorException("Limit ".self::$CFG['limit']." hit, aborting.\n");
 			}
 
 			// update progress
@@ -422,7 +423,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 					$totals['broken_lua']++;
 					return;
 				} elseif (!isset($extracted['datapoints'])) {
-					throw new ErrorException("ERROR: no datapoints at all (did Lua even run?), reading $filename_full " . print_r($extracted, 1));
+					throw new \ErrorException("ERROR: no datapoints at all (did Lua even run?), reading $filename_full " . print_r($extracted, 1));
 				}
 			}
 
@@ -494,7 +495,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			Logger::vlog($e->getMessage()." - $filename_full");
 			Telemetry::$db->rollback();
 			return;
-		} catch (Exception $e) {
+		} catch (\Exception $e) {
 			Logger::log(microtime(true)." ERROR processing $filename_full: " . $e->getMessage() . " at stack trace: " . $e->getTraceAsString());
 			throw $e;
 		} finally {
@@ -532,7 +533,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			return ++$totals['tmfiles_empty'];
 		$scrape_folder = Tm::cfgstr('SCRAPES_PATH',['FLAVOUR'=>$flavour,'DAY'=>$day]);
 		mkdir($scrape_folder,0777,true);
-		if (!is_dir($scrape_folder)) throw new ErrorException("Failed to create/access scrape folder at $scrape_folder");
+		if (!is_dir($scrape_folder)) throw new \ErrorException("Failed to create/access scrape folder at $scrape_folder");
 		$scrape_file = "{$user}@{$acct}.json";
 		$scrape_filepath = $scrape_folder."/".$scrape_file;
 		if (file_exists($scrape_filepath))
@@ -554,16 +555,16 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		if ($force || time()-$time_last_mtimes >= self::$CFG['MTIMES_WRITE_INTERVAL']) {
 			$mtimes_cache_filename = Tm::cfgstr('FLAVOUR_PATH',['FLAVOUR'=>$flavour])."/".self::$CFG['MTIMES_CACHE_FILENAME'];
 			$f=file_put_contents($mtimes_cache_filename,json_encode($last_scrape_dates),LOCK_EX);
-			if (!$f) throw new ErrorException("Cannot write mtimes cache");
+			if (!$f) throw new \ErrorException("Cannot write mtimes cache");
 			$time_last_mtimes = time();
 		}
 	}
 
 	static function read_raw_sv($filename) {
 		// read gzipped SV file
-		if (!file_exists($filename)) throw new ErrorException("TelemetryScrapeSVs::read_raw_sv: File not found: $filename");
+		if (!file_exists($filename)) throw new \ErrorException("TelemetryScrapeSVs::read_raw_sv: File not found: $filename");
 		$fp = gzopen($filename, 'rb');
-		if (!$fp) throw new ErrorException("TelemetryScrapeSVs::read_raw_sv: Cannot open gzipped file: $filename");
+		if (!$fp) throw new \ErrorException("TelemetryScrapeSVs::read_raw_sv: Cannot open gzipped file: $filename");
 		$sv_raw = '';
 		while (!gzeof($fp)) {
 			$sv_raw .= gzread($fp, 100000);
@@ -734,7 +735,7 @@ ENDLUA;
 		self::test_datapoints();
 		try {
 			Logger::vlog("Database: connected and present.");
-		} catch (ErrorException $e) {
+		} catch (\ErrorException $e) {
 			die("DB Connection to ".self::$CFG['DB']['host']." FAILED - ".$e->getMessage());
 		}
 		Logger::vlog("Self-tests: \x1b[48;5;72;30mPASS\x1b[0m");
@@ -743,17 +744,17 @@ ENDLUA;
 	static function test_paths() {
 		Logger::vlog("Testing paths:");
 
-		if (!is_dir(self::$CFG['SV_STORAGE_ROOT'])) throw new ErrorException("Missing SV storage root: ".self::$CFG['SV_STORAGE_ROOT']."\n");
+		if (!is_dir(self::$CFG['SV_STORAGE_ROOT'])) throw new \ErrorException("Missing SV storage root: ".self::$CFG['SV_STORAGE_ROOT']."\n");
 		Logger::vlog(" - Will read SVs in root of: \x1b[33m".self::$CFG['SV_STORAGE_ROOT']."\x1b[0m");
 
-		if (!is_dir(self::$CFG['SV_STORAGE_DATA_PATH'])) throw new ErrorException("Missing SV storage folder: ".self::$CFG['SV_STORAGE_DATA_PATH']."\n");
+		if (!is_dir(self::$CFG['SV_STORAGE_DATA_PATH'])) throw new \ErrorException("Missing SV storage folder: ".self::$CFG['SV_STORAGE_DATA_PATH']."\n");
 		Logger::vlog(" - Specifically SV Sync config says: \x1b[33m".self::$CFG['SV_STORAGE_DATA_PATH']."\x1b[0m");
 
 		foreach (self::$CFG['f'] as $flav) {
 			Logger::vlog("   - Flavour: \x1b[38;5;78m$flav\x1b[0m");
 
 			$svpath = Tm::cfgstr('SV_STORAGE_FLAVOUR_PATH',['FLAVOUR'=>$flav]);
-			if (!is_dir($svpath)) throw new ErrorException("Missing SV storage flavour folder: ".$svpath."\n");
+			if (!is_dir($svpath)) throw new \ErrorException("Missing SV storage flavour folder: ".$svpath."\n");
 			Logger::vlog("     - Reading SVs from: \x1b[33m$svpath\x1b[0m");
 
 			/*
@@ -769,7 +770,7 @@ ENDLUA;
 		$count=0;
 		foreach (FileTools::rglob_gen("mock_storage","*.lua*",10) as $i=>$f)
 			$count++;
-		if ($count<50) throw new ErrorException("rglob_gen self-test failed, found only $count files in mock_storage, expected at least 50.");
+		if ($count<50) throw new \ErrorException("rglob_gen self-test failed, found only $count files in mock_storage, expected at least 50.");
 
 		return true;
 	}
@@ -813,7 +814,7 @@ ENDLUA;
 			$filename = $matches[3];
 			return "$flavour/$user/$filename";
 		} else
-			throw new ErrorException("Cannot slugify file path: $path");
+			throw new \ErrorException("Cannot slugify file path: $path");
 	}
 
 	/** Convert file slug (flavour/account/filename) to full file path. */

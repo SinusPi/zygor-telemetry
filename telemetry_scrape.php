@@ -2,6 +2,9 @@
 <?php
 ini_set("max_execution_time",3600);
 
+use Zygor\Telemetry\Telemetry;
+use Zygor\Telemetry\TelemetryScrape;
+
 /**
  * Extracts telemetry data from SV files using Lua scripts.
  * Usage:

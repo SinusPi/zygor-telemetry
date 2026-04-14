@@ -1,4 +1,5 @@
 <?php
+namespace Zygor\Telemetry;
 
 /**
  * One-shot schema management library.
@@ -32,8 +33,8 @@ class SchemaManager {
 	 * @param mysqli $connection MySQLi connection object
 	 */
 	public function __construct($connection) {
-		if (!$connection instanceof mysqli)
-			throw new InvalidArgumentException("Connection must be a MySQLi instance");
+		if (!$connection instanceof \mysqli)
+			throw new \InvalidArgumentException("Connection must be a MySQLi instance");
 		$this->conn = $connection;
 	}
 
@@ -48,7 +49,7 @@ class SchemaManager {
 	 */
 	public function manageTable($table_name, $migrations) {
 		if (!is_array($migrations) || empty($migrations))
-			throw new InvalidArgumentException("Migrations must be a non-empty array");
+			throw new \InvalidArgumentException("Migrations must be a non-empty array");
 
 		// Parse migration definitions
 		list($this->states, $this->transitions, $this->max_reset, $this->max_version) = $this->parseStatesAndTransitions($migrations);
@@ -62,9 +63,9 @@ class SchemaManager {
 		}
 
 		if ($current_version > $this->max_version)
-			throw new Exception("Current version $current_version of table '$table_name' exceeds maximum defined migration version $this->max_version");
+			throw new \Exception("Current version $current_version of table '$table_name' exceeds maximum defined migration version $this->max_version");
 		if ($current_version < 0)
-			throw new Exception("Invalid current version $current_version for table '$table_name'");
+			throw new \Exception("Invalid current version $current_version for table '$table_name'");
 		if ($current_version == $this->max_version)
 			return [
 				'status' => 'already_current',
@@ -87,7 +88,7 @@ class SchemaManager {
 		for ($i = $current_version + 1; $i <= $this->max_version; $i++) {
 			$transition_key = ($i - 1) . ">" . $i;
 			if (!isset($this->transitions[$transition_key])) {
-				throw new Exception("No migration path defined for version $i. Missing transition '$transition_key'");
+				throw new \Exception("No migration path defined for version $i. Missing transition '$transition_key'");
 			}
 			$queries[] = $this->transitions[$transition_key];
 			$migrated++;
@@ -98,7 +99,7 @@ class SchemaManager {
 			$this->conn->begin_transaction();
 			foreach ($queries as $sql) {
 				if (!$this->conn->query($sql)) {
-					throw new Exception("Failed to execute migration SQL: " . $this->conn->error);
+					throw new \Exception("Failed to execute migration SQL: " . $this->conn->error);
 				}
 			}
 			$this->updateVersion($table_name, $this->max_version);
@@ -112,7 +113,7 @@ class SchemaManager {
 				'migrated' => $migrated,
 			];
 
-		} catch (Exception $e) {
+		} catch (\Exception $e) {
 			$this->conn->rollback();
 			throw $e;
 		}
@@ -129,11 +130,11 @@ class SchemaManager {
 				// State definition
 				$version = (int)$key;
 				if ($version < 1)
-					throw new InvalidArgumentException("State version must be a positive integer, got: $key");
+					throw new \InvalidArgumentException("State version must be a positive integer, got: $key");
 				if (isset($states[$version]))
-					throw new InvalidArgumentException("Duplicate state definition for version $version");
+					throw new \InvalidArgumentException("Duplicate state definition for version $version");
 				if (!preg_match('/^\s*CREATE\s+TABLE/i', $sql))
-					throw new InvalidArgumentException("State '$key' SQL must be a CREATE TABLE statement, got: " . substr($sql, 0, 50) . "...");
+					throw new \InvalidArgumentException("State '$key' SQL must be a CREATE TABLE statement, got: " . substr($sql, 0, 50) . "...");
 				$states[$version] = $sql;
 				if ($version > $max_version) $max_version = $version;
 				if ($version > $max_reset) $max_reset = $version;
@@ -141,17 +142,17 @@ class SchemaManager {
 				// Transition definition
 				$parts = explode('>', $key);
 				if (count($parts) !== 2)
-					throw new InvalidArgumentException("Invalid transition key '$key', must be in format N>M");
+					throw new \InvalidArgumentException("Invalid transition key '$key', must be in format N>M");
 				$from_version = (int)$parts[0];
 				$to_version = (int)$parts[1];
 				if ($from_version < 1 || $to_version < 1)
-					throw new InvalidArgumentException("Transition versions must be positive integers, got: $key");
+					throw new \InvalidArgumentException("Transition versions must be positive integers, got: $key");
 				if ($to_version !== $from_version + 1)
-					throw new InvalidArgumentException("Transition '$key' skips version numbers. Must transition from N to N+1 only, got $from_version to $to_version");
+					throw new \InvalidArgumentException("Transition '$key' skips version numbers. Must transition from N to N+1 only, got $from_version to $to_version");
 				if (isset($transitions[$key]))
-					throw new InvalidArgumentException("Duplicate transition definition for '$key'");
+					throw new \InvalidArgumentException("Duplicate transition definition for '$key'");
 				if (!preg_match('/^\s*ALTER\s+TABLE/i', $sql))
-					throw new InvalidArgumentException("Transition '$key' SQL must be an ALTER TABLE statement, got: " . substr($sql, 0, 50) . "...");
+					throw new \InvalidArgumentException("Transition '$key' SQL must be an ALTER TABLE statement, got: " . substr($sql, 0, 50) . "...");
 				$transitions[$key] = $sql;
 				if ($to_version > $max_version) $max_version = $to_version;
 			}
@@ -160,7 +161,7 @@ class SchemaManager {
 		// check consistency
 		for ($v = 1; $v < $max_version; $v++) {
 			if (!isset($transitions[$v.">".($v+1)]))
-				throw new InvalidArgumentException("No migration path defined for version $v. Missing transition '$v>".($v+1)."'");
+				throw new \InvalidArgumentException("No migration path defined for version $v. Missing transition '$v>".($v+1)."'");
 		}
 		
 		return [$states, $transitions, $max_reset, $max_version];
@@ -226,6 +227,6 @@ class SchemaManager {
 
 		$alter_query = "ALTER TABLE `{$table_escaped}` COMMENT = '{$new_comment_escaped}'";
 		if (!$this->conn->query($alter_query))
-			throw new Exception("Failed to update version for table '$table_name': " . $this->conn->error);
+			throw new \Exception("Failed to update version for table '$table_name': " . $this->conn->error);
 	}
 }

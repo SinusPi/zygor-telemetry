@@ -1,4 +1,5 @@
 <?php
+namespace Zygor\Telemetry;
 
 /**
  * Set of utilities to display metrics' HTML forms and charts.

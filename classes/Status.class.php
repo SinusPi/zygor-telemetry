@@ -1,6 +1,7 @@
 <?php
+namespace Zygor\Telemetry;
 
-class TelemetryStatus {
+class Status {
 	static $last_statuses = [];
 	static $last_tag = "";
 

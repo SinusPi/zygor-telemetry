@@ -1,6 +1,7 @@
 <?php
+namespace Zygor\Telemetry;
 
-use Telemetry as Tm;
+use \Zygor\Telemetry\Telemetry as Tm;
 
 /**
  * Set of utilities to comb through arbitrary files for telemetry data.
@@ -17,7 +18,7 @@ class TelemetryScrape {
 	}
 
 	static function startup() {
-		if (!Telemetry::is_ready()) throw new Exception("Scrape core: Telemetry core not initialized");
+		if (!Telemetry::is_ready()) throw new \Exception("Scrape core: Telemetry core not initialized");
 		self::init();
 		self::config();
 		self::db_create(); // create generic scraping-related tables if not exist
@@ -62,7 +63,7 @@ class TelemetryScrape {
 			if (method_exists($subclass, 'startup')) {
 				try {
 					$subclass::startup();
-				} catch (Exception $e) {
+				} catch (\Exception $e) {
 					Logger::log("Startup error in scraper $subclass: ".$e->getMessage());
 					throw $e;
 				}
@@ -189,7 +190,7 @@ class TelemetryScrape {
 	 */
 	static function get_file_scrapetimes_batch($topics, $ids) {
 		$r = Tm::$db->query($_q="SELECT * FROM `topic_scrapetimes` WHERE `topic` IN ({sa}) AND `file_id` IN ({sa})", $topics, $ids);
-		if (!$r) throw new ErrorException("DB error in $_q: ".Tm::$db->error());
+		if (!$r) throw new \ErrorException("DB error in $_q: ".Tm::$db->error());
 
 		// aggregate by file_id
 		$files = [];
@@ -219,7 +220,7 @@ class TelemetryScrape {
 			return Tm::$db->qesc("({s},{d},{d},{d})", $topic, $file_id, $last_events_per_topic[$topic] ?: null, $scrape_time ?: time());
 		}, $topics));
 		$r = Tm::$db->query($_q="INSERT INTO `topic_scrapetimes` (topic, file_id, last_event_time, scrape_time) VALUES $values_sql ON DUPLICATE KEY UPDATE last_event_time=VALUES(last_event_time), scrape_time=VALUES(scrape_time)");
-		if (!$r) throw new ErrorException("DB error, query $_q: ".Tm::$db->error());
+		if (!$r) throw new \ErrorException("DB error, query $_q: ".Tm::$db->error());
 		Logger::vlog("Updated scrape times for file_id $file_id and topics: scrape time ".Tm::dt($scrape_time).", ".join(", ",array_map(function($t) use ($last_events_per_topic) { return $t."=".Tm::dt($last_events_per_topic[$t] ?: 0); }, $topics)));
 	}
 
@@ -229,7 +230,7 @@ class TelemetryScrape {
 	static function db_set_file_scrapetime ($topic, $file_id, $last_event_time=null, $scrape_time=null) {
 		$q = Tm::$db->qesc($_q="INSERT INTO `topic_scrapetimes` (topic, file_id, last_event_time, scrape_time) VALUES ({s}, {d}, {d}, {d}) ON DUPLICATE KEY UPDATE scrape_time=VALUES(scrape_time), last_event_time=VALUES(last_event_time)", $topic, $file_id, $last_event_time ?: null, $scrape_time ?: time());
 		$r = Tm::$db->query($q);
-		if (!$r) throw new ErrorException("DB error, query $_q: ".Tm::$db->error());
+		if (!$r) throw new \ErrorException("DB error, query $_q: ".Tm::$db->error());
 	}
 
 	// Tests, DB schemas
@@ -285,7 +286,7 @@ class TelemetryScrape {
 						      AND `files`.`flavnum` IN ({da})
 						      AND `topic_scrapetimes`.`scrape_time` IS NOT NULL",
 						  	$OPTS['topics'], $flavnums);
-						if (!$q) throw new ErrorException("DB error counting topic_scrapetimes entries: ".Tm::$db->error());
+						if (!$q) throw new \ErrorException("DB error counting topic_scrapetimes entries: ".Tm::$db->error());
 						$count = $q ? $q->fetch_row()[0] : 0;
 						echo "This will clear $count entries from topic_scrapetimes for flavors ".implode(",", $OPTS['flavour'])." and topics: ".implode(",", $OPTS['topics']).". If you're sure, run again with --sure flag.\n";
 						return;
@@ -297,7 +298,7 @@ class TelemetryScrape {
 					      AND `flavnum` IN ({da})",
 					  	$OPTS['topics'], $flavnums);
 					if (Tm::$db->error())
-						throw new ErrorException("Failed to clear topic_scrapetimes table: ".Tm::$db->error());
+						throw new \ErrorException("Failed to clear topic_scrapetimes table: ".Tm::$db->error());
 					echo("Cleared ".Tm::$db->affected_rows()." topic_scrapetimes entries for flavors ".implode(",", $OPTS['flavour'])." and topics: ".implode(",", $OPTS['topics']).".\n");
 				}
 			],
@@ -311,7 +312,7 @@ class TelemetryScrape {
 							WHERE `topic` IN ({sa})
 						      AND `flavnum` IN ({da})",
 						  	$OPTS['topics'], $flavnums);
-						if (!$q) throw new ErrorException("DB error counting topic_scrapetimes entries: ".Tm::$db->error());
+						if (!$q) throw new \ErrorException("DB error counting topic_scrapetimes entries: ".Tm::$db->error());
 						$count = $q ? $q->fetch_row()[0] : 0;
 						echo "This will set scrape_time and last_event_time to current time for $count entries in topic_scrapetimes for flavors ".implode(",", $OPTS['flavour'])." and topics: ".implode(",", $OPTS['topics']).". If you're sure, run again with --sure flag.\n";
 						return;
@@ -322,7 +323,7 @@ class TelemetryScrape {
 					      AND `flavnum` IN ({da})",
 						$OPTS['topics'], $flavnums);
 					if (Tm::$db->error())
-						throw new ErrorException("Failed to update topic_scrapetimes table: ".Tm::$db->error());
+						throw new \ErrorException("Failed to update topic_scrapetimes table: ".Tm::$db->error());
 					echo("Set ".Tm::$db->affected_rows()." topic_scrapetimes entries to current time for flavors ".implode(",", $OPTS['flavour'])." and topics: ".implode(",", $OPTS['topics']).".\n");
 				}
 			],
@@ -344,7 +345,7 @@ class TelemetryScrape {
 		}
 		try {
 			$maint_tasks[$task]['action']();
-		} catch (Exception $e) {
+		} catch (\Exception $e) {
 			echo "Error performing maintenance task '$task': ".$e->getMessage()."\n";
 			exit(1);
 		}
@@ -352,7 +353,7 @@ class TelemetryScrape {
 	}
 
 	static function run($flavours, $topics) {
-		throw new ErrorException("Base TelemetryScrape class does not implement run(). This method should be implemented in each scraper subclass to perform the actual scraping.");
+		throw new \ErrorException("Base TelemetryScrape class does not implement run(). This method should be implemented in each scraper subclass to perform the actual scraping.");
 	}
 
 }

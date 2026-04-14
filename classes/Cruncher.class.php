@@ -1,4 +1,5 @@
 <?php
+namespace Zygor\Telemetry;
 
 /**
  * Represents a cruncher definition from a topic's crunchers array

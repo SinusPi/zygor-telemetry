@@ -1,4 +1,6 @@
 <?php
+namespace Zygor\Telemetry;
+
 class FileTools {
 	/**
 	 * Pretty much a FilesystemIterator with a limit
@@ -110,8 +112,8 @@ class FileTools {
 			$file = include $filename;
 			if (!is_array($file)) return null;
 			return $file;
-		} catch (Exception $e) {
-			throw new Exception("Failed to parse file $filename: ".$e->getMessage()."\n");
+		} catch (\Exception $e) {
+			throw new \Exception("Failed to parse file $filename: ".$e->getMessage()."\n");
 		}
 	}
 }

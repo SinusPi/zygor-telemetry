@@ -1,8 +1,10 @@
 <?php
+namespace Zygor\Telemetry;
+
 /**
  * Config class for managing hierarchical configuration with priorities.
  */
-class Config implements ArrayAccess {
+class Config implements \ArrayAccess {
 	private $configs = [];
 	private $priorities = [];
 	private $merged = null;

@@ -1,4 +1,6 @@
 <?php
+namespace Zygor\Telemetry;
+
 if (!defined('DAY')) define('DAY', 24 * 60 * 60);
 if (!defined('NOW')) define('NOW', time());
 
@@ -178,7 +180,7 @@ class Telemetry {
 	}
 
 	static function graceful_die($data) {
-		TelemetryStatus::status(self::$tag,$data);
+		Status::status(self::$tag,$data);
 		Logger::log("Terminating with status: ".json_encode($data));
 		self::die_json($data);
 	}
@@ -240,12 +242,12 @@ class Telemetry {
 	static function date_add_dashes($d) {
 		if (preg_match("/^(\\d{4})(\\d{2})(\\d{2})$/",$d,$m)) $d=$m[1]."-".$m[2]."-".$m[3]; // force YYYY-MM-DD
 		if (preg_match("/^\d{4}-\d{2}-\d{2}$/",$d)) return $d;
-		throw new Exception("Date format invalid: $d");
+		throw new \Exception("Date format invalid: $d");
 	}
 	static function date_strip_dashes($d) {
 		if (preg_match("/^(\\d{4})-(\\d{2})-(\\d{2})$/",$d,$m)) $d=$m[1].$m[2].$m[3]; // force YYYYMMDD
 		if (preg_match("/^\\d{8}$/",$d)) return $d;
-		throw new Exception("Date format invalid: $d");
+		throw new \Exception("Date format invalid: $d");
 	}
 	static function parse_date($datestr) {
 		// try to parse as YYYYMMDD or YYYY-MM-DD
@@ -256,7 +258,7 @@ class Telemetry {
 		if (is_numeric($datestr)) {
 			return intval($datestr);
 		}
-		throw new Exception("Invalid date format: $datestr");
+		throw new \Exception("Invalid date format: $datestr");
 	}
 
 
@@ -311,13 +313,13 @@ class Telemetry {
 	private static function flavnum_one($flavour) {
 		$fd = self::$CFG['WOW_FLAVOUR_DATA'];
 		$flavnum = $fd[$flavour]['num'] ?: 0;
-		if ($flavnum===0) throw new ErrorException("Unknown flavour '$flavour', known are: ".implode(", ", array_keys($fd)).".");
+		if ($flavnum===0) throw new \ErrorException("Unknown flavour '$flavour', known are: ".implode(", ", array_keys($fd)).".");
 		return $flavnum;
 	}
 	static function flavnum($flavour) {
 		if (is_string($flavour)) return self::flavnum_one($flavour);
 		elseif (is_array($flavour)) return array_map([__CLASS__,'flavnum_one'], $flavour);
-		else throw new ErrorException("Invalid flavour format: ".print_r($flavour,true));
+		else throw new \ErrorException("Invalid flavour format: ".print_r($flavour,true));
 	}
 
 	static function is_linux() {
@@ -340,18 +342,18 @@ class Telemetry {
 	static function db_startup() {
 		if (isset(self::$db)) return self::$db; // already connected
 		$cfg = self::$CFG['DB']?:null;
-		if (!$cfg) throw new ErrorException("No DB configuration found in Telemetry config.");
+		if (!$cfg) throw new \ErrorException("No DB configuration found in Telemetry config.");
 
 		try {
 			self::$db = new TelemetryDB();
 			self::$db->connect($cfg);
-		} catch (Exception $e) {
-			throw new ErrorException("Failed to connect to database '".$cfg['db']."' on '".$cfg['host']."': ".$e->getMessage()."\n");
+		} catch (\Exception $e) {
+			throw new \ErrorException("Failed to connect to database '".$cfg['db']."' on '".$cfg['host']."': ".$e->getMessage()."\n");
 		}
 		try {
 			self::db_create_tables();
-		} catch (Exception $e) {
-			throw new ErrorException("Failed to create or migrate database tables: ".$e->getMessage()."\n");
+		} catch (\Exception $e) {
+			throw new \ErrorException("Failed to create or migrate database tables: ".$e->getMessage()."\n");
 			self::$db->disconnect();
 			self::$db = null;
 		}
@@ -563,7 +565,7 @@ class Telemetry {
 			case "dedupe-events":
 				return self::doDedupeEvents($OPTS);
 			default:
-				throw new Exception("Unknown misc task: $task; available: dedupe-events");
+				throw new \Exception("Unknown misc task: $task; available: dedupe-events");
 		}
 	}
 
@@ -574,9 +576,9 @@ class Telemetry {
 		if (!$OPTS['from'] || !$OPTS['to']) {
 			echo "Calculating file IDs for error response... :P\r";
 			$q = self::$db->query("SELECT MAX(`file_id`) FROM `events`");
-			if (!$q) throw new Exception("Database query failed: ".self::$db->error());
+			if (!$q) throw new \Exception("Database query failed: ".self::$db->error());
 			$max_file_id = $q->fetch_array()[0];
-			throw new Exception("dedupe-events needs a file id range, --from=1 --to=$max_file_id.");
+			throw new \Exception("dedupe-events needs a file id range, --from=1 --to=$max_file_id.");
 		}
 		$flavnum = self::flavnum($OPTS['flavour']);
 		self::$db->query_mode = MYSQLI_USE_RESULT;
@@ -590,7 +592,7 @@ class Telemetry {
 		  $flavnum,
 		  $OPTS['topics'],
 		  intval($OPTS['from']), intval($OPTS['to']));
-		if (!$q) throw new Exception("Database query failed: ".self::$db->error());
+		if (!$q) throw new \Exception("Database query failed: ".self::$db->error());
 
 		$seen = [];
 		$dupes = [];
@@ -646,15 +648,15 @@ class Telemetry {
 
 /// these stay here for now
 
-class FileLockedException extends Exception {
+class FileLockedException extends \Exception {
 	// Custom exception for file locking issues
 }
 
-class MinorError extends Exception {
+class MinorError extends \Exception {
 	// Custom exception for error messages
 }
 
-class SkipException extends Exception {
+class SkipException extends \Exception {
 	// just a skip, not an error
 }
 
@@ -675,7 +677,7 @@ class File {
 
 }
 
-class ConfigException extends Exception {
+class ConfigException extends \Exception {
 	// Custom exception for configuration errors
 }
 

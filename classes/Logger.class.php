@@ -1,4 +1,5 @@
 <?php
+namespace Zygor\Telemetry;
 
 /**
  * Logger utility class for telemetry operations.
