@@ -592,31 +592,35 @@ class Telemetry {
 		$filebatchsize = 1000;
 		$from=intval($OPTS['from']);
 		$to=intval($OPTS['to']);
-		$found = 0;
-		$deleted = 0;
+		$found_total = 0;
+		$deleted_total = 0;
 		$last_found = 0;
 		$last_time = microtime(true);
 		for ($id = $from; $id <= $to; $id += $filebatchsize) {
 			$id_to = min($id + $filebatchsize - 1, $to);
 			$dupes = self::doDedupeEvents_Find($id, $id_to, $flavnums, $OPTS);
-			$found += count($dupes);
+			$found_total += count($dupes);
 			Logger::vlog("File ID range $id - $id_to: found ".count($dupes)." duplicate events.");
 			if ($OPTS['sure'] && $dupes) {
-				$deleted += self::doDedupeEvents_Delete($dupes);
+				$deleted = self::doDedupeEvents_Delete($dupes);
+				$deleted_total += $deleted;
+				if ($deleted != count($dupes)) { // sanity fail
+					throw new \Exception("Deleted $deleted events but found ".count($dupes)." duplicates, something went wrong in file ID range $id - $id_to.");
+				}
 			}
-			if ($OPTS['progress'] && ($found > $last_found || microtime(true) - $last_time > self::$CFG['STATUS_INTERVAL'])) {
-				echo "File range $from-$to: querying ".$id." - ".$id_to.", found ".$found." duplicates".($deleted > 0 ? ", deleted $deleted" : "")."...\n";
-				$last_found = $found;
+			if ($OPTS['progress'] && ($found_total > $last_found || microtime(true) - $last_time > self::$CFG['STATUS_INTERVAL'])) {
+				Status::update_progress(self::$tag, $id_to-$id,$to-$from,['totals'=>($OPTS['sure']?['deleted'=>$deleted_total]:['found'=>$found_total]),'range_from'=>$id,'range_to'=>$id_to]);
+				$last_found = $found_total;
 				$last_time = microtime(true);
 			}
 		}
-		if ($deleted > 0) {
-			Logger::log("Deduplication complete. Removed $deleted duplicate events.");
-			return $deleted;
+		if ($deleted_total > 0) {
+			Logger::log("Deduplication complete. Removed $deleted_total duplicate events.");
+			return $deleted_total;
 		} elseif ($OPTS['sure']) {
 			Logger::log("No duplicate events found to delete.");
 		} else {
-			Logger::log("Dry run complete, found $found duplicate events. Run with --sure to actually delete the found duplicate events.");
+			Logger::log("Dry run complete, found $found_total duplicate events. Run with --sure to actually delete the found duplicate events.");
 		}
 	}
 

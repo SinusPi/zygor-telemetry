@@ -16,9 +16,7 @@ class FileTools {
 			$handle = @opendir($dir);
 			if (!$handle) return;
 			
-			$subdirs = [];
-			
-			// Scan directory: yield matching files, collect subdirectories for recursion
+			// Scan directory: yield matching files, dive into subdirectories
 			while (false !== ($entry = readdir($handle))) {
 				if ($entry === '.' || $entry === '..') continue;
 				

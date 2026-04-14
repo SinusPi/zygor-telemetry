@@ -60,8 +60,10 @@ class Status {
 	
 			$bar_length = 10;
 
+			$kv = function($k,$v) { return "$k=$v"; };
+
 			$tot1=array_filter($extra['totals'] ?: [],function($v) { return is_numeric($v); });
-			$tots=array_map(function($k,$v) { return "$k=$v"; }, array_keys($tot1), array_values($tot1));
+			$tots=array_map($kv, array_keys($tot1), array_values($tot1));
 
 			$digits=strlen($total);
 
@@ -77,19 +79,21 @@ class Status {
 					'time_total_est_hr'=>date("Y-m-d H:i:s",time()+$time_remaining_est),
 				],
 			] + $extra;
+			unset($extra['totals']);
 			//print_r(self::get_last_status());
 			self::status($tag,$progress,true);
 			//print_r(self::get_last_status());
 			//die();
 			echo sprintf(
-				"Progress: [%{$bar_length}s] %3d%% (%{$digits}d/%{$digits}d) - %ds elapsed, %ds remaining; totals: %s\n",
+				"Progress: [%{$bar_length}s] %3d%% (%{$digits}d/%{$digits}d) - %ds elapsed, %ds remaining; totals: %s; %s\n",
 				$progress['progress']['progress_bar'],
 				$progress['progress']['progress_percent'],
 				$progress['progress']['progress_raw'],
 				$progress['progress']['progress_total'],
 				$progress['progress']['time_elapsed'],
 				$progress['progress']['time_remaining'],
-				implode(", ", $tots)
+				join(", ", $tots),
+				join(", ", array_map($kv, array_keys($extra), array_values($extra)))
 			);
 			$time_last_status = time();
 			$n_last=$n;
