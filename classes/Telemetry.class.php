@@ -636,8 +636,9 @@ class Telemetry {
 		  $flavnums,
 		  $OPTS['topics'],
 		  $from, $to);
+		self::$db->query_mode = MYSQLI_STORE_RESULT;
 		if (!$q) throw new \Exception("Database query failed: ".self::$db->error());
-
+		
 		$one_file_events = function($q) {
 			$last_file_id = null;
 			$events = [];
