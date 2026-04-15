@@ -132,7 +132,7 @@ class TelemetryScrape {
 	 * @param string $prefix prefix replacing $startfolder in the file paths when looking up in DB
 	 * @yield File $file
 	 */
-	static function get_fresh_files_gen($topics, $startfolder, $filemask, $cb_slugger, $filetype, $batch_size=20, $flavnum=null) {
+	static function get_fresh_files_gen($topics, $startfolder, $filemask, $cb_slugger, $filetype, $batch_size=20, $flavnum=null, &$totals) {
 		Logger::vlog("Finding files in $startfolder matching $filemask...");
 		$files_gen = FileTools::rglob_gen($startfolder,$filemask,10);
 		$file_batches_gen = FileTools::batchify($files_gen, $batch_size);
@@ -173,6 +173,7 @@ class TelemetryScrape {
 
 				if (!$file->any_fresh) {
 					Logger::vlog("- File {$file->slug} is NOT fresh for any topic (mtime: ".Tm::dt($file->mtime)."), skipping.");
+					$totals['files_skipped_mtime'] = (isset($totals['files_skipped_mtime']) ? $totals['files_skipped_mtime'] : 0) + 1;
 				} else {
 					// list fresh topics with mtimes
 					$fresh_topics = array_filter($topics, function($t) use ($file) { return $file->topics[$t]['fresh']; });

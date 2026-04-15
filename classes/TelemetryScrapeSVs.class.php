@@ -293,6 +293,8 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		//$file_count_total = Tm::$db->query_one("SELECT COUNT(*) FROM files WHERE filetype='sv' AND slugname LIKE {s}", $flavour."/%") ?: 0;
 		// add progress later; will involve decreasing total as we filter out unchanged files, and increasing current as we process them
 
+		$totals = [];
+
 		$total_files = 0;
 		if (self::$CFG['progress']) {
 			TmSt::stat(['status'=>"ENUMERATING",'stage'=>1,'stageof'=>2,'flavour'=>$flavour,'progress'=>['total_files'=>$total_files]]);
@@ -303,7 +305,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		}
 
 		// get svfiles that may have fresh data for the topics listed
-		$gen_fresh_svfiles = self::get_fresh_files_gen(array_keys($topics_sv), $sync_path, self::$CFG['filemask'], [__CLASS__,'file_path_to_slug'], "sv", self::$CFG['BATCH_SIZE'], Telemetry::flavnum($flavour));
+		$gen_fresh_svfiles = self::get_fresh_files_gen(array_keys($topics_sv), $sync_path, self::$CFG['filemask'], [__CLASS__,'file_path_to_slug'], "sv", self::$CFG['BATCH_SIZE'], Telemetry::flavnum($flavour), $totals);
 
 		// narrow down per configuration
 		/** @var File[] $gen_narrowed_svfiles */
@@ -466,6 +468,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 					return $carry;
 				}, array_map(function($topic) { return $topic['last_event_time'] ?: 0; }, $file->topics));
 			} catch (SkipException $e) {
+				$totals['files_skipped_data'] = (isset($totals['files_skipped_data']) ? $totals['files_skipped_data'] : 0) + 1;
 			}
 				
 			//$last_event_time = max(array_column($extracted['datapoints'],'time')) ?: 0;
@@ -504,6 +507,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		} catch (FileLockedException $e) {
 			Logger::vlog($e->getMessage()." - $filename_full");
 			Telemetry::$db->rollback();
+			$totals['files_skipped_locked'] = (isset($totals['files_skipped_locked']) ? $totals['files_skipped_locked'] : 0) + 1;
 			return;
 		} catch (\Exception $e) {
 			Logger::log(microtime(true)." ERROR processing $filename_full: " . $e->getMessage() . " at stack trace: " . $e->getTraceAsString());
