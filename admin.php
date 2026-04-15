@@ -12,6 +12,12 @@
 	<div class="container">
 		<h1>Telemetry Administration</h1>
 		<h2>Available Topics</h2>
+		<div class="flavor-legend">
+			<span class="flavor-legend-item flavor-wow">Retail</span>
+			<span class="flavor-legend-item flavor-classic">Classic</span>
+			<span class="flavor-legend-item flavor-tbc">TBC</span>
+			<span class="flavor-legend-item flavor-tbc-anniv">TBC Anniv</span>
+		</div>
 		<div id="topics-container">
 			<table>
 				<thead>
@@ -262,7 +268,7 @@
 					$(row).find('[data-field="endpoint"]').text(topic.endpoint ? '✓' : '—').toggleClass('disabled', !topic.endpoint);
 					$(row).find('[data-field="view"]').text(topic.view ? '✓' : '—').toggleClass('disabled', !topic.view);
 					const daymapActions = flavors.map((flavor) =>
-						$('<a href="#" class="action-link" data-flavor="' + flavor + '">O</a> ')
+						$('<a href="#" class="action-link" data-flavor="' + flavor + '">◼</a> ')
 							.on('click', function(e) {
 								e.preventDefault();
 								showDaymap(topic.name, null, new Date().getFullYear(), $(this).data('flavor'));
@@ -452,6 +458,13 @@
 					variant: 'daymap'
 				},
 				dataType: 'json',
+				beforeSend: function() {
+					$('.calendar-header').text(topicName + (cruncherName ? ' - ' + cruncherName : '') + ' — Loading…');
+					$('#calendar-modal').addClass('active loading');
+				},
+				complete: function() {
+					$('#calendar-modal').removeClass('loading');
+				},
 				success: function(response) {
 					if (response.success) {
 						// Cache the response for future year selections
@@ -643,6 +656,13 @@
 		$(document).on('click', function(e) {
 			var $modal = $('#calendar-modal');
 			if ($modal.hasClass('active') && e.target.id === 'calendar-modal') {
+				closeCalendar();
+			}
+		});
+
+		// Close modal on Escape key
+		$(document).on('keydown', function(e) {
+			if (e.key === 'Escape' && $('#calendar-modal').hasClass('active')) {
 				closeCalendar();
 			}
 		});

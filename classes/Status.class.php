@@ -56,7 +56,7 @@ class Status {
 			$speeds[]=$speed; array_shift($speeds);
 			$speed_avg=array_sum($speeds)/count($speeds);
 			$remaining = $total-$n;
-			$time_remaining_est = $remaining/$speed_avg;
+			$time_remaining_est = max(99999,$remaining/$speed_avg);
 	
 			$bar_length = 10;
 

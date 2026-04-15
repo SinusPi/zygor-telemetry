@@ -355,6 +355,30 @@ tr.topic-row {
 		align-items: center;
 		justify-content: center;
 
+		&.loading .calendar-content {
+			min-width: 260px;
+			min-height: 80px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+
+			.calendar-header::after {
+				content: '';
+				display: inline-block;
+				width: 16px;
+				height: 16px;
+				margin-left: 10px;
+				border: 2px solid #ccc;
+				border-top-color: #1976d2;
+				border-radius: 50%;
+				animation: calendar-spin 0.7s linear infinite;
+				vertical-align: middle;
+			}
+
+			/* hide everything except the header while loading */
+			.year-selector, .months-grid, .calendar-close { display: none; }
+		}
+
 		.calendar-content {
 			background-color: white;
 			padding: 18px;
@@ -485,6 +509,10 @@ tr.topic-row {
 	}
 }
 
+@keyframes calendar-spin {
+	to { transform: rotate(360deg); }
+}
+
 #git-logs-container {
 	font-family: 'Consolas','Courier New', monospace;
 	font-size:10px;
@@ -535,5 +563,40 @@ tr.topic-row {
 		&:active {
 			background-color: #5e35b1;
 		}
+	}
+}
+
+/* Flavor color palette */
+:root {
+	--flavor-wow:        #e65400;
+	--flavor-classic:    #149ad8;
+	--flavor-tbc:        #ccb800;
+	--flavor-tbc-anniv:  #ab44ff;
+}
+
+/* Must match specificity of the nested a.action-link rule in #topics-container */
+#topics-container a.action-link[data-flavor="wow"]                { color: var(--flavor-wow) !important;       }
+#topics-container a.action-link[data-flavor="wow-classic"]        { color: var(--flavor-classic) !important;   }
+#topics-container a.action-link[data-flavor="wow-classic-tbc"]    { color: var(--flavor-tbc) !important;       }
+#topics-container a.action-link[data-flavor="wow-classic-tbc-anniv"] { color: var(--flavor-tbc-anniv) !important; }
+
+.flavor-legend {
+	display: flex;
+	gap: 14px;
+	margin: 6px 0 2px;
+	font-size: 12px;
+
+	.flavor-legend-item {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		font-weight: 600;
+
+		&::before { content: "●"; }
+
+		&.flavor-wow        { color: var(--flavor-wow);       }
+		&.flavor-classic    { color: var(--flavor-classic);   }
+		&.flavor-tbc        { color: var(--flavor-tbc);       }
+		&.flavor-tbc-anniv  { color: var(--flavor-tbc-anniv); }
 	}
 }
