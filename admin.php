@@ -253,6 +253,7 @@
 			if (Object.keys(topics).length === 0) {
 				tbody.append('<tr><td colspan="6" style="text-align: center;">No topics available</td></tr>');
 			} else {
+				const flavors = ["wow","wow-classic","wow-classic-tbc","wow-classic-tbc-anniv"];
 				$.each(topics, function(name, topic) {
 					var row = rowTemplate.content.cloneNode(true);
 					$(row).find('[data-field="name"]').text(topic.name);
@@ -260,9 +261,14 @@
 					$(row).find('[data-field="crunchers"]').text(topic.crunchers > 0 ? topic.crunchers : '—').toggleClass('disabled', topic.crunchers === 0);
 					$(row).find('[data-field="endpoint"]').text(topic.endpoint ? '✓' : '—').toggleClass('disabled', !topic.endpoint);
 					$(row).find('[data-field="view"]').text(topic.view ? '✓' : '—').toggleClass('disabled', !topic.view);
-					$(row).find('[data-field="actions"]')
-						.on('click', function() { showDaymap(topic.name, null); })
-						.text('daymap');
+					const daymapActions = flavors.map((flavor) =>
+						$('<a href="#" class="action-link" data-flavor="' + flavor + '">O</a> ')
+							.on('click', function(e) {
+								e.preventDefault();
+								showDaymap(topic.name, null, new Date().getFullYear(), $(this).data('flavor'));
+							})
+					);
+					$(row).find('[data-field="actions"]').append(daymapActions);
 					tbody.append(row);
 					
 					// Add sub-rows for each cruncher
@@ -415,10 +421,11 @@
 			}
 		}
 
-		function showDaymap(topicName, cruncherName=null, selectedYear) {
+		function showDaymap(topicName, cruncherName=null, selectedYear, flavour='wow') {
 			var currentYear = selectedYear || new Date().getFullYear();
 			window.currentDaymapTopic = topicName;
 			window.currentDaymapCruncher = cruncherName;
+			window.currentDaymapFlavor = flavour;
 			
 			// Fetch full history from 2000 to current year on first load
 			// If we already have cached data, use that instead
@@ -441,7 +448,7 @@
 					cruncher: cruncherName,
 					from: fromDate,
 					to: toDate,
-					flavour: 'wow',
+					flavour: flavour,
 					variant: 'daymap'
 				},
 				dataType: 'json',
@@ -665,7 +672,7 @@
 			<td style="text-align: center;"><span class="badge" data-field="crunchers"></span></td>
 			<td style="text-align: center;"><span class="badge" data-field="endpoint"></span></td>
 			<td style="text-align: center;"><span class="badge" data-field="view"></span></td>
-			<td><a class="action-link" data-field="actions"></a></td>
+			<td data-field="actions"></td>
 		</tr>
 	</template>
 
@@ -674,7 +681,7 @@
 			<td class="cruncher-indent" data-field="label"></td>
 			<td><code data-field="input"></code></td>
 			<td colspan="3"><code class="table-name" data-field="table"></code></td>
-			<td><a class="action-link" data-field="actions"></a></td>
+			<td data-field="actions"></td>
 		</tr>
 	</template>
 
