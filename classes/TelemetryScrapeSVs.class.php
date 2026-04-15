@@ -335,14 +335,6 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		foreach ($gen_narrowed_svfiles as $n => $file) {
 			$fresh_topics_in_file = array_filter($topics_sv, function($topic,$name) use ($file) { return $file->topics[$name]['fresh']; },ARRAY_FILTER_USE_BOTH);
 			self::process_single_sv_file($flavour, $file, $fresh_topics_in_file, $totals);
-			if (self::$CFG['dedupe']) {
-				$dupes = Telemetry::doDedupeEvents_Find($file->id,$file->id,[Telemetry::flavnum($flavour)], self::$CFG);
-				if (count($dupes)) {
-					$deleted = Telemetry::doDedupeEvents_Delete($dupes, self::$CFG);
-					$totals['deduped'] = (isset($totals['deduped']) ? $totals['deduped'] : 0) + $deleted;
-					Logger::vlog("Deduped ".$deleted." events for file ID {$file->id} ({$file->slug})");
-				}
-			}
 
 			// obey limit
 			if (isset(self::$CFG['limit']) && $n>=self::$CFG['limit']-1) {
@@ -495,6 +487,15 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			//self::db_update_sv_file_times($file->id, filemtime($filename_full), NOW, $last_event_time);
 			
 			self::db_set_file_scrapetimes(array_keys($topics), $file->id, $newest_per_topic, $file->mtime);
+
+			if (self::$CFG['dedupe']) {
+				$dupes = Telemetry::doDedupeEvents_Find($file->id,$file->id,[Telemetry::flavnum($flavour)], self::$CFG);
+				if (count($dupes)) {
+					$deleted = Telemetry::doDedupeEvents_Delete($dupes, self::$CFG);
+					$totals['deduped'] = (isset($totals['deduped']) ? $totals['deduped'] : 0) + $deleted;
+					Logger::vlog("Deduped ".$deleted." events for file ID {$file->id} ({$file->slug})");
+				}
+			}
 
 			Telemetry::$db->commit();
 
