@@ -306,6 +306,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		$gen_fresh_svfiles = self::get_fresh_files_gen(array_keys($topics_sv), $sync_path, self::$CFG['filemask'], [__CLASS__,'file_path_to_slug'], "sv", self::$CFG['BATCH_SIZE'], Telemetry::flavnum($flavour));
 
 		// narrow down per configuration
+		/** @var File[] $gen_narrowed_svfiles */
 		$gen_narrowed_svfiles = Telemetry::filter_gen($gen_fresh_svfiles, function($file) {
 			// too old, excluded
 			$age = time() - $file->mtime;
@@ -339,7 +340,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 				if (count($dupes)) {
 					$deleted = Telemetry::doDedupeEvents_Delete($dupes, self::$CFG);
 					$totals['deduped'] = (isset($totals['deduped']) ? $totals['deduped'] : 0) + $deleted;
-					Logger::vlog("Deduped ".$deleted." events for file ID {$file->id} ({$file->slugname})");
+					Logger::vlog("Deduped ".$deleted." events for file ID {$file->id} ({$file->slug})");
 				}
 			}
 
