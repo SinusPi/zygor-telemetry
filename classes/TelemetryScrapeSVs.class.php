@@ -346,7 +346,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 
 			// update progress
 			if (self::$CFG['progress']) {
-				TmSt::update_progress(self::$logtag,$totals['files_processed']+$totals['files_skip_data']+$totals['files_skip_lock'],$total_files,['totals'=>$totals],self::$CFG['verbose']);
+				TmSt::update_progress(self::$logtag,$totals['files_processed']+$totals['files_skip_mtime']+$totals['files_skip_data']+$totals['files_skip_lock'],$total_files,['totals'=>$totals],self::$CFG['verbose']);
 			}
 		}
 
@@ -357,8 +357,8 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		$tots = array_map(function($k,$v) { return "$k=$v"; }, array_keys($tot1), array_values($tot1));
 		Logger::log("Scrape of $flavour complete; ".implode(", ",$tots));
 
-		if (count($totals['files_without_zgvs'])/(count($freshfiles_to_process)-$totals['files_skipped'])>0.5)
-			Logger::log("Weird. Out of ".(count($freshfiles_to_process)-$totals['files_skipped'])." files read, ".count($totals['files_without_zgvs'])." had no ZGVs.");
+		if (count($totals['files_without_zgvs'])/(count($freshfiles_to_process)-$totals['files_skip_mtime']-$totals['files_skip_data']-$totals['files_skip_lock'])>0.5)
+			Logger::log("Weird. Out of ".(count($freshfiles_to_process)-$totals['files_skip_mtime']-$totals['files_skip_data']-$totals['files_skip_lock'])." files read, ".count($totals['files_without_zgvs'])." had no ZGVs.");
 		*/
 
 		Logger::log("Scrape of $flavour complete; found ". $totals['total_files'] ." files, processed ". $totals['files_processed'] .".");

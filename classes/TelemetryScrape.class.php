@@ -173,7 +173,7 @@ class TelemetryScrape {
 
 				if (!$file->any_fresh) {
 					Logger::vlog("- File {$file->slug} is NOT fresh for any topic (mtime: ".Tm::dt($file->mtime)."), skipping.");
-					$totals['files_skipped_mtime'] = (isset($totals['files_skipped_mtime']) ? $totals['files_skipped_mtime'] : 0) + 1;
+					$totals['files_skip_mtime'] = (isset($totals['files_skip_mtime']) ? $totals['files_skip_mtime'] : 0) + 1;
 				} else {
 					// list fresh topics with mtimes
 					$fresh_topics = array_filter($topics, function($t) use ($file) { return $file->topics[$t]['fresh']; });
