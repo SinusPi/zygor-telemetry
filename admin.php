@@ -1,5 +1,48 @@
 <?php
 // Admin panel for telemetry management
+$FLAVORS = [
+	"wow" => "Retail",
+	"classic" => "Classic",
+	"tbc" => "Classic MOP",
+	"tbc-anniv" => "TBC Anniv"
+];
+
+$DATES = [
+	[ 'type'=>"expansion", 'name'=>"The Burning Crusade", 'date' => "January 16, 2007"],
+	[ 'type'=>"expansion", 'name'=>"Wrath of the Lich King", 'date' => "November 13, 2008"],
+	[ 'type'=>"expansion", 'name'=>"Cataclysm", 'date' => "December 7, 2010"],
+	[ 'type'=>"expansion", 'name'=>"Mists of Pandaria", 'date' => "September 25, 2012"],
+	[ 'type'=>"expansion", 'name'=>"Warlords of Draenor", 'date' => "November 13, 2014"],
+	[ 'type'=>"expansion", 'name'=>"Legion", 'date' => "August 30, 2016"],
+	[ 'type'=>"expansion", 'name'=>"Battle for Azeroth", 'date' => "August 13, 2018"],
+	[ 'type'=>"expansion", 'name'=>"Shadowlands", 'date' => "November 23, 2020"],
+	[ 'type'=>"expansion", 'name'=>"Dragonflight", 'date' => "November 28, 2022"],
+	[ 'type'=>"expansion", 'name'=>"The War Within", 'date' => "August 26, 2024"],
+	[ 'type'=>"expansion", 'name'=>"Midnight", 'date' => "March 2, 2026"],
+
+	[ 'type'=>"classic", 'name'=>"Molten Core, Onyxia, Maraudon", 'phase'=> "Phase 1", 'date' => "December 12, 2024"],
+	[ 'type'=>"classic", 'name'=>"Dire Maul, Azuregos, Kazzak, Honor System, PvP Rank Rewards, , Alterac Valley, Warsong Gulch", 'phase'=> "Phase 2", 'date' => "January 9, 2025"],
+	[ 'type'=>"classic", 'name'=>"Blackwing Lair, Darkmoon Faire, Arathi Basin", 'phase'=> "Phase 3", 'date' => "March 20th, 2025"],
+	[ 'type'=>"classic", 'name'=>"Zul'Gurub, Green Dragons", 'phase'=> "Phase 4", 'date' => "May 1st, 2025"],
+	[ 'type'=>"classic", 'name'=>"AQ War Effort, AQ Raids, Tier 0.5, Loot Revamp", 'phase'=> "Phase 5", 'date' => "July 10th, 2025"],
+	[ 'type'=>"classic", 'name'=>"Naxxramas, Scourge Invasion, World PvP in Silithus/EPL", 'phase'=> "Phase 6", 'date' => "October 2nd, 2025"],
+
+	[ 'type'=>"som", 'name'=>"Molten Core, Onyxia, Maraudon, PvP Honor System and Battlegrounds", 'phase'=> "Phase 1", 'date' => "16 November, 2021"],
+	[ 'type'=>"som", 'name'=>"Dire Maul, Azuregos, Kazzak", 'phase'=> "Phase 2", 'date' => "16 December, 2021"],
+	[ 'type'=>"som", 'name'=>"Blackwing Lair, Darkmoon Faire, Darkmoon deck drops begin", 'phase'=> "Phase 3", 'date' => "10 February, 2022"],
+	[ 'type'=>"som", 'name'=>"Zul'Gurub, Dragons of Nightmare", 'phase'=> "Phase 4", 'date' => "3 March, 2022"],
+	[ 'type'=>"som", 'name'=>"Ahn'Qiraj War Effort begins, Ahn'Qiraj raids within 30 days as the war effort dictates", 'phase'=> "Phase 5", 'date' => "21 April, 2022"],
+	[ 'type'=>"som", 'name'=>"Naxxramas, Scourge Invasion", 'phase'=> "Phase 6", 'date' => "28 July, 2022"],
+
+	[ 'type'=>"tbc-anniv", 'name'=>"Leveling Updates, Draenei and Blood Elves, Jewelcrafting", 'phase'=>"Pre Patch", 'date' => "January 13th, 2026"],
+	[ 'type'=>"tbc-anniv", 'name'=>"Level Cap increased, New Dungeons, Heroic Dungeons, Karazhan, Gruul's Lair, and Magtheridon, Outland Zones", 'phase'=>"Phase 1", 'date' => "February 5th, 2026"],
+	[ 'type'=>"tbc-anniv", 'name'=>"Serpentshrine Cavern, Tempest Keep Raids, Profession Updates", 'phase'=>"Phase 2", 'date' => "May 14th, 2026"],
+	[ 'type'=>"tbc-anniv", 'name'=>"Mount Hyjal, and Black Temple Raids", 'phase'=>"Phase 3", 'date' => "Summer, 2026"],
+	[ 'type'=>"tbc-anniv", 'name'=>"Zul'Aman", 'phase'=>"Phase 4", 'date' => "Autumn, 2026"],
+	[ 'type'=>"tbc-anniv", 'name'=>"Magister's Terrace (Dungeon) Sunwell Plateau (Raid) Isle of Quel'Dan Daily Quest Hub", 'phase'=>"Phase 5", 'date' => "Autumn, 2026"],
+
+
+];
 ?>
 <!DOCTYPE html>
 <html>
@@ -13,10 +56,9 @@
 		<h1>Telemetry Administration</h1>
 		<h2>Available Topics</h2>
 		<div class="flavor-legend">
-			<span class="flavor-legend-item flavor-wow">Retail</span>
-			<span class="flavor-legend-item flavor-classic">Classic</span>
-			<span class="flavor-legend-item flavor-tbc">TBC</span>
-			<span class="flavor-legend-item flavor-tbc-anniv">TBC Anniv</span>
+			<?php foreach ($FLAVORS as $slug => $label): ?>
+				<span class="flavor-legend-item" data-flavor="<?= $slug ?>"><?= $label ?></span>
+			<?php endforeach; ?>
 		</div>
 		<div id="topics-container">
 			<table>
@@ -83,6 +125,12 @@
 
 	<script>
 		window.gitLogsOffset = 0;
+		<?php
+			$dates_map = [];
+			foreach ($DATES as $d)
+				$dates_map[date('Y-m-d', strtotime($d['date']))] = ['type' => $d['type'], 'name' => $d['name'], 'phase' => isset($d['phase']) ? $d['phase'] : null];
+		?>;
+		window.IMPORTANT_DATES = <?= json_encode($dates_map) ?>;
 
 		$(function() {
 			loadStatus();
@@ -523,10 +571,14 @@
 					if (heatLevel > 10) heatLevel = 10;
 				}
 				
-				$(this).attr('title', count);
+		$(this).attr('title', count);
 				$(this).removeClass(function(index, css) {
 					return (css.match(/heat-\d+/g) || []).join(' ');
 				});
+				var importantDate = window.IMPORTANT_DATES && window.IMPORTANT_DATES[dateStr];
+				$(this).toggleClass('important-date', !!importantDate);
+				if (importantDate)
+					$(this).attr('title', `${count}\n\u2605 [${importantDate.type}] ${importantDate.name}` + (importantDate.phase ? ` (${importantDate.phase})` : '') + `\n(${dateStr})`);
 				if (heatLevel > 0) {
 					$(this).addClass('heat-' + heatLevel);
 				}
