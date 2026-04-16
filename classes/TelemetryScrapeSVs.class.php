@@ -504,7 +504,8 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 				$dupes = Telemetry::doDedupeEvents_Find($file->id,$file->id,[Telemetry::flavnum($flavour)], self::$CFG);
 				if (count($dupes)) {
 					$deleted = Telemetry::doDedupeEvents_Delete($dupes, self::$CFG);
-					$totals['deduped'] = (isset($totals['deduped']) ? $totals['deduped'] : 0) + $deleted;
+					$totals['data_deduped'] = (isset($totals['data_deduped']) ? $totals['data_deduped'] : 0) + $deleted;
+					$totals['data_added'] -= $deleted;
 					Logger::vlog("Deduped ".$deleted." events for file ID {$file->id} ({$file->slug})");
 				}
 			}
