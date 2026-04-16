@@ -192,7 +192,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			TmSt::stat(['file_last'=>$filename_userfile],true);
 
 			if (!self::$CFG['ignore-mtimes'] && isset($last_mtimes[$flavourslug]) && filemtime($filename_full) <= $last_mtimes[$flavourslug]) {  // do not re-scrape if the file hasn't been updated
-				$totals['files_skipped']++;
+				$totals['files_skip_mtime']++;
 				//$totals['files_skipped_last_why'] = date("Ymd",filemtime($full_filename))."<=".date("Ymd",$last_mtimes[$filename_full]);
 				continue; //skip
 			}
@@ -203,14 +203,14 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		Logger::log(sprintf(
 			"Processing %d files (%s%s%d not changed since scrape).",
 			count($freshfiles_to_process),
-			$totals['files_skipped'] ? $totals['files_skipped'] . " skipped, " : "",
+			$totals['files_skip_mtime'] ? $totals['files_skip_mtime'] . " skipped, " : "",
 			$totals['not_files'] ? $totals['not_files'] . " not files, " : "",
 			count($freshfiles) - count($freshfiles_to_process)
 		));
 		
 		unset($freshfiles);
 
-		$totals['inserted_datapoints'] = 0;
+		$totals['data_added'] = 0;
 
 
 		// PRE OPT!!
@@ -332,7 +332,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			return true;
 		});
 
-		$GLOBALS['processed_files'] = 0;
+		$totals['files_processed'] = 0;
 
 		foreach ($gen_narrowed_svfiles as $n => $file) {
 			$fresh_topics_in_file = array_filter($topics_sv, function($topic,$name) use ($file) { return $file->topics[$name]['fresh']; },ARRAY_FILTER_USE_BOTH);
@@ -346,7 +346,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 
 			// update progress
 			if (self::$CFG['progress']) {
-				TmSt::update_progress(self::$logtag,$n,$total_files,['totals'=>$totals],self::$CFG['verbose']);
+				TmSt::update_progress(self::$logtag,$totals['files_processed']+$totals['files_skip_data']+$totals['files_skip_lock'],$total_files,['totals'=>$totals],self::$CFG['verbose']);
 			}
 		}
 
@@ -361,7 +361,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			Logger::log("Weird. Out of ".(count($freshfiles_to_process)-$totals['files_skipped'])." files read, ".count($totals['files_without_zgvs'])." had no ZGVs.");
 		*/
 
-		Logger::log("Scrape of $flavour complete; found ". $GLOBALS['total_files'] ." files, processed ". $GLOBALS['processed_files'] .".");
+		Logger::log("Scrape of $flavour complete; found ". $totals['total_files'] ." files, processed ". $totals['files_processed'] .".");
 		
 
 		TmSt::stat(['status'=>"IDLE"]);
@@ -474,7 +474,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 					return $carry;
 				}, array_map(function($topic) { return $topic['last_event_time'] ?: 0; }, $file->topics));
 			} catch (SkipException $e) {
-				$totals['files_skipped_data'] = (isset($totals['files_skipped_data']) ? $totals['files_skipped_data'] : 0) + 1;
+				$totals['files_skip_data'] = (isset($totals['files_skip_data']) ? $totals['files_skip_data'] : 0) + 1;
 			}
 				
 			//$last_event_time = max(array_column($extracted['datapoints'],'time')) ?: 0;
@@ -486,7 +486,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			if ($count) {
 				$inserted = Telemetry::$db->store_datapoints(Telemetry::flavnum($flavour),$file->id,$extracted['datapoints']);
 				Logger::vlog("Datapoints inserted into DB: $inserted");
-				$totals['inserted_datapoints'] += $inserted;
+				$totals['data_added'] += $inserted;
 			}
 
 			// $last_event_data = array_filter($extracted['datapoints'], function($dp) use ($last_event_time) { return $dp['time'] == $last_event_time; });
@@ -498,7 +498,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			self::db_set_file_scrapetimes(array_keys($topics), $file->id, $newest_per_topic, $file->mtime);
 
 			if ($file->error)
-				Telemetry::$db->query("UPDATE files SET error=null WHERE id={i}", $file->id); // reset error if it was set before and we succeeded now
+				Telemetry::$db->query("UPDATE files SET error=null WHERE id={d}", $file->id); // reset error if it was set before and we succeeded now
 
 			if (self::$CFG['dedupe']) {
 				$dupes = Telemetry::doDedupeEvents_Find($file->id,$file->id,[Telemetry::flavnum($flavour)], self::$CFG);
@@ -511,12 +511,12 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 
 			Telemetry::$db->commit();
 
-			$GLOBALS['processed_files']++;
+			$totals['files_processed'] = (isset($totals['files_processed']) ? $totals['files_processed'] : 0) + 1;
 
 		} catch (FileLockedException $e) {
 			Logger::vlog($e->getMessage()." - $filename_full");
 			Telemetry::$db->rollback();
-			$totals['files_skipped_locked'] = (isset($totals['files_skipped_locked']) ? $totals['files_skipped_locked'] : 0) + 1;
+			$totals['files_skip_lock'] = (isset($totals['files_skip_lock']) ? $totals['files_skip_lock'] : 0) + 1;
 			return;
 		} catch (\Exception $e) {
 			Logger::log(microtime(true)." ERROR processing $filename_full: " . $e->getMessage() . " at stack trace: " . $e->getTraceAsString());
