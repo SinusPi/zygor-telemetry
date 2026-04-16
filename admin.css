@@ -415,6 +415,11 @@ tr.topic-row {
 					&:hover {
 						background-color: #1565c0;
 					}
+
+					&:disabled {
+						background-color: #ccc;
+						cursor: default;
+					}
 				}
 
 				select {
@@ -484,11 +489,16 @@ tr.topic-row {
 							&.heat-9  { background-color: hsla(110, 95%,25%,1); }
 							&.heat-10 { background-color: hsla(110,100%,20%,1); }
 
-						&.important-date {
-							box-shadow: inset 0 0 0 2px #f9a825;
-							z-index: 1;
-							cursor: help;
-						}
+							&.important-date {
+								box-shadow: inset 0 0 0 2px #f9a825;
+								z-index: 1;
+								cursor: help;
+
+								&[data-flavor="wow"]                { box-shadow: inset 0 0 0 2px var(--flavor-wow); }
+								&[data-flavor="wow-classic"]            { box-shadow: inset 0 0 0 2px var(--flavor-classic); }
+								&[data-flavor="wow-classic-tbc"]    { box-shadow: inset 0 0 0 2px var(--flavor-tbc); }
+								&[data-flavor="wow-classic-tbc-anniv"] { box-shadow: inset 0 0 0 2px var(--flavor-tbc-anniv); }
+							}
 						}
 					}
 				}
@@ -588,6 +598,7 @@ tr.topic-row {
 
 .flavor-legend {
 	display: flex;
+	justify-content: flex-end;
 	gap: 14px;
 	margin: 6px 0 2px;
 	font-size: 12px;
@@ -601,8 +612,8 @@ tr.topic-row {
 		&::before { content: "●"; }
 
 		&[data-flavor=wow]                { color: var(--flavor-wow);       }
-		&[data-flavor=classic]            { color: var(--flavor-classic);   }
-		&[data-flavor=tbc]                { color: var(--flavor-tbc);       }
-		&[data-flavor=tbc-anniv]          { color: var(--flavor-tbc-anniv); }
+		&[data-flavor=wow-classic]            { color: var(--flavor-classic);   }
+		&[data-flavor=wow-classic-tbc]    { color: var(--flavor-tbc);       }
+		&[data-flavor=wow-classic-tbc-anniv] { color: var(--flavor-tbc-anniv); }
 	}
 }

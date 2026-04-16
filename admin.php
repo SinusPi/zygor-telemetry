@@ -2,30 +2,30 @@
 // Admin panel for telemetry management
 $FLAVORS = [
 	"wow" => "Retail",
-	"classic" => "Classic",
-	"tbc" => "Classic MOP",
-	"tbc-anniv" => "TBC Anniv"
+	"wow-classic" => "Classic",
+	"wow-classic-tbc" => "Classic MOP",
+	"wow-classic-tbc-anniv" => "TBC Anniv"
 ];
 
 $DATES = [
-	[ 'type'=>"expansion", 'name'=>"The Burning Crusade", 'date' => "January 16, 2007"],
-	[ 'type'=>"expansion", 'name'=>"Wrath of the Lich King", 'date' => "November 13, 2008"],
-	[ 'type'=>"expansion", 'name'=>"Cataclysm", 'date' => "December 7, 2010"],
-	[ 'type'=>"expansion", 'name'=>"Mists of Pandaria", 'date' => "September 25, 2012"],
-	[ 'type'=>"expansion", 'name'=>"Warlords of Draenor", 'date' => "November 13, 2014"],
-	[ 'type'=>"expansion", 'name'=>"Legion", 'date' => "August 30, 2016"],
-	[ 'type'=>"expansion", 'name'=>"Battle for Azeroth", 'date' => "August 13, 2018"],
-	[ 'type'=>"expansion", 'name'=>"Shadowlands", 'date' => "November 23, 2020"],
-	[ 'type'=>"expansion", 'name'=>"Dragonflight", 'date' => "November 28, 2022"],
-	[ 'type'=>"expansion", 'name'=>"The War Within", 'date' => "August 26, 2024"],
-	[ 'type'=>"expansion", 'name'=>"Midnight", 'date' => "March 2, 2026"],
+	[ 'type'=>"expansion", 'flavor'=>"wow", 'name'=>"The Burning Crusade", 'date' => "January 16, 2007"],
+	[ 'type'=>"expansion", 'flavor'=>"wow", 'name'=>"Wrath of the Lich King", 'date' => "November 13, 2008"],
+	[ 'type'=>"expansion", 'flavor'=>"wow", 'name'=>"Cataclysm", 'date' => "December 7, 2010"],
+	[ 'type'=>"expansion", 'flavor'=>"wow", 'name'=>"Mists of Pandaria", 'date' => "September 25, 2012"],
+	[ 'type'=>"expansion", 'flavor'=>"wow", 'name'=>"Warlords of Draenor", 'date' => "November 13, 2014"],
+	[ 'type'=>"expansion", 'flavor'=>"wow", 'name'=>"Legion", 'date' => "August 30, 2016"],
+	[ 'type'=>"expansion", 'flavor'=>"wow", 'name'=>"Battle for Azeroth", 'date' => "August 13, 2018"],
+	[ 'type'=>"expansion", 'flavor'=>"wow", 'name'=>"Shadowlands", 'date' => "November 23, 2020"],
+	[ 'type'=>"expansion", 'flavor'=>"wow", 'name'=>"Dragonflight", 'date' => "November 28, 2022"],
+	[ 'type'=>"expansion", 'flavor'=>"wow", 'name'=>"The War Within", 'date' => "August 26, 2024"],
+	[ 'type'=>"expansion", 'flavor'=>"wow", 'name'=>"Midnight", 'date' => "March 2, 2026"],
 
-	[ 'type'=>"classic", 'name'=>"Molten Core, Onyxia, Maraudon", 'phase'=> "Phase 1", 'date' => "December 12, 2024"],
-	[ 'type'=>"classic", 'name'=>"Dire Maul, Azuregos, Kazzak, Honor System, PvP Rank Rewards, , Alterac Valley, Warsong Gulch", 'phase'=> "Phase 2", 'date' => "January 9, 2025"],
-	[ 'type'=>"classic", 'name'=>"Blackwing Lair, Darkmoon Faire, Arathi Basin", 'phase'=> "Phase 3", 'date' => "March 20th, 2025"],
-	[ 'type'=>"classic", 'name'=>"Zul'Gurub, Green Dragons", 'phase'=> "Phase 4", 'date' => "May 1st, 2025"],
-	[ 'type'=>"classic", 'name'=>"AQ War Effort, AQ Raids, Tier 0.5, Loot Revamp", 'phase'=> "Phase 5", 'date' => "July 10th, 2025"],
-	[ 'type'=>"classic", 'name'=>"Naxxramas, Scourge Invasion, World PvP in Silithus/EPL", 'phase'=> "Phase 6", 'date' => "October 2nd, 2025"],
+	[ 'type'=>"classic", 'flavor'=>"wow-classic", 'name'=>"Molten Core, Onyxia, Maraudon", 'phase'=> "Phase 1", 'date' => "December 12, 2024"],
+	[ 'type'=>"classic", 'flavor'=>"wow-classic", 'name'=>"Dire Maul, Azuregos, Kazzak, Honor System, PvP Rank Rewards, , Alterac Valley, Warsong Gulch", 'phase'=> "Phase 2", 'date' => "January 9, 2025"],
+	[ 'type'=>"classic", 'flavor'=>"wow-classic", 'name'=>"Blackwing Lair, Darkmoon Faire, Arathi Basin", 'phase'=> "Phase 3", 'date' => "March 20th, 2025"],
+	[ 'type'=>"classic", 'flavor'=>"wow-classic", 'name'=>"Zul'Gurub, Green Dragons", 'phase'=> "Phase 4", 'date' => "May 1st, 2025"],
+	[ 'type'=>"classic", 'flavor'=>"wow-classic", 'name'=>"AQ War Effort, AQ Raids, Tier 0.5, Loot Revamp", 'phase'=> "Phase 5", 'date' => "July 10th, 2025"],
+	[ 'type'=>"classic", 'flavor'=>"wow-classic", 'name'=>"Naxxramas, Scourge Invasion, World PvP in Silithus/EPL", 'phase'=> "Phase 6", 'date' => "October 2nd, 2025"],
 
 	[ 'type'=>"som", 'name'=>"Molten Core, Onyxia, Maraudon, PvP Honor System and Battlegrounds", 'phase'=> "Phase 1", 'date' => "16 November, 2021"],
 	[ 'type'=>"som", 'name'=>"Dire Maul, Azuregos, Kazzak", 'phase'=> "Phase 2", 'date' => "16 December, 2021"],
@@ -34,12 +34,12 @@ $DATES = [
 	[ 'type'=>"som", 'name'=>"Ahn'Qiraj War Effort begins, Ahn'Qiraj raids within 30 days as the war effort dictates", 'phase'=> "Phase 5", 'date' => "21 April, 2022"],
 	[ 'type'=>"som", 'name'=>"Naxxramas, Scourge Invasion", 'phase'=> "Phase 6", 'date' => "28 July, 2022"],
 
-	[ 'type'=>"tbc-anniv", 'name'=>"Leveling Updates, Draenei and Blood Elves, Jewelcrafting", 'phase'=>"Pre Patch", 'date' => "January 13th, 2026"],
-	[ 'type'=>"tbc-anniv", 'name'=>"Level Cap increased, New Dungeons, Heroic Dungeons, Karazhan, Gruul's Lair, and Magtheridon, Outland Zones", 'phase'=>"Phase 1", 'date' => "February 5th, 2026"],
-	[ 'type'=>"tbc-anniv", 'name'=>"Serpentshrine Cavern, Tempest Keep Raids, Profession Updates", 'phase'=>"Phase 2", 'date' => "May 14th, 2026"],
-	[ 'type'=>"tbc-anniv", 'name'=>"Mount Hyjal, and Black Temple Raids", 'phase'=>"Phase 3", 'date' => "Summer, 2026"],
-	[ 'type'=>"tbc-anniv", 'name'=>"Zul'Aman", 'phase'=>"Phase 4", 'date' => "Autumn, 2026"],
-	[ 'type'=>"tbc-anniv", 'name'=>"Magister's Terrace (Dungeon) Sunwell Plateau (Raid) Isle of Quel'Dan Daily Quest Hub", 'phase'=>"Phase 5", 'date' => "Autumn, 2026"],
+	[ 'type'=>"tbc-anniv", 'flavor'=>"wow-classic-tbc-anniv", 'name'=>"Leveling Updates, Draenei and Blood Elves, Jewelcrafting", 'phase'=>"Pre Patch", 'date' => "January 13th, 2026"],
+	[ 'type'=>"tbc-anniv", 'flavor'=>"wow-classic-tbc-anniv", 'name'=>"Level Cap increased, New Dungeons, Heroic Dungeons, Karazhan, Gruul's Lair, and Magtheridon, Outland Zones", 'phase'=>"Phase 1", 'date' => "February 5th, 2026"],
+	[ 'type'=>"tbc-anniv", 'flavor'=>"wow-classic-tbc-anniv", 'name'=>"Serpentshrine Cavern, Tempest Keep Raids, Profession Updates", 'phase'=>"Phase 2", 'date' => "May 14th, 2026"],
+	[ 'type'=>"tbc-anniv", 'flavor'=>"wow-classic-tbc-anniv", 'name'=>"Mount Hyjal, and Black Temple Raids", 'phase'=>"Phase 3", 'date' => "Summer, 2026"],
+	[ 'type'=>"tbc-anniv", 'flavor'=>"wow-classic-tbc-anniv", 'name'=>"Zul'Aman", 'phase'=>"Phase 4", 'date' => "Autumn, 2026"],
+	[ 'type'=>"tbc-anniv", 'flavor'=>"wow-classic-tbc-anniv", 'name'=>"Magister's Terrace (Dungeon) Sunwell Plateau (Raid) Isle of Quel'Dan Daily Quest Hub", 'phase'=>"Phase 5", 'date' => "Autumn, 2026"],
 
 
 ];
@@ -128,7 +128,7 @@ $DATES = [
 		<?php
 			$dates_map = [];
 			foreach ($DATES as $d)
-				$dates_map[date('Y-m-d', strtotime($d['date']))] = ['type' => $d['type'], 'name' => $d['name'], 'phase' => isset($d['phase']) ? $d['phase'] : null];
+				$dates_map[date('Y-m-d', strtotime($d['date']))] = $d;
 		?>;
 		window.IMPORTANT_DATES = <?= json_encode($dates_map) ?>;
 
@@ -556,8 +556,10 @@ $DATES = [
 			var maxCount = window.currentMaxCount || 1;
 			var totalCount = window.currentTotalCount || 0;
 			var yearTotals = window.currentYearTotals || {};
+			var topic = window.currentDaymapTopic || 'Unknown Topic?';
+			var flavor = window.currentDaymapFlavor || '';
 
-			$(".calendar-header").text(window.currentDaymapTopic + ' - Yearly Total: ' + (yearTotals[$('#year-select').val()] || 0) + ' / Overall Total: ' + totalCount);
+			$(".calendar-header").text(`Topic: ${topic} - Flavor: ${flavor} - Yearly Total: ${yearTotals[$('#year-select').val()] || 0} / Overall Total: ${totalCount}`);
 			
 			$('.calendar-day').each(function() {
 				var dateStr = $(this).data('date');
@@ -570,13 +572,14 @@ $DATES = [
 					heatLevel = Math.ceil(ratio * 10);
 					if (heatLevel > 10) heatLevel = 10;
 				}
-				
-		$(this).attr('title', count);
+				$(this).attr('title', count);
 				$(this).removeClass(function(index, css) {
 					return (css.match(/heat-\d+/g) || []).join(' ');
 				});
+
 				var importantDate = window.IMPORTANT_DATES && window.IMPORTANT_DATES[dateStr];
 				$(this).toggleClass('important-date', !!importantDate);
+				$(this).attr('data-flavor', importantDate ? importantDate.flavor : '')
 				if (importantDate)
 					$(this).attr('title', `${count}\n\u2605 [${importantDate.type}] ${importantDate.name}` + (importantDate.phase ? ` (${importantDate.phase})` : '') + `\n(${dateStr})`);
 				if (heatLevel > 0) {
@@ -612,6 +615,10 @@ $DATES = [
 					}
 				});
 			});
+
+			// update button states
+			$("#prev-year-btn").prop('disabled', year === parseInt(window.yearRange[0]));
+			$("#next-year-btn").prop('disabled', year === parseInt(window.yearRange[window.yearRange.length - 1]));
 		}
 
 		function displayCalendar(topicName, daymapObj, year) {
@@ -693,8 +700,9 @@ $DATES = [
 
 				// Update dropdown to reflect new year
 				$('#year-select').val(newYear);
+
 			}
-			
+
 			// Populate grid with new year and apply data
 			populateCalendarGrid(newYear);
 			applyDaymapData();
