@@ -420,14 +420,16 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 				if ($extracted['err'] == "stderr_output") {
 					$totals['broken_lua']++;
 					//echo $filename_full . ": ERROR: " . $extracted['error'];
-					Telemetry::$db->query("UPDATE files SET error=1 WHERE id={i}", $file->id);
+					$q = Telemetry::$db->query("UPDATE files SET error=1 WHERE id={i}", $file->id);
+					if (!$q) Logger::log("Failed to mark file as error in DB: " . Telemetry::$db->error());
 					// SV+Lua broken, it could mean our extraction failed, or the file was broken in the first place.
 					return;
 				} elseif ($extracted['err'] == "no_zgvs") {
 					$size = filesize($filename_full);
 					if ($size > 500) $totals['files_without_zgvs'][] = $filename_userfile; // just log it
 					$totals['broken_lua']++;
-					Telemetry::$db->query("UPDATE files SET error=1 WHERE id={i}", $file->id);
+					$q = Telemetry::$db->query("UPDATE files SET error=1 WHERE id={i}", $file->id);
+					if (!$q) Logger::log("Failed to mark file as error in DB: " . Telemetry::$db->error());
 					return;
 				} elseif (!isset($extracted['datapoints'])) {
 					throw new \ErrorException("ERROR: no datapoints at all (did Lua even run?), reading $filename_full " . print_r($extracted, 1));
