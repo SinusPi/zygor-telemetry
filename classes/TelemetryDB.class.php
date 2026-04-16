@@ -158,7 +158,7 @@ class TelemetryDB {
 		if ($this->error()) throw new \ErrorException("DB error getting file '$filename': " . $this->error());
 		if ($r && $r->num_rows) {
 			$file = $r->fetch_assoc();
-			return new File($file['id'], $file['slugname']);
+			return new File($file['id'], $file['slugname'], $file['error']);
 		}
 		$this->query("INSERT INTO files (slugname) VALUES ({s}) ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)", $filename);
 		return new File($this->insert_id(), $filename);
@@ -183,7 +183,7 @@ class TelemetryDB {
 			foreach ($files_not_found as $nf) {
 				$this->query("INSERT INTO files (slugname, filetype, flavnum) VALUES ({s}, {s}, {dn}) ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)", $nf, $filetype, $flavnum);
 				if ($this->error()) throw new \ErrorException("DB error inserting file '$nf': " . $this->error());
-				$file_rows[] = ['id' => $this->insert_id(), 'slugname' => $nf]; // mock entry
+				$file_rows[] = ['id' => $this->insert_id(), 'slugname' => $nf, 'error' => null]; // mock entry
 			}
 		}
 		// sort result array in the same order as $slugnames
@@ -191,7 +191,7 @@ class TelemetryDB {
 		$sorted_file_rows = [];
 		foreach ($slugnames as $fn) {
 			$row = $file_rows_by_slugname[$fn];
-			$sorted_file_rows[] = $row ? new File($row['id'], $row['slugname']) : null;
+			$sorted_file_rows[] = $row ? new File($row['id'], $row['slugname'], $row['error']) : null;
 		}
 		return $sorted_file_rows;
 	}

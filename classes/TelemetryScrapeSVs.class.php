@@ -368,6 +368,8 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 	}
 
 	/** Run all SV-sourced topic scrapers on a single file
+	 * @param string $flavour
+	 * @param File $file
 	 * @return void
 	 */
 	static function process_single_sv_file($flavour, $file, $topics, &$totals) {
@@ -417,13 +419,15 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			if ($extracted['status'] != "ok") {
 				if ($extracted['err'] == "stderr_output") {
 					$totals['broken_lua']++;
-					echo $filename_full . ": ERROR: " . $extracted['error'];
+					//echo $filename_full . ": ERROR: " . $extracted['error'];
+					Telemetry::$db->query("UPDATE files SET error=1 WHERE id={i}", $file->id);
 					// SV+Lua broken, it could mean our extraction failed, or the file was broken in the first place.
 					return;
 				} elseif ($extracted['err'] == "no_zgvs") {
 					$size = filesize($filename_full);
 					if ($size > 500) $totals['files_without_zgvs'][] = $filename_userfile; // just log it
 					$totals['broken_lua']++;
+					Telemetry::$db->query("UPDATE files SET error=1 WHERE id={i}", $file->id);
 					return;
 				} elseif (!isset($extracted['datapoints'])) {
 					throw new \ErrorException("ERROR: no datapoints at all (did Lua even run?), reading $filename_full " . print_r($extracted, 1));
@@ -490,6 +494,9 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			//self::db_update_sv_file_times($file->id, filemtime($filename_full), NOW, $last_event_time);
 			
 			self::db_set_file_scrapetimes(array_keys($topics), $file->id, $newest_per_topic, $file->mtime);
+
+			if ($file->error)
+				Telemetry::$db->query("UPDATE files SET error=null WHERE id={i}", $file->id); // reset error if it was set before and we succeeded now
 
 			if (self::$CFG['dedupe']) {
 				$dupes = Telemetry::doDedupeEvents_Find($file->id,$file->id,[Telemetry::flavnum($flavour)], self::$CFG);

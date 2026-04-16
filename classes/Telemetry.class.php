@@ -400,6 +400,7 @@ class Telemetry {
 				COMMENT='list of all parsed files, for bookkeeping and reference from events';
 			",
 			'1>2' => "ALTER TABLE `files` ADD COLUMN `flavnum` int(1) NULL AFTER `filetype`",
+			'2>3' => "ALTER TABLE `files` ADD COLUMN `error` int(1) NULL AFTER `flavnum`",
 			]);
 		if ($result && $result['status'] === 'migrated') Logger::vlog("DB: 'files' table created or migrated to version ".$result['target_version']);
 	}
@@ -710,12 +711,14 @@ class File {
 	public $topics;
 	public $newest_scrape_time;
 	public $any_fresh;
+	public $error;
 
 	public $mtime; // not stored
 	
-	public function __construct($id, $fileslug) {
+	public function __construct($id, $fileslug, $error=null) {
 		$this->id = $id;
 		$this->slug = $fileslug;
+		$this->error = $error;
 	}
 
 }
