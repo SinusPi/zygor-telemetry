@@ -597,6 +597,7 @@ class Telemetry {
 
 	static function doCountEvents($OPTS) {
 		$flavnums = self::flavnum($OPTS['flavour']);
+		Logger::log("Starting event counting for flavour(s) ".implode(", ", $OPTS['flavour'])." and topic(s) ".implode(", ", $OPTS['topics']).". This may take a while...");
 		$q = self::$db->query("INSERT INTO `counts` (`flavnum`, `type`, `subtype`, `count`, `updated_at`)
 			SELECT `flavnum`,`type`,`subtype`, COUNT(*) AS count, UNIX_TIMESTAMP() as updated_at
 			FROM `events`
