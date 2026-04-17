@@ -596,6 +596,33 @@ tr.topic-row {
 #topics-container a.action-link[data-flavor="wow-classic-tbc"]    { color: var(--flavor-tbc) !important;       }
 #topics-container a.action-link[data-flavor="wow-classic-tbc-anniv"] { color: var(--flavor-tbc-anniv) !important; }
 
+.topic-counts {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 3px;
+
+	.count-flavor {
+		font-size: 10px;
+		font-weight: 700;
+		padding: 1px 4px;
+		border-radius: 3px;
+		min-width: 24px;
+		text-align: center;
+		border: 1px solid currentColor;
+		opacity: 0.85;
+		cursor: default;
+
+		&[data-flavor=wow]                { color: var(--flavor-wow);       }
+		&[data-flavor=wow-classic]        { color: var(--flavor-classic);   }
+		&[data-flavor=wow-classic-tbc]    { color: var(--flavor-tbc);       }
+		&[data-flavor=wow-classic-tbc-anniv] { color: var(--flavor-tbc-anniv); }
+
+		&.count-loading { color: #bbb; border-color: #ddd; }
+		&.count-zero    { color: #ccc; border-color: #e8e8e8; font-weight: 400; }
+		&.count-error   { color: #e53935; border-color: #e53935; }
+	}
+}
+
 .flavor-legend {
 	display: flex;
 	justify-content: flex-end;

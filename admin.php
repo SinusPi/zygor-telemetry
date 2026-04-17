@@ -70,6 +70,7 @@ $DATES = [
 						<th>Endpoint</th>
 						<th>View</th>
 						<th>Actions</th>
+						<th>Recent Counts</th>
 					</tr>
 				</thead>
 				<tbody></tbody>
@@ -323,6 +324,11 @@ $DATES = [
 							})
 					);
 					$(row).find('[data-field="actions"]').append(daymapActions);
+					$(row).find('tr').attr('data-topic', name);
+					var countSpans = flavors.map(function(f) {
+						return $('<span class="count-flavor count-loading" data-flavor="' + f + '">·</span>');
+					});
+					$(row).find('[data-field="counts"]').append(countSpans);
 					tbody.append(row);
 					
 					// Add sub-rows for each cruncher
@@ -345,6 +351,35 @@ $DATES = [
 					}
 				});
 			}
+			loadTopicCounts(topics);
+		}
+
+		function loadTopicCounts(topics) {
+			const flavors = ["wow","wow-classic","wow-classic-tbc","wow-classic-tbc-anniv"];
+			$.each(topics, function(name) {
+				flavors.forEach(function(flavor) {
+					$.ajax({
+						url: 'telemetry_endpoint.php',
+						type: 'GET',
+						data: { do: 'count_events', type: name, flavour: flavor },
+						dataType: 'json',
+						success: function(response) {
+							var total = 0;
+							if (response.success && response.counts)
+								$.each(response.counts, function(i, c) { total += parseInt(c.count) || 0; });
+							$('tr[data-topic="' + name + '"] .count-flavor[data-flavor="' + flavor + '"]')
+								.removeClass('count-loading')
+								.toggleClass('count-zero', total === 0)
+								.attr('title', flavor + ': ' + total.toLocaleString())
+								.text(total > 0 ? total.toLocaleString() : '—');
+						},
+						error: function() {
+							$('tr[data-topic="' + name + '"] .count-flavor[data-flavor="' + flavor + '"]')
+								.removeClass('count-loading').addClass('count-error').text('!');
+						}
+					});
+				});
+			});
 		}
 
 		function displaySources(sources) {
@@ -753,6 +788,7 @@ $DATES = [
 			<td style="text-align: center;"><span class="badge" data-field="endpoint"></span></td>
 			<td style="text-align: center;"><span class="badge" data-field="view"></span></td>
 			<td data-field="actions"></td>
+			<td class="topic-counts" data-field="counts"></td>
 		</tr>
 	</template>
 
@@ -762,6 +798,7 @@ $DATES = [
 			<td><code data-field="input"></code></td>
 			<td colspan="3"><code class="table-name" data-field="table"></code></td>
 			<td data-field="actions"></td>
+			<td></td>
 		</tr>
 	</template>
 
@@ -769,7 +806,7 @@ $DATES = [
 		<tr class="cruncher-header-row">
 			<td class="cruncher-header" style="font-weight: bold; padding: 8px 4px 4px 20px;">Cruncher</td>
 			<td class="cruncher-header" style="font-weight: bold;">Source</td>
-			<td class="cruncher-header" colspan="4" style="font-weight: bold;">Dest. Table</td>
+			<td class="cruncher-header" colspan="5" style="font-weight: bold;">Dest. Table</td>
 		</tr>
 	</template>
 

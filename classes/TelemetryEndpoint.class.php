@@ -43,6 +43,10 @@ class TelemetryEndpoint {
 			return self::serveGetStatus();
 		}
 
+		if ($do === 'count_events') {
+			return self::serveCountEvents();
+		}
+
 		if (isset($_REQUEST['topic'])) {
 			return self::serveDataRequest();
 		}
@@ -152,6 +156,19 @@ class TelemetryEndpoint {
 		} catch (\Exception $e) {
 			self::response(["success" => false, "code" => 500, "error" => "Exception while fetching status records: " . $e->getMessage()]);
 		}
+	}
+
+	static function serveCountEvents() {
+		$flavnum = Telemetry::flavnum($_REQUEST['flavour']);
+		$type = isset($_REQUEST['type']) ? $_REQUEST['type'] : null;
+		if (!in_array($type, array_keys(Telemetry::$TOPICS)))
+			self::response(["success" => false, "code" => 400, "error" => "Invalid type specified", "errcode" => "BAD_TYPE"]);
+		$q = Telemetry::$db->query("SELECT `type`, `subtype`, `count` FROM `counts` WHERE `flavnum`={d} AND `type`={s}", $flavnum, $type);
+		if (!$q) throw new \Exception("Database query failed: " . Telemetry::$db->error());
+		$counts = [];
+		while ($row = $q->fetch_assoc())
+			$counts[] = $row;
+		self::response(["success" => true, "code" => 200, "counts" => $counts]);
 	}
 
 	static function serveDataRequest() {
