@@ -370,6 +370,7 @@ class Telemetry {
 		self::db_create_files_table();
 		self::db_create_events_table();
 		self::db_create_vars_table();
+		self::db_create_counts_table();
 	}
 
 	static function db_create_status_table() {
@@ -384,7 +385,9 @@ class Telemetry {
 				DEFAULT CHARSET=latin1
 				COLLATE=latin1_swedish_ci
 				COMMENT='current status of telemetry processing jobs';
-			"]);
+			",
+			'1>2' => "ALTER TABLE `status` MODIFY `updated_at` int(10) NOT NULL",
+			]);
 		if ($result && $result['status'] === 'migrated') Logger::vlog("DB: 'status' table created or migrated to version ".$result['target_version']);
 	}
 
@@ -467,6 +470,23 @@ class Telemetry {
 			) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_swedish_ci"
 		]);
 		if ($result && $result['status'] === 'migrated') Logger::vlog("DB: 'vars' table created or migrated to version ".$result['target_version']);
+	}
+
+	static function db_create_counts_table() {
+		$result = (new SchemaManager(self::$db->conn))->manageTable("counts", [
+			// v1: initial counts table schema
+			"1" => "CREATE TABLE `counts` (
+				`id` int(11) NOT NULL AUTO_INCREMENT,
+				`flavnum` int(1) NOT NULL,
+				`type` char(40) NOT NULL,
+				`subtype` char(40) DEFAULT NULL,
+				`count` int(11) NOT NULL,
+				`updated_at` int(10) NOT NULL,
+				UNIQUE KEY `id` (`id`) USING BTREE,
+				KEY `type_subtype` (`type`,`subtype`) USING BTREE
+			) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci"
+		]);
+		if ($result && $result['status'] === 'migrated') Logger::vlog("DB: 'counts' table created or migrated to version ".$result['target_version']);
 	}
 
 	static function db_get_var($var) {
@@ -568,9 +588,24 @@ class Telemetry {
 		switch ($task) {
 			case "dedupe-events":
 				return self::doDedupeEvents($OPTS);
+			case "count-events":
+				return self::doCountEvents($OPTS);
 			default:
-				throw new \Exception("Unknown misc task: $task; available: dedupe-events");
+				throw new \Exception("Unknown misc task: $task; available: dedupe-events, count-events");
 		}
+	}
+
+	static function doCountEvents($OPTS) {
+		$flavnums = self::flavnum($OPTS['flavour']);
+		$q = self::$db->query("INSERT INTO `counts` (`flavnum`, `type`, `subtype`, `count`, `updated_at`)
+			SELECT `flavnum`,`type`,`subtype`, COUNT(*) AS count, UNIX_TIMESTAMP() as updated_at
+			FROM `events`
+			WHERE `flavnum` IN ({da})
+			  AND `type` IN ({sa})
+			GROUP BY `flavnum`, `type`, `subtype`",
+			$flavnums, $OPTS['topics']);
+		if (!$q) throw new \Exception("Counting events query failed: ".self::$db->error());
+		Logger::log("Event counting complete for flavour(s) ".implode(", ", $OPTS['flavour'])." and topic(s) ".implode(", ", $OPTS['topics']).".");
 	}
 
 	static function doDedupeEvents($OPTS) {
