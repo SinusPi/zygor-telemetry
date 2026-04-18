@@ -31,21 +31,11 @@ class TelemetryEndpoint {
 	static function serveRequest() {
 		$do = isset($_REQUEST['do']) ? $_REQUEST['do'] : null;
 		
-		if ($do === 'list_topics') {
-			return self::serveListTopics();
-		}
-
-		if ($do === 'list_sources') {
-			return self::serveListSources();
-		}
-
-		if ($do === 'get_status') {
-			return self::serveGetStatus();
-		}
-
-		if ($do === 'count_events') {
-			return self::serveCountEvents();
-		}
+		if ($do === 'list_topics') return self::serveListTopics();
+		if ($do === 'list_sources') return self::serveListSources();
+		if ($do === 'get_status') return self::serveGetStatus();
+		if ($do === 'count_events') return self::serveCountEvents();
+		if ($do === 'mark_file_dirty') return self::serveMarkFileDirty();
 
 		if (isset($_REQUEST['topic'])) {
 			return self::serveDataRequest();
@@ -169,6 +159,18 @@ class TelemetryEndpoint {
 		while ($row = $q->fetch_assoc())
 			$counts[] = $row;
 		self::response(["success" => true, "code" => 200, "counts" => $counts]);
+	}
+
+	static function serveMarkFileDirty() {
+		$filename = isset($_REQUEST['file']) ? $_REQUEST['file'] : null;  if (!$filename) self::response(["success" => false, "code" => 400, "error" => "Missing 'file' parameter", "errcode" => "MISSING_PARAM"]);
+		$slug = TelemetryScrapeSVs::file_path_to_slug($filename);
+
+		$q = Telemetry::$db->query("UPDATE `files` SET `dirty`=1 WHERE `slugname`={s} LIMIT 1", $slug);
+		if (!$q) self::response(["success" => false, "code" => 500, "error" => "Query failed: " . Telemetry::$db->error()]);
+		$affected = Telemetry::$db->affected_rows();
+		if ($affected === 0)
+			self::response(["success" => false, "code" => 404, "error" => "File not found", "errcode" => "FILE_NOT_FOUND"]);
+		self::response(["success" => true, "code" => 200, "affected" => $affected]);
 	}
 
 	static function serveDataRequest() {

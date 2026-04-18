@@ -500,6 +500,8 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			if ($file->error)
 				Telemetry::$db->query("UPDATE files SET error=null WHERE id={d}", $file->id); // reset error if it was set before and we succeeded now
 
+			Telemetry::$db->query("UPDATE files SET dirty=0 WHERE id={d}", $file->id); // mark as clean, we just scraped it
+
 			if (self::$CFG['dedupe']) {
 				$dupes = Telemetry::doDedupeEvents_Find($file->id,$file->id,[Telemetry::flavnum($flavour)], self::$CFG);
 				if (count($dupes)) {

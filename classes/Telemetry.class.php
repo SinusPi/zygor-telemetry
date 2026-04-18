@@ -404,6 +404,7 @@ class Telemetry {
 			",
 			'1>2' => "ALTER TABLE `files` ADD COLUMN `flavnum` int(1) NULL AFTER `filetype`",
 			'2>3' => "ALTER TABLE `files` ADD COLUMN `error` int(1) NULL AFTER `flavnum`",
+			'3>4' => "ALTER TABLE `files` ADD COLUMN `dirty` tinyint(1) NOT NULL DEFAULT 0 AFTER `error`",
 			]);
 		if ($result && $result['status'] === 'migrated') Logger::vlog("DB: 'files' table created or migrated to version ".$result['target_version']);
 	}
