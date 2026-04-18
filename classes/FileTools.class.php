@@ -43,6 +43,34 @@ class FileTools {
 			yield $file;
 		}
 	}
+
+	static function dirty_gen($startfolder,$pat,$batch_size=10,$flavnum) {
+		$batch_size = 100;
+		$last_id = 0;
+		$flavfolder = array_keys(array_filter(Telemetry::$CFG['WOW_FLAVOUR_DATA'],function($f) use ($flavnum) { return $f['num'] == $flavnum; }))[0];
+		if (strpos($startfolder,$flavfolder)===strlen($startfolder)-strlen($flavfolder)) {
+			$startfolder = substr($startfolder,0,strlen($startfolder)-strlen($flavfolder));
+		}
+		do {
+			$q = Telemetry::$db->query(
+				"SELECT `id`, `slugname`, `filetype`, `flavnum`, `error`, `dirty`
+				 FROM `files`
+				 WHERE `dirty` = 1
+				   AND `flavnum` = {d}
+				   AND `id` > {d}
+				 ORDER BY `id` ASC
+				 LIMIT {d}",
+				$flavnum, $last_id, $batch_size
+			);
+			if (!$q) throw new \Exception("dirty_gen query failed: " . Telemetry::$db->error());
+			$rows = $q->fetch_all(MYSQLI_ASSOC);
+			$q->free();
+			foreach ($rows as $row) {
+				$last_id = $row['id'];
+				yield $startfolder . $row['slugname'];
+			}
+		} while (count($rows) === $batch_size);
+	}
 	
 	// use glob to find all matching files, allowing ** to recurse into all folders
 	/** @deprecated */

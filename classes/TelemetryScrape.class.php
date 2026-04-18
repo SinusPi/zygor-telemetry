@@ -134,7 +134,12 @@ class TelemetryScrape {
 	 */
 	static function get_fresh_files_gen($topics, $startfolder, $filemask, $cb_slugger, $filetype, $batch_size=20, $flavnum=null, &$totals) {
 		Logger::vlog("Finding files in $startfolder matching $filemask...");
-		$files_gen = FileTools::rglob_gen($startfolder,$filemask,10);
+		
+		if (self::$CFG['use-dirty']) {
+			$files_gen = FileTools::dirty_gen($startfolder,$filemask,10,$flavnum);
+		} else {
+			$files_gen = FileTools::rglob_gen($startfolder,$filemask,10);
+		}
 		$file_batches_gen = FileTools::batchify($files_gen, $batch_size);
 		$GLOBALS['total_files'] = 0;
 		$n = 0;
