@@ -37,8 +37,8 @@ ENDLUA
 			},
 			'action' => "insert",
 			'table' => "usedguide",
-			'table_schema' => "
-				CREATE TABLE `<TABLE>` (
+			'table_schema' => 
+				"CREATE TABLE `<TABLE>` (
 					`event_id` int(11) NOT NULL,
 					`flavnum` int(1) NOT NULL,
 					`time` int(11) NOT NULL,
