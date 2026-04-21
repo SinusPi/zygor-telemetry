@@ -1,8 +1,10 @@
 <?php
 namespace Zygor\Telemetry;
 
-use Telemetry as Tm;
-use TelemetryStatus as TmSt;
+use Zygor\Telemetry\Telemetry as Tm;
+use Zygor\Telemetry\Status as TmSt;
+use Zygor\Telemetry\BufferedSelect;
+use Zygor\Telemetry\BufferedInsert;
 
 /**
  */
@@ -52,7 +54,7 @@ class TelemetryCrunch {
 		$days = array_values(array_filter($days,function($d) use ($startday,$today) { $d=intval($d); return $d >= 20000000 && $d <= 30000000 && $d >= $startday && $d < $today; }));
 		*/
 		
-		$startday = isset(self::$CFG['start-day']) ? self::$CFG['start-day'] : 0;
+		$startday = isset(self::$CFG['start-day']) ? self::$CFG['start-day'] : strtotime("2018-01-01");
 		$endtime = self::$CFG['today-too'] ? date("Ymd",NOW) : date("Ymd",strtotime("-1 day")); // exclude today, unless forced; much could change, usually no point rendering today
 
 		TmSt::stat([
@@ -318,45 +320,40 @@ class TelemetryCrunch {
 
 			$flavnum = Tm::flavnum($flavour);
 			$type = $cruncher->eventtype ?: $name;
+			$subtype = $cruncher->eventsubtype ?: null;
 
 			// get starting point
 			$max_id = Tm::$db->query_one(Tm::$db->qesc("SELECT IFNULL(MAX(event_id),0) FROM {$table} WHERE flavnum={d}",$flavnum)) ?: 0;
 			Logger::vlog("Processing {$type} events, starting with index ".($max_id+1)."...");
 
-			// get new events
-			if ($cruncher->eventsubtype) {
-				$getquery = Tm::$db->qesc("SELECT * FROM events WHERE flavnum={d} AND type={s} AND subtype={s} AND id>{d}",$flavnum,$type,$cruncher->eventsubtype,$max_id);
-			} else {
-				$getquery = Tm::$db->qesc("SELECT * FROM events WHERE flavnum={d} AND type={s} AND id>{d}",$flavnum,$type,$max_id);
-			}
-			//Logger::vlog("DEBUG: getquery: $getquery");
-			$getrequest = Tm::$db->query($getquery);
+			$wheres = Tm::$db->qesc("flavnum={d} AND type={s}", $flavnum, $type);
+			if ($subtype) $wheres .= Tm::$db->qesc(" AND subtype = {s}", $subtype);
 
-			if ($getrequest->num_rows==0) {
+			$total = Tm::$db->query_one(Tm::$db->qesc("SELECT COUNT(1) FROM events WHERE {$wheres} AND id > {d}", $max_id)) ?: 0;
+			if ($total===0) {
 				Logger::vlog("No new {$name}-{$subname} events to process.");
 				continue;
 			}
-			Logger::vlog("Found ".strval($getrequest->num_rows)." records, processing...");
-			
-			$count = 0;
-			while ($event = $getrequest->fetch_assoc()) {
-				$count++;
-				//Logger::vlog("Processing ".strval($count)."/".strval($getrequest->num_rows));
+			Logger::vlog("Total new events to process: {$total}.");
 
+			$querier = new BufferedSelect(Tm::$db, "SELECT * FROM events WHERE {$wheres}", "id", $max_id, 100);
+
+			// get new events in batches
+			foreach ($querier->rows() as $event) {
 				$func = $cruncher->function;
 				$fields = $func($event);
 
 				if ($cruncher->action === "insert" && $cruncher->table !== null) {
-					$table = $cruncher->table;
-					$insertquery = Tm::$db->qarrayesc("INSERT INTO {$table} ({keys}) VALUES ({values})",$fields);
-					$insertrequest = Tm::$db->query($insertquery);
-					if (Tm::$db->affected_rows()!=1) throw new Exception("FAILED to insert crunched event id {$event['id']} into {$table}");
-					if (Tm::$db->error()) throw new Exception("ERROR inserting event id {$event['id']} into {$table}: ".Tm::$db->error());
+					if (!isset($inserter)) $inserter = new BufferedInsert(Tm::$db, $cruncher->table, 100);
+					$inserter->insert($fields);
 				}
+
+				TmSt::update_progress("CRUNCH-".strtoupper(str_replace("-","_", $flavour)), $querier->count, $total);
 			}
 
 			if ($cruncher->action === "insert") {
-				Logger::vlog("Added ".strval($count)." new {$name}-{$subname} records.");
+				if (isset($inserter)) $inserter->flush();
+				Logger::vlog("Added ".strval($querier->count)." new {$name}-{$subname} records.");
 			}
 		}
 		Logger::vlog("Crunchers for flavour \x1b[38;5;78m{$flavour}\x1b[0m complete.");

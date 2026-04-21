@@ -14,6 +14,8 @@ require_once __DIR__ . '/classes/TelemetryScrape.class.php';
 require_once __DIR__ . '/classes/TelemetryScrapePackagerLog.class.php';
 require_once __DIR__ . '/classes/TelemetryScrapeSVs.class.php';
 require_once __DIR__ . '/classes/TelemetryView.class.php';
+require_once __DIR__ . '/classes/BufferedSelect.class.php';
+require_once __DIR__ . '/classes/BufferedInsert.class.php';
 
 require_once __DIR__ . '/includes/VerboseException.class.php';
 require_once __DIR__ . '/includes/zygor.class.inc.php';
