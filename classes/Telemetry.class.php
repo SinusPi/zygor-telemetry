@@ -636,7 +636,7 @@ class Telemetry {
 		$last_time = microtime(true);
 		for ($id = $from; $id <= $to; $id += $filebatchsize) {
 			$id_to = min($id + $filebatchsize - 1, $to);
-			Tm::$db->begin_transaction();
+			self::$db->begin_transaction();
 			$dupes = self::doDedupeEvents_Find($id, $id_to, $flavnums, $OPTS);
 			$found_total += count($dupes);
 			Logger::vlog("File ID range $id - $id_to: found ".count($dupes)." duplicate events.");
@@ -647,7 +647,7 @@ class Telemetry {
 					throw new \Exception("Deleted $deleted events but found ".count($dupes)." duplicates, something went wrong in file ID range $id - $id_to.");
 				}
 			}
-			Tm::$db->commit();
+			self::$db->commit();
 			if ($OPTS['progress'] && ($found_total > $last_found || microtime(true) - $last_time > self::$CFG['STATUS_INTERVAL'])) {
 				Status::update_progress(self::$tag, $id-$from,$to-$from,['totals'=>($OPTS['sure']?['deleted'=>$deleted_total]:['found'=>$found_total]),'range_from'=>$id,'range_to'=>$id_to]);
 				$last_found = $found_total;
