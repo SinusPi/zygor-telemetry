@@ -361,7 +361,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			Logger::log("Weird. Out of ".(count($freshfiles_to_process)-$totals['files_skip_mtime']-$totals['files_skip_data']-$totals['files_skip_lock'])." files read, ".count($totals['files_without_zgvs'])." had no ZGVs.");
 		*/
 
-		Logger::log("Scrape of $flavour complete; found ". $totals['total_files'] ." files, processed ". $totals['files_processed'] .".");
+		Logger::log("Scrape of $flavour complete; found ". $total_files ." files, processed ". $totals['files_processed'] .".");
 		
 
 		TmSt::stat(['status'=>"IDLE"]);
