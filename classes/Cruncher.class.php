@@ -30,7 +30,7 @@ class Cruncher {
 			}
 		}
 		if (!$this->eventtype) $this->eventtype = $topicObj ? $topicObj->name : $this->name;
-		if (!$this->eventsubtype) $this->eventsubtype = $this->eventtype;
+		if (!$this->eventsubtype) $this->eventsubtype = null;
 		if (!$this->table) $this->table = $this->name;
 	}
 
