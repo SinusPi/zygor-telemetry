@@ -121,10 +121,10 @@ class Config implements \ArrayAccess {
 	 *
 	 * @param mixed $offset
 	 * @param mixed $value
-	 * @throws Exception
+	 * @throws \Exception
 	 */
 	public function offsetSet($offset, $value) {
-		throw new Exception("Cannot modify merged config directly. Use add() method. Attempted to set '$offset' to '$value' at location: ".debug_backtrace()[0]['file'].":".debug_backtrace()[0]['line']);
+		throw new \Exception("Cannot modify merged config directly. Use add() method. Attempted to set '$offset' to '$value' at location: ".debug_backtrace()[0]['file'].":".debug_backtrace()[0]['line']);
 	}
 
 	/**
@@ -134,6 +134,6 @@ class Config implements \ArrayAccess {
 	 * @throws Exception
 	 */
 	public function offsetUnset($offset) {
-		throw new Exception("Cannot modify merged config directly. Use add() method.");
+		throw new \Exception("Cannot modify merged config directly. Use add() method.");
 	}
 }
