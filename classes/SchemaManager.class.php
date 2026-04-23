@@ -44,12 +44,18 @@ class SchemaManager {
 	 * @param array $migrations Associative array of migration keys and SQL statements:
 	 *                          - "N" => "CREATE TABLE ..." : defines state at version N (shortcut for N to target)
 	 *                          - "N>N+1" => "ALTER TABLE ..." : transition from version N to N+1
-	 * @return array Status array with applied migrations and target version
+	 * @return array Associative array with migration results and status: ['status'=>'migrated|already_current', 'current_version'=>int, 'target_version'=>int, 'created'=>bool, 'migrated'=>int]
 	 * @throws Exception If migration path is incomplete or other errors occur
 	 */
 	public function manageTable($table_name, $migrations) {
-		if (!is_array($migrations) || empty($migrations))
-			throw new \InvalidArgumentException("Migrations must be a non-empty array");
+		if (is_string($migrations)) {
+			// Shortcut: if a single CREATE TABLE is provided, treat it as the final state with a reset point at the same version
+			$migrations = [
+				"1" => $migrations,
+			];
+		} elseif (!is_array($migrations)) {
+			throw new \InvalidArgumentException("Migrations must be a string or an array of migration definitions");
+		}
 
 		// Parse migration definitions
 		list($this->states, $this->transitions, $this->max_reset, $this->max_version) = $this->parseStatesAndTransitions($migrations);

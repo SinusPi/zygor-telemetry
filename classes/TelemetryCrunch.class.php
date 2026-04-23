@@ -305,9 +305,6 @@ class TelemetryCrunch {
 			// create if needed
 			if ($cruncher->table_schema !== null && $cruncher->table !== null) {
 				$table = $cruncher->table;
-				if (is_string($cruncher->table_schema)) 
-					// legacy support for simple string schema
-					$cruncher->table_schema = ['1' => $cruncher->table_schema];
 				$schema = str_replace("<TABLE>", $table, $cruncher->table_schema);
 				// apply schema checks as in scrapers
 				$result = (new SchemaManager(Tm::$db->conn))->manageTable($table, $schema);
