@@ -5,6 +5,7 @@ use Zygor\Telemetry\Telemetry as Tm;
 use Zygor\Telemetry\Status as TmSt;
 use Zygor\Telemetry\BufferedSelect;
 use Zygor\Telemetry\BufferedInsert;
+use Zygor\Telemetry\SchemaManager;
 
 /**
  */
@@ -28,7 +29,7 @@ class TelemetryCrunch {
 	 * @deprecated Use TelemetryCrunch::crunch_flavour() instead.
 	 */
 	static function crunch($flavour) {
-		if (!in_array($flavour,array_keys(Telemetry::$CFG['WOW_FLAVOUR_DATA']))) throw new Exception("Unsupported flavour '{$flavour}' (supported: ".join(", ",array_keys(self::$CFG['WOW_FLAVOUR_DATA'])).")");
+		if (!in_array($flavour,array_keys(Telemetry::$CFG['WOW_FLAVOUR_DATA']))) throw new \Exception("Unsupported flavour '{$flavour}' (supported: ".join(", ",array_keys(self::$CFG['WOW_FLAVOUR_DATA'])).")");
 
 		$tag = "CRUNCH-".strtoupper(str_replace("-","_", $flavour));
 
@@ -304,15 +305,18 @@ class TelemetryCrunch {
 			// create if needed
 			if ($cruncher->table_schema !== null && $cruncher->table !== null) {
 				$table = $cruncher->table;
-				Tm::$db->query("SHOW CREATE TABLE {$table}");
-				if (Tm::$db->error()) {
-					Logger::vlog("\x1b[31;1mTable '{$table}' for cruncher '{$subname}' does not exist, creating...\x1b[0m");
-					$schema_sql = $cruncher->table_schema;
-					$schema_sql = str_replace("<TABLE>",$table,$schema_sql);
-					Tm::$db->query($schema_sql);
-					if (Tm::$db->error()) 
-						throw new Exception("Failed to create table `{$table}`: ".Tm::$db->error());
-					Logger::vlog("Table '{$table}' created.");
+				if (is_string($cruncher->table_schema)) 
+					// legacy support for simple string schema
+					$cruncher->table_schema = ['1' => $cruncher->table_schema];
+				$schema = str_replace("<TABLE>", $table, $cruncher->table_schema);
+				// apply schema checks as in scrapers
+				$result = (new SchemaManager(Tm::$db->conn))->manageTable($table, $schema);
+				if ($result['created']) {
+					Logger::vlog("\x1b[32mTable '{$table}' for cruncher '{$subname}' created.\x1b[0m");
+				} elseif ($result['migrated']) {
+					Logger::vlog("\x1b[33mTable '{$table}' for cruncher '{$subname}' migrated.\x1b[0m");
+				} elseif ($result['error']) {
+					throw new \Exception("Error managing table `{$table}` for cruncher '{$subname}': ".$result['error']);
 				}
 			}
 
