@@ -130,6 +130,7 @@ class TelemetryScrape {
 	 * @param string $startfolder folder to start searching in
 	 * @param string $filemask glob pattern to match files, e.g. "*.lua*"
 	 * @param string $prefix prefix replacing $startfolder in the file paths when looking up in DB
+	 * @return \Generator<int,File,mixed,mixed> 
 	 * @yield File $file
 	 */
 	static function get_fresh_files_gen($topics, $startfolder, $filemask, $cb_slugger, $filetype, $batch_size=20, $flavnum=null, &$totals) {

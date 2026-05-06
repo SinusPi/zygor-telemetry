@@ -326,6 +326,12 @@ class Telemetry {
 		return stripos(php_uname(), 'linux') !== false;
 	}
 
+	/** 
+	 * @template T
+	 *  @param iterable<int,T> $iterable
+	 *  @param callable $callback
+	 *  @return \Generator<int,T, mixed, mixed>
+	 */
 	static function filter_gen($iterable, $callback) {
 		foreach ($iterable as $key => $value) {
 			if ($callback($value, $key)) {

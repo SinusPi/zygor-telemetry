@@ -91,7 +91,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 	/**
 	 * Grab data from SVs, store into db
 	 * @param string $flavour
-	 * @param string[] $topics
+	 * @param string[] $topics_selected
 	 */
 	static function scrape($flavour, $topics_selected=[]) {
 		if (!Telemetry::is_ready()) throw new \Exception("Telemetry core not initialized");
@@ -308,7 +308,6 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		$gen_fresh_svfiles = self::get_fresh_files_gen(array_keys($topics_sv), $sync_path, self::$CFG['filemask'], [__CLASS__,'file_path_to_slug'], "sv", self::$CFG['BATCH_SIZE'], Telemetry::flavnum($flavour), $totals);
 
 		// narrow down per configuration
-		/** @var File[] $gen_narrowed_svfiles */
 		$gen_narrowed_svfiles = Telemetry::filter_gen($gen_fresh_svfiles, function($file) {
 			// too old, excluded
 			$age = time() - $file->mtime;
@@ -505,7 +504,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 			if (self::$CFG['dedupe']) {
 				$dupes = Telemetry::doDedupeEvents_Find($file->id,$file->id,[Telemetry::flavnum($flavour)], self::$CFG);
 				if (count($dupes)) {
-					$deleted = Telemetry::doDedupeEvents_Delete($dupes, self::$CFG);
+					$deleted = Telemetry::doDedupeEvents_Delete($dupes);
 					$totals['data_deduped'] = (isset($totals['data_deduped']) ? $totals['data_deduped'] : 0) + $deleted;
 					$totals['data_added'] -= $deleted;
 					Logger::vlog("Deduped ".$deleted." events for file ID {$file->id} ({$file->slug})");
@@ -603,7 +602,7 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 	/** 
 	* @param string $sv_raw 
 	* @param string $flavour 
-	* @param array $datapoint_defs
+	* @param array $topic_defs
 	* @return array ['status'=>"ok",'datapoints'=>[...], 'times'=>[...] ] or ['status'=>"err", 'err'=>...]
 	*/
 	static function extract_datapoints_with_lua($sv_raw,$flavour,$topic_defs) {
