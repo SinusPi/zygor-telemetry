@@ -498,10 +498,10 @@ class Telemetry {
 		if ($result && $result['status'] === 'migrated') Logger::vlog("DB: 'counts' table created or migrated to version ".$result['target_version']);
 	}
 
-	static function db_get_var($var) {
+	static function db_get_var($var,$default=null) {
 		$q = self::$db->query("SELECT `value` FROM `vars` WHERE `var` = {s}", $var);
 		$row = $q->fetch_array();
-		return $row ? $row[0] : null;
+		return $row ? $row[0] : $default;
 	}
 
 	static function db_set_var($var, $value) {
