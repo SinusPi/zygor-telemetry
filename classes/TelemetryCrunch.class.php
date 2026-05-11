@@ -323,38 +323,50 @@ class TelemetryCrunch {
 			$type = $cruncher->eventtype ?: $name;
 			$subtype = $cruncher->eventsubtype ?: null;
 
-			// get starting point
-			$max_id = Tm::$db->query_one(Tm::$db->qesc("SELECT IFNULL(MAX(event_id),0) FROM {$table} WHERE flavnum={d}",$flavnum)) ?: 0;
-			Logger::vlog("Processing {$type} events, starting with index ".($max_id+1)."...");
+			if ($cruncher->action=="insert") {
+				// prepare inserter if needed
+			
+				// get starting point
+				$max_id = Tm::$db->query_one(Tm::$db->qesc("SELECT IFNULL(MAX(event_id),0) FROM {$table} WHERE flavnum={d}",$flavnum)) ?: 0;
+				Logger::vlog("Processing {$type} events, starting with index ".($max_id+1)."...");
 
-			$wheres = Tm::$db->qesc("flavnum={d} AND type={s}", $flavnum, $type);
-			if ($subtype) $wheres .= Tm::$db->qesc(" AND subtype = {s}", $subtype);
+				$wheres = Tm::$db->qesc("flavnum={d} AND type={s}", $flavnum, $type);
+				if ($subtype) $wheres .= Tm::$db->qesc(" AND subtype = {s}", $subtype);
 
-			$total = Tm::$db->query_one(Tm::$db->qesc("SELECT COUNT(1) FROM events WHERE {$wheres} AND id > {d}", $max_id)) ?: 0;
-			if ($total===0) {
-				Logger::vlog("No new {$name}-{$subname} events to process.");
-				continue;
-			}
-			Logger::vlog("Total new events to process: {$total}.");
+				$total = Tm::$db->query_one(Tm::$db->qesc("SELECT COUNT(1) FROM events WHERE {$wheres} AND id > {d}", $max_id)) ?: 0;
+				if ($total===0) {
+					Logger::vlog("No new {$name}-{$subname} events to process.");
+					continue;
+				}
+				Logger::vlog("Total new events to process: {$total}.");
 
-			$querier = new BufferedSelect(Tm::$db, "SELECT * FROM events WHERE {$wheres}", "id", $max_id, 100);
+				$querier = new BufferedSelect(Tm::$db, "SELECT * FROM events WHERE {$wheres}", "id", $max_id, 100);
 
-			// get new events in batches
-			foreach ($querier->rows() as $event) {
-				$func = $cruncher->function;
-				$fields = $func($event);
+				// get new events in batches
+				foreach ($querier->rows() as $event) {
+					$func = $cruncher->function;
+					$fields = $func($event);
 
-				if ($cruncher->action === "insert" && $cruncher->table !== null) {
-					if (!isset($inserter)) $inserter = new BufferedInsert(Tm::$db, $cruncher->table, 100);
-					$inserter->insert($fields);
+					if ($cruncher->action === "insert" && $cruncher->table !== null) {
+						if (!isset($inserter)) $inserter = new BufferedInsert(Tm::$db, $cruncher->table, 100);
+						$inserter->insert($fields);
+					}
+
+					TmSt::update_progress("CRUNCH-".strtoupper(str_replace("-","_", $flavour)), $querier->count, $total);
 				}
 
-				TmSt::update_progress("CRUNCH-".strtoupper(str_replace("-","_", $flavour)), $querier->count, $total);
-			}
-
-			if ($cruncher->action === "insert") {
-				if (isset($inserter)) $inserter->flush();
-				Logger::vlog("Added ".strval($querier->count)." new {$name}-{$subname} records.");
+				if ($cruncher->action === "insert") {
+					if (isset($inserter)) $inserter->flush();
+					Logger::vlog("Added ".strval($querier->count)." new {$name}-{$subname} records.");
+				}
+			} elseif ($cruncher->action === "run") {
+				// just run the code once per execution
+				$func = $cruncher->function;
+				$values = $func();
+				// the function can do whatever it wants, including inserting into tables, but it can also return some values for logging if needed.
+				if ($values) {
+					Logger::vlog("Cruncher '{$subname}' returned values: ".json_encode($values));
+				}
 			}
 		}
 		Logger::vlog("Crunchers for flavour \x1b[38;5;78m{$flavour}\x1b[0m complete.");
