@@ -475,7 +475,8 @@ class Telemetry {
 				`var` char(40) NOT NULL,
 				`value` varchar(2048) NOT NULL,
 				UNIQUE KEY `var` (`var`)
-			) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_swedish_ci"
+			) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_swedish_ci",
+			"1>2" => "ALTER TABLE `vars` CHANGE `value` `value` varchar(40) NOT NULL",
 		]);
 		if ($result && $result['status'] === 'migrated') Logger::vlog("DB: 'vars' table created or migrated to version ".$result['target_version']);
 	}
