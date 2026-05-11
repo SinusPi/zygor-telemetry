@@ -196,7 +196,7 @@ class TelemetryEndpoint {
 			return self::serveDataRequestDaymap($topicObj, $cruncherObj, $from, $to, $flavnum);
 		}
 		if (!$topicendpoint || !is_callable($topicendpoint[$variant])) {
-			self::response(["success" => false,"code" => 400,"error" => "No endpoint "+$variant+" defined for topic","topic" => $topic,"errcode" => "NO_ENDPOINT"]);
+			self::response(["success" => false,"code" => 400,"error" => "No endpoint ".$variant." defined for topic","topic" => $topic,"errcode" => "NO_ENDPOINT"]);
 		}
 
 		try {
@@ -220,21 +220,40 @@ class TelemetryEndpoint {
 			$andeventlist = " AND `type` IN (" . join(",", array_map(function($t) { return "'" . Telemetry::$db->escape($t) . "'"; }, $types)) . ")";
 			//$andtype = " AND `type`='" . Telemetry::$db->escape($topicObj->name) . "'";
 		}
+		$table = Telemetry::$db->escape($table);
 
 		try {
+			$cache_slug = "daymap_{$table}_{$flavnum}";
 			// Build daymap for entire range in one query
 			try {
-				$table = Telemetry::$db->escape($table);
-				$query = Telemetry::$db->query(
-					"SELECT FROM_UNIXTIME(`time`, '%Y-%m-%d') as day, COUNT(*) as cnt
-					FROM $table
-					WHERE `flavnum`={d} AND `time`>={d} AND `time`<{d} $andeventlist
-					GROUP BY day
-					ORDER BY day ASC",
-					$flavnum, $from, $to
-				);
+				// check vars for last daymap build for this topic/flavour and if it's recent enough, return cached data instead of rebuilding
+				Telemetry::$db->begin_transaction();
+				$last_build = Telemetry::db_get_var($cache_slug . "_last_build", 0);
+				$cache_ttl = 86400; // 1 day
+				if (time() - $last_build > $cache_ttl || isset($_REQUEST['no_cache'])) {
+					// cache is stale, rebuild it
+					Telemetry::$db->query("DROP TABLE IF EXISTS `$cache_slug`"); // clear old cache data for this topic/flavour";
+					$query = Telemetry::$db->query(
+						"CREATE TABLE `$cache_slug` (`day` DATE, `cnt` INT)
+						 AS
+						SELECT date(FROM_UNIXTIME(`time`, '%Y-%m-%d')) as day, COUNT(*) as cnt
+						FROM `$table`
+						WHERE `flavnum`={d} AND `time`>={d} AND `time`<{d} $andeventlist
+						GROUP BY day
+						ORDER BY day ASC
+						",
+						$flavnum, $from, $to
+					);
+					Telemetry::db_set_var($cache_slug . "_last_build", time());
+				}
+				Telemetry::$db->commit();
+
+				$query = Telemetry::$db->query("SELECT * FROM `$cache_slug` WHERE `day` >= FROM_UNIXTIME({d}) AND `day` < FROM_UNIXTIME({d})", $from, $to);
+
+			} catch (\mysqli_sql_exception $e) {
+				throw new \Exception("Database query failed: [". Telemetry::$db->errno() . "] ".Telemetry::$db->error() . " - Query: " . Telemetry::$db->LAST_QUERY);
 			} catch (\Exception $e) {
-				throw new \Exception("Database query failed: " . $e->getMessage() . " - Query: " . Telemetry::$db->LAST_QUERY);
+				throw new \Exception("Error: " . $e . " - Query: " . Telemetry::$db->LAST_QUERY);
 			}
 			$result = $query->fetch_all(MYSQLI_ASSOC);
 			
