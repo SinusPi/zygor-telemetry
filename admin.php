@@ -425,30 +425,34 @@ $DATES = [
 			
 			$.each(commits, function(idx, commit) {
 				var row = template.content.cloneNode(true);
-				$(row).find('[data-field="hash"]').text(commit.hash.substring(0, 7));
-				$(row).find('[data-field="author-email"]')
+				
+				let $row = $(row);
+
+				$row.find('[data-field="hash"]').text(commit.hash.substring(0, 7));
+				$row.find('[data-field="author-email"]')
 					.attr('title', commit.email)
 					.text(commit.author);
-				$(row).find('[data-field="date"]').text(formatDateISO(commit.date));
-				
+				$row.find('[data-field="date"]').text(formatDateISO(commit.date));
+
 				var fullMsg = commit.message;
 				if (commit.message_body) {
 					fullMsg += '\n' + commit.message_body;
 				}
-				$(row).find('[data-field="message"]')
+				$row.find('[data-field="message"]')
 					.attr('title', fullMsg)
 					.text(commit.message);
-				
+
+					
 				if (commit.message_body) {
-					$(row).find('[data-field="message-body"]')
+					$row.find('.commit-body').css('display', 'block'); // can't .show() in a template element, wtf
+					$row.find('[data-field="message-body"]')
 						.attr('title', fullMsg)
 						.html(escapeHtml(commit.message_body).replace(/\n/g, '<br>'));
-					$(row).find('.commit-body').show();
 				} else {
-					$(row).find('.commit-body').hide();
+					$row.find('.commit-body').css('display', 'none');
 				}
 				
-				tbody.append(row);
+				tbody.append($row);
 			});
 			
 			return tbody.html();
