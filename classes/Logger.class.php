@@ -20,7 +20,7 @@ class Logger {
 		self::setup_db();
 	}
 
-	static function log($s,$tag=null, $level='MAIN') {
+	static function log($s,$tag=null, $level='INFO') {
 		$tag = $tag ?: self::$tag;
 		self::$tag = $tag;
 		if (self::$log_path) {
