@@ -209,21 +209,22 @@ class TelemetryEndpoint {
 
 	static function serveDataRequestDaymap($topicObj, $cruncherObj=null, $from, $to, $flavnum) {
 		if (isset($cruncherObj)) {
+			// serve daymap for specific cruncher within the topic
 			if (!$cruncherObj->table) 
 				self::response(["success" => false,"code" => 400,"error" => "Cruncher does not have a database table configured","errcode" => "NO_TABLE"]);
 			$table = $cruncherObj->table;
 			$andeventlist = "";
 		} else {
-			$table = "events"; // will default to "events" in the query if not specified
+			$table = "events"; // will default to "events" to serve raw events
 			$crunchers = $topicObj->crunchers ?: [];
-			$types = array_map(function($c) { return $c->eventtype ?: 'unknown'; }, $crunchers);
+			$types = array_unique(array_map(function($c) { return $c->eventtype ?: 'unknown'; }, $crunchers));
 			$andeventlist = " AND `type` IN (" . join(",", array_map(function($t) { return "'" . Telemetry::$db->escape($t) . "'"; }, $types)) . ")";
 			//$andtype = " AND `type`='" . Telemetry::$db->escape($topicObj->name) . "'";
 		}
 		$table = Telemetry::$db->escape($table);
 
 		try {
-			$cache_slug = "daymap_{$table}_{$flavnum}";
+			$cache_slug = "daymap_\${$table}".(isset($types) ? "_$" . join("_$", $types) : "") . "_{$flavnum}";
 			// Build daymap for entire range in one query
 			try {
 				// check vars for last daymap build for this topic/flavour and if it's recent enough, return cached data instead of rebuilding
