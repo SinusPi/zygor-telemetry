@@ -120,12 +120,135 @@ $DATES = [
 				</thead>
 				<tbody></tbody>
 			</table>
-		</div>
 
+			<template id="commit-row-template">
+				<tr class="commit-row">
+					<td><span class="commit-hash" data-field="hash"></span></td>
+					<td><span data-field="author-email"></span><br></td>
+					<td data-field="date"></td>
+					<td>
+						<strong data-field="message"></strong>
+						<div class="commit-body"><small data-field="message-body"></small></div>
+					</td>
+				</tr>
+			</template>
+
+			<script>
+				function loadGitLogs() {
+					window.gitLogsOffset = 0;
+					$.ajax({
+						url: 'git_logs.php',
+						type: 'GET',
+						data: { limit: 15, offset: 0 },
+						dataType: 'json',
+						success: function(response) {
+							if (response.success) {
+								displayGitLogs(response.commits, true);
+								window.gitLogsOffset = response.offset + response.count;
+							} else {
+								showError('Failed to load commits: ' + response.error, 'git-logs-container');
+							}
+						},
+						error: function(xhr, status, error) {
+							showError('Error loading commits: ' + error, 'git-logs-container');
+						},
+						beforeSend: function() {
+							$('#git-logs-container table tbody').empty().html('<tr><td colspan="4" style="text-align: center;">Loading commits...</td></tr>');
+						}
+					});
+				}
+
+				function loadMoreGitLogs() {
+					$.ajax({
+						url: 'git_logs.php',
+						type: 'GET',
+						data: { limit: 20, offset: window.gitLogsOffset },
+						dataType: 'json',
+						success: function(response) {
+							if (response.success) {
+								displayGitLogs(response.commits, false);
+								window.gitLogsOffset = response.offset + response.count;
+							} else {
+								alert('Failed to load more commits: ' + response.error);
+							}
+						},
+						error: function(xhr, status, error) {
+							alert('Error loading more commits: ' + error);
+						}
+					});
+				}
+
+				function buildCommitRows(commits) {
+					var tbody = $('<tbody></tbody>');
+					var template = document.querySelector('#commit-row-template');
+					
+					$.each(commits, function(idx, commit) {
+						var row = template.content.cloneNode(true);
+						
+						let $row = $(row);
+
+						$row.find('[data-field="hash"]').text(commit.hash.substring(0, 7));
+						$row.find('[data-field="author-email"]')
+							.attr('title', commit.email)
+							.text(commit.author);
+						$row.find('[data-field="date"]').text(formatDateISO(commit.date));
+
+						var fullMsg = commit.message;
+						if (commit.message_body) {
+							fullMsg += '\n' + commit.message_body;
+						}
+						$row.find('[data-field="message"]')
+							.attr('title', fullMsg)
+							.text(commit.message);
+
+							
+						if (commit.message_body) {
+							$row.find('.commit-body').css('display', 'block'); // can't .show() in a template element, wtf
+							$row.find('[data-field="message-body"]')
+								.attr('title', fullMsg)
+								.html(escapeHtml(commit.message_body).replace(/\n/g, '<br>'));
+						} else {
+							$row.find('.commit-body').css('display', 'none');
+						}
+						
+						tbody.append($row);
+					});
+					
+					return tbody.html();
+				}
+
+				function displayGitLogs(commits, isInitial) {
+					if (isInitial === undefined) isInitial = true;
+					
+					var tbody = $('#git-logs-container table tbody');
+					
+					if (isInitial) {
+						// Clear and repopulate on first load
+						tbody.empty();
+						
+						if (commits.length === 0) {
+							tbody.append('<tr><td colspan="4" style="text-align: center;">No commits available</td></tr>');
+						} else {
+							var rows = buildCommitRows(commits);
+							tbody.append(rows);
+						}
+						
+						tbody.append('<tr class="git-logs-more-row"><td colspan="4" style="text-align: center; padding: 8px;"><button onclick="loadMoreGitLogs()" class="more-button">More...</button></td></tr>');
+					} else {
+						// Append more rows before the "More..." button
+						var rows = buildCommitRows(commits);
+						tbody.find('tr.git-logs-more-row').before(rows);
+					}
+				}
+
+				window.gitLogsOffset = 0;
+				
+			</script>
+		</div>
 	</div>
 
 	<script>
-		window.gitLogsOffset = 0;
+		
 		<?php
 			$dates_map = [];
 			foreach ($DATES as $d)
@@ -190,50 +313,6 @@ $DATES = [
 
 		function loadSources() {
 			loadData('list_sources', 'sources-container', 'sources', displaySources);
-		}
-
-		function loadGitLogs() {
-			window.gitLogsOffset = 0;
-			$.ajax({
-				url: 'git_logs.php',
-				type: 'GET',
-				data: { limit: 15, offset: 0 },
-				dataType: 'json',
-				success: function(response) {
-					if (response.success) {
-						displayGitLogs(response.commits, true);
-						window.gitLogsOffset = response.offset + response.count;
-					} else {
-						showError('Failed to load commits: ' + response.error, 'git-logs-container');
-					}
-				},
-				error: function(xhr, status, error) {
-					showError('Error loading commits: ' + error, 'git-logs-container');
-				},
-				beforeSend: function() {
-					$('#git-logs-container table tbody').empty().html('<tr><td colspan="4" style="text-align: center;">Loading commits...</td></tr>');
-				}
-			});
-		}
-
-		function loadMoreGitLogs() {
-			$.ajax({
-				url: 'git_logs.php',
-				type: 'GET',
-				data: { limit: 20, offset: window.gitLogsOffset },
-				dataType: 'json',
-				success: function(response) {
-					if (response.success) {
-						displayGitLogs(response.commits, false);
-						window.gitLogsOffset = response.offset + response.count;
-					} else {
-						alert('Failed to load more commits: ' + response.error);
-					}
-				},
-				error: function(xhr, status, error) {
-					alert('Error loading more commits: ' + error);
-				}
-			});
 		}
 
 		function displayStatus(statuses) {
@@ -416,69 +495,6 @@ $DATES = [
 					
 					tbody.append(row);
 				});
-			}
-		}
-
-		function buildCommitRows(commits) {
-			var tbody = $('<tbody></tbody>');
-			var template = document.querySelector('#commit-row-template');
-			
-			$.each(commits, function(idx, commit) {
-				var row = template.content.cloneNode(true);
-				
-				let $row = $(row);
-
-				$row.find('[data-field="hash"]').text(commit.hash.substring(0, 7));
-				$row.find('[data-field="author-email"]')
-					.attr('title', commit.email)
-					.text(commit.author);
-				$row.find('[data-field="date"]').text(formatDateISO(commit.date));
-
-				var fullMsg = commit.message;
-				if (commit.message_body) {
-					fullMsg += '\n' + commit.message_body;
-				}
-				$row.find('[data-field="message"]')
-					.attr('title', fullMsg)
-					.text(commit.message);
-
-					
-				if (commit.message_body) {
-					$row.find('.commit-body').css('display', 'block'); // can't .show() in a template element, wtf
-					$row.find('[data-field="message-body"]')
-						.attr('title', fullMsg)
-						.html(escapeHtml(commit.message_body).replace(/\n/g, '<br>'));
-				} else {
-					$row.find('.commit-body').css('display', 'none');
-				}
-				
-				tbody.append($row);
-			});
-			
-			return tbody.html();
-		}
-
-		function displayGitLogs(commits, isInitial) {
-			if (isInitial === undefined) isInitial = true;
-			
-			var tbody = $('#git-logs-container table tbody');
-			
-			if (isInitial) {
-				// Clear and repopulate on first load
-				tbody.empty();
-				
-				if (commits.length === 0) {
-					tbody.append('<tr><td colspan="4" style="text-align: center;">No commits available</td></tr>');
-				} else {
-					var rows = buildCommitRows(commits);
-					tbody.append(rows);
-				}
-				
-				tbody.append('<tr class="git-logs-more-row"><td colspan="4" style="text-align: center; padding: 8px;"><button onclick="loadMoreGitLogs()" class="more-button">More...</button></td></tr>');
-			} else {
-				// Append more rows before the "More..." button
-				var rows = buildCommitRows(commits);
-				tbody.find('tr.git-logs-more-row').before(rows);
 			}
 		}
 
@@ -822,18 +838,6 @@ $DATES = [
 			<td style="text-align: center; vertical-align: middle;">
 				<span class="badge" data-field="status-badge"></span>
 				<div class="status-details" data-field="status-details"></div>
-			</td>
-		</tr>
-	</template>
-
-	<template id="commit-row-template">
-		<tr class="commit-row">
-			<td><span class="commit-hash" data-field="hash"></span></td>
-			<td><span data-field="author-email"></span><br></td>
-			<td data-field="date"></td>
-			<td>
-				<strong data-field="message"></strong>
-				<div class="commit-body"><small data-field="message-body"></small></div>
 			</td>
 		</tr>
 	</template>
