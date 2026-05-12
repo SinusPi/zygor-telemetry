@@ -358,6 +358,7 @@ class Telemetry {
 		}
 		try {
 			self::db_create_tables();
+			Logger::setup_db();
 		} catch (\Exception $e) {
 			throw new \ErrorException("Failed to create or migrate database tables: ".$e->getMessage()."\n");
 			self::$db->disconnect();
