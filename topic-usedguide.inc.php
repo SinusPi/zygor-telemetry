@@ -1,4 +1,7 @@
 <?php
+use \Zygor\Telemetry\Telemetry;
+use \Zygor\Telemetry\Logger;
+
 return [
 	'scraper'=>[
 		'input'=>"sv",
@@ -20,6 +23,23 @@ ENDLUA
 	],
 	'crunchers'=>[
 		[
+			'table' => "usedguide",
+			'table_schema' => [
+				'1'=>"CREATE TABLE `<TABLE>` (
+					`event_id` int(11) NOT NULL,
+					`flavnum` int(1) NOT NULL,
+					`time` int(11) NOT NULL,
+					`guide` varchar(30) NOT NULL,
+					`type` varchar(10) NOT NULL,
+					PRIMARY KEY (`event_id`)
+				) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci
+				",
+				'1>2' =>"ALTER TABLE `<TABLE>` ADD INDEX `time` (`time`)",
+				'2>3' =>"ALTER TABLE `<TABLE>` ADD INDEX `flavnum_time` (`flavnum`,`time`)",
+				'3>4' =>"ALTER TABLE `<TABLE>` CHANGE `type` `type` ENUM('LEVELING','LOREMASTER','ACHIEVEMENTS','TITLES','PETSMOUNTS','GOLD','REPUTATIONS','DAILIES','DUNGEONS','GEAR','SHARED','PROFESSIONS','EVENTS') DEFAULT NULL",
+				'4>5' =>"ALTER TABLE `<TABLE>` CHANGE `guide` `guide` varchar(100) NOT NULL",
+			],
+			'action' => "insert", // run once per source event, output goes into the specified table
 			'function' => function($line) {
 				$unpacked = json_decode($line["data"], true);
 				$line = $unpacked + $line;
@@ -35,23 +55,52 @@ ENDLUA
 
 				return $values;
 			},
-			'action' => "insert",
-			'table' => "usedguide",
+		],
+
+		[
+			// on each run, this cruncher will tally up the usedguide events of the previous day into a separate table,
+			// grouped by flavor and guide type. This allows for quick retrieval of daily stats without having to query
+			// the raw events table which can be huge.
+			'name'=>"daily used guide tallies",
+			'table' => "usedguide_daily",
 			'table_schema' => [
 				'1'=>"CREATE TABLE `<TABLE>` (
-					`event_id` int(11) NOT NULL,
+					`day` DATE NOT NULL DEFAULT '1970-01-01',
 					`flavnum` int(1) NOT NULL,
-					`time` int(11) NOT NULL,
-					`guide` varchar(30) NOT NULL,
-					`type` varchar(10) NOT NULL,
-					PRIMARY KEY (`event_id`)
+					`type` varchar(12) NOT NULL ENUM('LEVELING','LOREMASTER','ACHIEVEMENTS','TITLES','PETSMOUNTS','GOLD','REPUTATIONS','DAILIES','DUNGEONS','GEAR','SHARED','PROFESSIONS','EVENTS') DEFAULT NULL,
+					`guide` varchar(100) NOT NULL,
+					`count` unsigned smallint NOT NULL DEFAULT 0,
+					PRIMARY KEY (`day`,`flavnum`,`type`)
+
 				) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci
 				",
-				'1>2' =>"ALTER TABLE `<TABLE>` ADD INDEX `time` (`time`)",
-				'2>3' =>"ALTER TABLE `<TABLE>` ADD INDEX `flavnum_time` (`flavnum`,`time`)",
-				'3>4' =>"ALTER TABLE `<TABLE>` CHANGE `type` `type` ENUM('LEVELING','LOREMASTER','ACHIEVEMENTS','TITLES','PETSMOUNTS','GOLD','REPUTATIONS','DAILIES','DUNGEONS','GEAR','SHARED','PROFESSIONS','EVENTS') DEFAULT NULL"
+			],
+			'action' => "run", // just run the code once per execution
+			'function' => function() {
+				$newest_id = Telemetry::$db->query_one("SELECT MAX(`event_id`) FROM `usedguide`");
+				$batch_size = 1000;
+				do {
+					Telemetry::$db->begin_transaction();
+					$last_id = Telemetry::db_get_var("cruncher_usedguide_daily_last_id",0);
+					$last_id_batch = $last_id + $batch_size;
+					if ($last_id >= $newest_id) break; // nothing new to process
+					Telemetry::$db->query(
+						"INSERT INTO usedguide_daily (`day`, `flavnum`, `type`, `guide`, `count`)
+							SELECT DAY(FROM_UNIXTIME(time)), flavnum, type, guide, count(*) as count
+								FROM usedguide
+								WHERE event_id > $last_id 
+								  AND event_id <= $last_id_batch
+								GROUP BY flavnum, guide
 
-			]
+							ON DUPLICATE KEY UPDATE count = count + VALUES(count)
+								"
+					);
+					$last_id = $last_id_batch;
+					Telemetry::db_set_var("cruncher_usedguide_daily_last_id", $last_id);
+					Telemetry::$db->commit();
+					Logger::vlog("Cruncher 'daily used guide tallies' processed events up to ID $last_id (".($newest_id - $last_id)." left)");
+				} while ($last_id_batch < $newest_id);
+			},
 			// without 'action' and maybe 'table' this cruncher just collects data in $mydata which isn't used anyway
 		]
 	],
