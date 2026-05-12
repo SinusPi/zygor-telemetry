@@ -60,6 +60,11 @@ $flavours = $OPTS['flavour'];
 $inputs = $OPTS['input'];
 $topics = $OPTS['topics'];
 
+$SUMMARY = [
+	'events_scraped' => 0,
+	'files_scraped' => 0,
+];
+
 try {
 	if (array_diff($inputs,$valid_inputs)) throw new ErrorException("Invalid input type specified (".implode(",",$inputs)."). Valid types are: ".implode(", ",$valid_inputs));
 	if (array_diff($topics,$valid_topics)) throw new ErrorException("Invalid topic specified (".implode(",",$topics)."). Valid topics are: ".implode(", ",$valid_topics));
@@ -84,6 +89,8 @@ try {
 		
 		echo "*** Done scraping source: $input.\n";
 	}
+
+	Logger::log("Scrape run completed: inputs=".implode(",",$inputs)."; topics=".implode(",",$topics)."; flavours=".implode(",",$flavours).". Got ".$SUMMARY['events_scraped']." events.");
 	
 } catch (ErrorException $e) {
 	echo "ERROR: ".$e->getMessage()."\n";

@@ -361,7 +361,9 @@ class TelemetryScrapeSVs extends TelemetryScrape {
 		*/
 
 		Logger::log("Scrape of $flavour complete; found ". $total_files ." files, processed ". $totals['files_processed'] .".");
-		
+
+		$SUMMARY['events_scraped'] += $totals['data_added'];
+		$SUMMARY['files_scraped'] += $totals['files_processed'];
 
 		TmSt::stat(['status'=>"IDLE"]);
 	}
