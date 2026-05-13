@@ -36,6 +36,7 @@ class TelemetryEndpoint {
 		if ($do === 'get_status') return self::serveGetStatus();
 		if ($do === 'count_events') return self::serveCountEvents();
 		if ($do === 'mark_file_dirty') return self::serveMarkFileDirty();
+		if ($do === 'get_logs') return self::serveGetLogs();
 
 		if (isset($_REQUEST['topic'])) {
 			return self::serveDataRequest();
@@ -159,6 +160,39 @@ class TelemetryEndpoint {
 		while ($row = $q->fetch_assoc())
 			$counts[] = $row;
 		self::response(["success" => true, "code" => 200, "counts" => $counts]);
+	}
+
+	static function serveGetLogs() {
+		$limit  = min(200, max(1, intval(isset($_REQUEST['limit'])  ? $_REQUEST['limit']  : 50)));
+		$offset = max(0, intval(isset($_REQUEST['offset']) ? $_REQUEST['offset'] : 0));
+		$tag    = isset($_REQUEST['tag'])   ? $_REQUEST['tag']   : null;
+		$level  = isset($_REQUEST['level']) ? $_REQUEST['level'] : null;
+
+		$where = ['1'];
+		$params = [];
+		if ($tag)   { $where[] = '`tag` = {s}';   $params[] = $tag; }
+		if ($level) { $where[] = '`level` = {s}'; $params[] = $level; }
+
+		$whereStr = implode(' AND ', $where);
+		$q = call_user_func_array(
+			[Telemetry::$db, 'query'],
+			array_merge(
+				["SELECT `id`, `time`, `level`, `tag`, `message` FROM `log` WHERE $whereStr ORDER BY `id` DESC LIMIT {d} OFFSET {d}"],
+				$params,
+				[$limit, $offset]
+			)
+		);
+		if (!$q) self::response(["success" => false, "code" => 500, "error" => "Query failed: " . Telemetry::$db->error()]);
+
+		$logs = $q->fetch_all(MYSQLI_ASSOC);
+
+		$qTotal = call_user_func_array(
+			[Telemetry::$db, 'query'],
+			array_merge(["SELECT COUNT(*) FROM `log` WHERE $whereStr"], $params)
+		);
+		$total = $qTotal ? intval($qTotal->fetch_array()[0]) : 0;
+
+		self::response(["success" => true, "code" => 200, "logs" => $logs, "offset" => $offset, "count" => count($logs), "total" => $total]);
 	}
 
 	static function serveMarkFileDirty() {

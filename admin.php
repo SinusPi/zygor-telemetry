@@ -107,6 +107,21 @@ $DATES = [
 			</table>
 		</div>
 
+		<h2>Log</h2>
+		<div id="log-container">
+			<table>
+				<thead>
+					<tr>
+						<th>Time</th>
+						<th>Level</th>
+						<th>Tag</th>
+						<th>Message</th>
+					</tr>
+				</thead>
+				<tbody></tbody>
+			</table>
+		</div>
+
 		<h2>Changelog</h2>
 		<div id="git-logs-container">
 			<table>
@@ -121,7 +136,16 @@ $DATES = [
 				<tbody></tbody>
 			</table>
 
-			<template id="commit-row-template">
+			<template id="log-row-template">
+		<tr class="log-row">
+			<td><code data-field="time"></code></td>
+			<td><span class="badge log-level" data-field="level"></span></td>
+			<td><strong data-field="tag"></strong></td>
+			<td data-field="message"></td>
+		</tr>
+	</template>
+
+	<template id="commit-row-template">
 				<tr class="commit-row">
 					<td><span class="commit-hash" data-field="hash"></span></td>
 					<td><span data-field="author-email"></span><br></td>
@@ -134,7 +158,75 @@ $DATES = [
 			</template>
 
 			<script>
-				function loadGitLogs() {
+				window.logOffset = 0;
+
+		function loadLogs() {
+			window.logOffset = 0;
+			$('#log-container table tbody').html('<tr><td colspan="4" style="text-align:center">Loading logs...</td></tr>');
+			fetchLogs(15, 0, true);
+		}
+
+		function loadMoreLogs() {
+			fetchLogs(50, window.logOffset, false);
+		}
+
+		function fetchLogs(limit, offset, isInitial) {
+			$.ajax({
+				url: 'telemetry_endpoint.php',
+				type: 'GET',
+				data: { do: 'get_logs', limit: limit, offset: offset },
+				dataType: 'json',
+				success: function(response) {
+					if (!response.success) {
+						showError('Failed to load logs: ' + response.error, 'log-container');
+						return;
+					}
+					displayLogs(response.logs, isInitial);
+					window.logOffset = response.offset + response.count;
+					$('#log-total').text(response.total.toLocaleString());
+				},
+				error: function(xhr, status, error) {
+					showError('Error loading logs: ' + error, 'log-container');
+				}
+			});
+		}
+
+		var LOG_LEVEL_CLASS = { MAIN: '', INFO: 'log-info', WARNING: 'log-warning', ERROR: 'log-error', DEBUG: 'log-debug' };
+
+		function displayLogs(logs, isInitial) {
+			var tbody = $('#log-container table tbody');
+			var template = document.querySelector('#log-row-template');
+
+			if (isInitial) {
+				tbody.empty();
+				if (logs.length === 0) {
+					tbody.append('<tr><td colspan="4" style="text-align:center">No log entries</td></tr>');
+					return;
+				}
+			}
+
+			$.each(logs, function(idx, entry) {
+				var frag = template.content.cloneNode(true);
+				var $frag = $(frag);
+				$frag.find('[data-field="time"]').text(entry.time);
+				$frag.find('[data-field="level"]')
+					.text(entry.level)
+					.addClass(LOG_LEVEL_CLASS[entry.level] || '');
+				$frag.find('[data-field="tag"]').text(entry.tag);
+				$frag.find('[data-field="message"]').text(entry.message);
+				if (isInitial) {
+					tbody.append($frag);
+				} else {
+					tbody.find('tr.log-more-row').before($frag);
+				}
+			});
+
+			if (isInitial) {
+				tbody.append('<tr class="log-more-row"><td colspan="4" style="text-align:center;padding:8px"><button onclick="loadMoreLogs()" class="more-button">More...</button> <span id="log-total"></span> total</td></tr>');
+			}
+		}
+
+		function loadGitLogs() {
 					window.gitLogsOffset = 0;
 					$.ajax({
 						url: 'git_logs.php',
@@ -242,7 +334,7 @@ $DATES = [
 				}
 
 				window.gitLogsOffset = 0;
-				
+
 			</script>
 		</div>
 	</div>
@@ -260,6 +352,7 @@ $DATES = [
 			loadStatus();
 			loadTopics();
 			loadSources();
+			loadLogs();
 			loadGitLogs();
 		});
 
