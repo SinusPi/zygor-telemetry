@@ -91,7 +91,7 @@ try {
 		echo "*** Done scraping source: $input.\n";
 	}
 
-	Logger::log("Scrape run completed: inputs=".implode(",",$inputs)."; topics=".implode(",",$topics)."; flavours=".implode(",",$flavours).". Got ".$SUMMARY['events_scraped']." events.");
+	Logger::log("Scrape run completed: inputs=".implode(",",$inputs)."; topics=".implode(",",$topics)."; flavours=".implode(",",$flavours).". Got ".$SUMMARY['events_scraped']." events.",null,"MAIN");
 	
 } catch (ErrorException $e) {
 	echo "ERROR: ".$e->getMessage()."\n";
