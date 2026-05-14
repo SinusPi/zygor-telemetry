@@ -29,7 +29,7 @@ try {
 
 	// Execute git log command to get recent commits with offset
 	$cmd = sprintf(
-		"cd %s && git log --pretty=format:%%H%%n%%an%%n%%ae%%n%%ai%%n%%s%%n%%b%%n--- --skip %d -n %d",
+		"cd %s && git log --pretty=tformat:commit=%%H%%nauthor=%%an%%nemail=%%ae%%ndate=%%ai%%nsubject=%%s%%nbody=%%n%%b%%n--- --skip %d -n %d",
 		escapeshellarg($repoDir),
 		$offset,
 		$limit
@@ -54,7 +54,6 @@ try {
 
 	foreach ($output as $line) {
 		if ($line === '---') {
-			// End of current commit
 			if ($currentCommit !== null) {
 				$currentCommit['message_body'] = trim(implode("\n", $bodyLines));
 				$commits[] = $currentCommit;
@@ -62,32 +61,29 @@ try {
 			$currentCommit = null;
 			$bodyLines = [];
 			$isParsingBody = false;
-		} elseif ($currentCommit === null) {
-			// Start new commit - first line is hash
+		} elseif ($isParsingBody) {
+			$bodyLines[] = $line;
+		} elseif (strncmp($line, 'commit=', 7) === 0) {
 			$currentCommit = [
-				'hash' => $line,
+				'hash' => substr($line, 7),
 				'author' => null,
 				'email' => null,
 				'date' => null,
 				'message' => null,
 				'message_body' => ''
 			];
-		} elseif ($currentCommit['author'] === null) {
-			// Second line is author name
-			$currentCommit['author'] = $line;
-		} elseif ($currentCommit['email'] === null) {
-			// Third line is author email
-			$currentCommit['email'] = $line;
-		} elseif ($currentCommit['date'] === null) {
-			// Fourth line is date (ISO format)
-			$currentCommit['date'] = $line;
-		} elseif ($currentCommit['message'] === null) {
-			// Fifth line is commit message
-			$currentCommit['message'] = $line;
+			$bodyLines = [];
+			$isParsingBody = false;
+		} elseif (strncmp($line, 'author=', 7) === 0) {
+			$currentCommit['author'] = substr($line, 7);
+		} elseif (strncmp($line, 'email=', 6) === 0) {
+			$currentCommit['email'] = substr($line, 6);
+		} elseif (strncmp($line, 'date=', 5) === 0) {
+			$currentCommit['date'] = substr($line, 5);
+		} elseif (strncmp($line, 'subject=', 8) === 0) {
+			$currentCommit['message'] = substr($line, 8);
+		} elseif (strncmp($line, 'body=', 5) === 0) {
 			$isParsingBody = true;
-		} else {
-			// Subsequent lines are message body
-			$bodyLines[] = $line;
 		}
 	}
 

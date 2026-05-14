@@ -203,8 +203,13 @@ $DATES = [
 					tbody.append('<tr><td colspan="4" style="text-align:center">No log entries</td></tr>');
 					return;
 				}
+				tbody.append('<tr class="log-more-row"><td colspan="4" style="text-align:center;padding:8px"><button onclick="loadMoreLogs()" class="more-button">Previous...</button> <span id="log-total"></span> total</td></tr>');
 			}
 
+			// API returns DESC (newest first); iterating in that order and calling .after() on the
+			// sentinel row each time pushes each entry below the previous insert, so the last
+			// entry processed (oldest) ends up right after the sentinel — oldest on top, newest at bottom.
+			var prevRow = tbody.find('tr.log-more-row');
 			$.each(logs, function(idx, entry) {
 				var frag = template.content.cloneNode(true);
 				var $frag = $(frag);
@@ -214,16 +219,8 @@ $DATES = [
 					.addClass(LOG_LEVEL_CLASS[entry.level] || '');
 				$frag.find('[data-field="tag"]').text(entry.tag);
 				$frag.find('[data-field="message"]').html(ansiToHtml(entry.message));
-				if (isInitial) {
-					tbody.append($frag);
-				} else {
-					tbody.find('tr.log-more-row').before($frag);
-				}
+				prevRow.after($frag);
 			});
-
-			if (isInitial) {
-				tbody.append('<tr class="log-more-row"><td colspan="4" style="text-align:center;padding:8px"><button onclick="loadMoreLogs()" class="more-button">More...</button> <span id="log-total"></span> total</td></tr>');
-			}
 		}
 
 		function loadGitLogs() {
@@ -320,17 +317,17 @@ $DATES = [
 						
 						if (commits.length === 0) {
 							tbody.append('<tr><td colspan="4" style="text-align: center;">No commits available</td></tr>');
-						} else {
-							var rows = buildCommitRows(commits);
-							tbody.append(rows);
+							return;
 						}
-						
-						tbody.append('<tr class="git-logs-more-row"><td colspan="4" style="text-align: center; padding: 8px;"><button onclick="loadMoreGitLogs()" class="more-button">More...</button></td></tr>');
-					} else {
-						// Append more rows before the "More..." button
-						var rows = buildCommitRows(commits);
-						tbody.find('tr.git-logs-more-row').before(rows);
+						tbody.append('<tr class="git-logs-more-row"><td colspan="4" style="text-align: center; padding: 8px;"><button onclick="loadMoreGitLogs()" class="more-button">Previous...</button></td></tr>');
 					}
+
+					// Reverse: API returns DESC (newest first); reversed array is oldest-first.
+					// .after() on the sentinel inserts the whole HTML block right after it,
+					// preserving the oldest-first order within the block.
+					var reversed = commits.slice().reverse();
+					var rows = buildCommitRows(reversed);
+					tbody.find('tr.git-logs-more-row').after(rows);
 				}
 
 				window.gitLogsOffset = 0;
