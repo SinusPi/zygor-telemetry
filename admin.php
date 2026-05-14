@@ -160,111 +160,98 @@ $DATES = [
 			<script>
 				window.logOffset = 0;
 
-		function loadLogs() {
-			window.logOffset = 0;
-			$('#log-container table tbody').html('<tr><td colspan="4" style="text-align:center">Loading logs...</td></tr>');
-			fetchLogs(15, 0, true);
-		}
+				function loadLogs() {
+					window.logOffset = 0;
+					$('#log-container table tbody').html('<tr><td colspan="4" style="text-align:center">Loading logs...</td></tr>');
+					fetchLogs(15, 0, true);
+				}
 
-		function loadMoreLogs() {
-			fetchLogs(50, window.logOffset, false);
-		}
+				function loadMoreLogs() {
+					fetchLogs(50, window.logOffset, false);
+				}
 
-		function fetchLogs(limit, offset, isInitial) {
-			$.ajax({
-				url: 'telemetry_endpoint.php',
-				type: 'GET',
-				data: { do: 'get_logs', limit: limit, offset: offset },
-				dataType: 'json',
-				success: function(response) {
-					if (!response.success) {
-						showError('Failed to load logs: ' + response.error, 'log-container');
-						return;
+				function fetchLogs(limit, offset, isInitial) {
+					$.ajax({
+						url: 'telemetry_endpoint.php',
+						type: 'GET',
+						data: { do: 'get_logs', limit: limit, offset: offset },
+						dataType: 'json',
+						success: function(response) {
+							if (!response.success) {
+								showError('Failed to load logs: ' + response.error, 'log-container');
+								return;
+							}
+							displayLogs(response.logs, isInitial);
+							window.logOffset = response.offset + response.count;
+							$('#log-total').text(response.total.toLocaleString());
+						},
+						error: function(xhr, status, error) {
+							showError('Error loading logs: ' + error, 'log-container');
+						}
+					});
+				}
+
+				var LOG_LEVEL_CLASS = { MAIN: '', INFO: 'log-info', WARNING: 'log-warning', ERROR: 'log-error', DEBUG: 'log-debug' };
+
+				function displayLogs(logs, isInitial) {
+					var tbody = $('#log-container table tbody');
+					var template = document.querySelector('#log-row-template');
+
+					if (isInitial) {
+						tbody.empty();
+						if (logs.length === 0) {
+							tbody.append('<tr><td colspan="4" style="text-align:center">No log entries</td></tr>');
+							return;
+						}
+						tbody.append('<tr class="log-more-row"><td colspan="4" style="text-align:center;padding:8px"><button onclick="loadMoreLogs()" class="more-button">Previous...</button> <span id="log-total"></span> total</td></tr>');
 					}
-					displayLogs(response.logs, isInitial);
-					window.logOffset = response.offset + response.count;
-					$('#log-total').text(response.total.toLocaleString());
-				},
-				error: function(xhr, status, error) {
-					showError('Error loading logs: ' + error, 'log-container');
+
+					// API returns DESC (newest first); iterating in that order and calling .after() on the
+					// sentinel row each time pushes each entry below the previous insert, so the last
+					// entry processed (oldest) ends up right after the sentinel — oldest on top, newest at bottom.
+					var prevRow = tbody.find('tr.log-more-row');
+					$.each(logs, function(idx, entry) {
+						var frag = template.content.cloneNode(true);
+						var $frag = $(frag);
+						$frag.find('[data-field="time"]').text(entry.time);
+						$frag.find('[data-field="level"]')
+							.text(entry.level)
+							.addClass(LOG_LEVEL_CLASS[entry.level] || '');
+						$frag.find('[data-field="tag"]').text(entry.tag);
+						$frag.find('[data-field="message"]').html(ansiToHtml(entry.message));
+						prevRow.after($frag);
+					});
 				}
-			});
-		}
 
-		var LOG_LEVEL_CLASS = { MAIN: '', INFO: 'log-info', WARNING: 'log-warning', ERROR: 'log-error', DEBUG: 'log-debug' };
-
-		function displayLogs(logs, isInitial) {
-			var tbody = $('#log-container table tbody');
-			var template = document.querySelector('#log-row-template');
-
-			if (isInitial) {
-				tbody.empty();
-				if (logs.length === 0) {
-					tbody.append('<tr><td colspan="4" style="text-align:center">No log entries</td></tr>');
-					return;
-				}
-				tbody.append('<tr class="log-more-row"><td colspan="4" style="text-align:center;padding:8px"><button onclick="loadMoreLogs()" class="more-button">Previous...</button> <span id="log-total"></span> total</td></tr>');
-			}
-
-			// API returns DESC (newest first); iterating in that order and calling .after() on the
-			// sentinel row each time pushes each entry below the previous insert, so the last
-			// entry processed (oldest) ends up right after the sentinel — oldest on top, newest at bottom.
-			var prevRow = tbody.find('tr.log-more-row');
-			$.each(logs, function(idx, entry) {
-				var frag = template.content.cloneNode(true);
-				var $frag = $(frag);
-				$frag.find('[data-field="time"]').text(entry.time);
-				$frag.find('[data-field="level"]')
-					.text(entry.level)
-					.addClass(LOG_LEVEL_CLASS[entry.level] || '');
-				$frag.find('[data-field="tag"]').text(entry.tag);
-				$frag.find('[data-field="message"]').html(ansiToHtml(entry.message));
-				prevRow.after($frag);
-			});
-		}
-
-		function loadGitLogs() {
-					window.gitLogsOffset = 0;
+				var gitOffset = 0
+				
+				function fetchGitLogs(limit, isInitial) {
 					$.ajax({
 						url: 'git_logs.php',
 						type: 'GET',
-						data: { limit: 15, offset: 0 },
+						data: { limit: limit, offset: gitOffset },
 						dataType: 'json',
 						success: function(response) {
 							if (response.success) {
-								displayGitLogs(response.commits, true);
-								window.gitLogsOffset = response.offset + response.count;
+								displayGitLogs(response.commits, isInitial);
+								gitOffset = response.offset + response.count;
 							} else {
 								showError('Failed to load commits: ' + response.error, 'git-logs-container');
 							}
 						},
 						error: function(xhr, status, error) {
 							showError('Error loading commits: ' + error, 'git-logs-container');
-						},
-						beforeSend: function() {
-							$('#git-logs-container table tbody').empty().html('<tr><td colspan="4" style="text-align: center;">Loading commits...</td></tr>');
 						}
 					});
 				}
 
+				function loadGitLogs() {
+					$('#git-logs-container table tbody').empty().html('<tr><td colspan="4" style="text-align: center;">Loading commits...</td></tr>');
+					fetchGitLogs(20, true);
+				}
+
 				function loadMoreGitLogs() {
-					$.ajax({
-						url: 'git_logs.php',
-						type: 'GET',
-						data: { limit: 20, offset: window.gitLogsOffset },
-						dataType: 'json',
-						success: function(response) {
-							if (response.success) {
-								displayGitLogs(response.commits, false);
-								window.gitLogsOffset = response.offset + response.count;
-							} else {
-								alert('Failed to load more commits: ' + response.error);
-							}
-						},
-						error: function(xhr, status, error) {
-							alert('Error loading more commits: ' + error);
-						}
-					});
+					fetchGitLogs(20, false);
 				}
 
 				function buildCommitRows(commits) {
@@ -329,8 +316,6 @@ $DATES = [
 					var rows = buildCommitRows(reversed);
 					tbody.find('tr.git-logs-more-row').after(rows);
 				}
-
-				window.gitLogsOffset = 0;
 
 			</script>
 		</div>
