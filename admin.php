@@ -213,7 +213,7 @@ $DATES = [
 					.text(entry.level)
 					.addClass(LOG_LEVEL_CLASS[entry.level] || '');
 				$frag.find('[data-field="tag"]').text(entry.tag);
-				$frag.find('[data-field="message"]').text(entry.message);
+				$frag.find('[data-field="message"]').html(ansiToHtml(entry.message));
 				if (isInitial) {
 					tbody.append($frag);
 				} else {
@@ -874,6 +874,108 @@ $DATES = [
 				closeCalendar();
 			}
 		});
+
+		// ansi to html conversion for log messages, handle 256 colors, don't use classes
+		function ansiToHtml(text) {
+			// Resolve an ANSI color index (0-255) to an RGB string
+			function ansi256ToRgb(n) {
+				if (n < 16) {
+					// Standard 16 colors
+					var base = [
+						[0,0,0],[170,0,0],[0,170,0],[170,170,0],
+						[0,0,170],[170,0,170],[0,170,170],[170,170,170],
+						[85,85,85],[255,85,85],[85,255,85],[255,255,85],
+						[85,85,255],[255,85,255],[85,255,255],[255,255,255]
+					];
+					var c = base[n];
+					return 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')';
+				}
+				if (n < 232) {
+					// 6x6x6 color cube: index 16-231
+					n -= 16;
+					var b = n % 6, g = Math.floor(n / 6) % 6, r = Math.floor(n / 36);
+					var ch = function(v) { return v ? v * 40 + 55 : 0; };
+					return 'rgb(' + ch(r) + ',' + ch(g) + ',' + ch(b) + ')';
+				}
+				// Grayscale ramp: index 232-255
+				var v = (n - 232) * 10 + 8;
+				return 'rgb(' + v + ',' + v + ',' + v + ')';
+			}
+
+			var result = '';
+			var openSpans = 0;
+			// Current state
+			var fg = null, bg = null, bold = false, dim = false, italic = false, underline = false, strike = false;
+
+			function applyState() {
+				var style = '';
+				var color = fg;
+				if (bold && fg) {
+					// brighten bold fg slightly - just let font-weight carry it
+				}
+				if (fg)        style += 'color:' + fg + ';';
+				if (bg)        style += 'background:' + bg + ';';
+				if (bold)      style += 'font-weight:bold;';
+				if (dim)       style += 'opacity:0.6;';
+				if (italic)    style += 'font-style:italic;';
+				if (underline) style += 'text-decoration:underline;';
+				if (strike)    style += 'text-decoration:line-through;';
+				if (!style)    return '';
+				openSpans++;
+				return '<span style="' + style + '">';
+			}
+
+			function closeAll() {
+				var s = '';
+				while (openSpans > 0) { s += '</span>'; openSpans--; }
+				return s;
+			}
+
+			var escaped = escapeHtml(text);
+			// Split on ESC[ ... m sequences
+			var re = /\x1b\[([0-9;]*)m/g;
+			var last = 0, m;
+			while ((m = re.exec(escaped)) !== null) {
+				result += escaped.slice(last, m.index);
+				last = m.index + m[0].length;
+
+				var parts = m[1] === '' ? [0] : m[1].split(';').map(Number);
+				var i = 0;
+				while (i < parts.length) {
+					var code = parts[i++];
+					if (code === 0) {
+						result += closeAll();
+						fg = bg = null; bold = dim = italic = underline = strike = false;
+					} else if (code === 1)  { result += closeAll(); bold = true;      result += applyState(); }
+					else if (code === 2)    { result += closeAll(); dim = true;       result += applyState(); }
+					else if (code === 3)    { result += closeAll(); italic = true;    result += applyState(); }
+					else if (code === 4)    { result += closeAll(); underline = true; result += applyState(); }
+					else if (code === 9)    { result += closeAll(); strike = true;    result += applyState(); }
+					else if (code === 22)   { result += closeAll(); bold = false; dim = false; result += applyState(); }
+					else if (code === 39)   { result += closeAll(); fg = null;        result += applyState(); }
+					else if (code === 49)   { result += closeAll(); bg = null;        result += applyState(); }
+					else if (code >= 30 && code <= 37) { result += closeAll(); fg = ansi256ToRgb(code - 30); result += applyState(); }
+					else if (code === 38) {
+						if (parts[i] === 5 && i + 1 < parts.length) {       // 256-color fg
+							result += closeAll(); fg = ansi256ToRgb(parts[i + 1]); i += 2; result += applyState();
+						} else if (parts[i] === 2 && i + 3 < parts.length) { // truecolor fg
+							result += closeAll(); fg = 'rgb(' + parts[i+1] + ',' + parts[i+2] + ',' + parts[i+3] + ')'; i += 4; result += applyState();
+						}
+					} else if (code >= 40 && code <= 47) { result += closeAll(); bg = ansi256ToRgb(code - 40); result += applyState(); }
+					else if (code === 48) {
+						if (parts[i] === 5 && i + 1 < parts.length) {       // 256-color bg
+							result += closeAll(); bg = ansi256ToRgb(parts[i + 1]); i += 2; result += applyState();
+						} else if (parts[i] === 2 && i + 3 < parts.length) { // truecolor bg
+							result += closeAll(); bg = 'rgb(' + parts[i+1] + ',' + parts[i+2] + ',' + parts[i+3] + ')'; i += 4; result += applyState();
+						}
+					} else if (code >= 90 && code <= 97)  { result += closeAll(); fg = ansi256ToRgb(code - 90 + 8); result += applyState(); }
+					  else if (code >= 100 && code <= 107) { result += closeAll(); bg = ansi256ToRgb(code - 100 + 8); result += applyState(); }
+				}
+			}
+			result += escaped.slice(last);
+			result += closeAll();
+			return result;
+		}
 	</script>
 
 	<!-- HTML Templates for table rows -->
