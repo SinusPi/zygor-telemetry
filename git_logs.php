@@ -29,7 +29,7 @@ try {
 
 	// Execute git log command to get recent commits with offset
 	$cmd = sprintf(
-		"cd %s && git log --pretty=tformat:commit=%%H%%nauthor=%%an%%nemail=%%ae%%ndate=%%ai%%nsubject=%%s%%nbody=%%n%%b%%n--- --skip %d -n %d",
+		"cd %s && git log --pretty=tformat:commit=%%H%%nauthor=%%an%%nemail=%%ae%%ndate=%%ai%%nmessage=%%s%%nbody=%%n%%b%%n--- --skip %d -n %d",
 		escapeshellarg($repoDir),
 		$offset,
 		$limit
@@ -74,24 +74,21 @@ try {
 			];
 			$bodyLines = [];
 			$isParsingBody = false;
-		} elseif (strncmp($line, 'author=', 7) === 0) {
-			$currentCommit['author'] = substr($line, 7);
-		} elseif (strncmp($line, 'email=', 6) === 0) {
-			$currentCommit['email'] = substr($line, 6);
-		} elseif (strncmp($line, 'date=', 5) === 0) {
-			$currentCommit['date'] = substr($line, 5);
-		} elseif (strncmp($line, 'subject=', 8) === 0) {
-			$currentCommit['message'] = substr($line, 8);
 		} elseif (strncmp($line, 'body=', 5) === 0) {
 			$isParsingBody = true;
+		} else {
+			list ($var,$value) = explode('=', $line, 2);
+			$currentCommit[$var] = $value;
 		}
 	}
 
 	// Handle last commit if output doesn't end with separator
+	/*
 	if ($currentCommit !== null) {
 		$currentCommit['message_body'] = trim(implode("\n", $bodyLines));
 		$commits[] = $currentCommit;
 	}
+	*/
 
 	die(json_encode([
 		"success" => true,
