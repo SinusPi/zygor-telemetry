@@ -734,6 +734,21 @@ class Telemetry {
 		}
 		return $deleted;
 	}
+
+	static function verify_verbose_flags(&$OPTS,$verbose_flags) {
+		// die on verbose with invalid flag, otherwise default to all
+		if ($OPTS['verbose'] === false) {
+			$OPTS['verbose'] = [];
+		} elseif ($OPTS['verbose'] === true) {
+			$OPTS['verbose'] = array_keys($verbose_flags);
+		} elseif ($OPTS['verbose']) {
+			if (!is_array($OPTS['verbose'])) $OPTS['verbose'] = explode(",",$OPTS['verbose']);
+			if (array_diff($OPTS['verbose'],$valid_verbose_flags=array_keys($verbose_flags))) {
+				echo "Invalid verbose flag(s) specified: '".implode(", ",array_diff($OPTS['verbose'],$valid_verbose_flags))."'. Valid flags are: ".implode(", ",$valid_verbose_flags)."\n";
+				exit(1);
+			}
+		}
+	}
 }
 
 

@@ -52,7 +52,7 @@ class TelemetryDB {
 			$query = $this->qesc($query, ...$args);
 		}
 		$this->LAST_QUERY = $query;
-		if (Telemetry::$CFG['verbose'] && in_array("querylog", Telemetry::$CFG['verboseflags'])) {
+		if (Telemetry::$CFG['verbose'] && in_array("querylog", Telemetry::$CFG['verbose'])) {
 			Logger::vlog("DB QUERY: $query");
 		}
 		return $this->conn->query($query, $this->query_mode);

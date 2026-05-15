@@ -32,19 +32,22 @@ $valid_crunchers = array_merge(...array_values(array_map(
 			$topic->crunchers, array_keys($topic->crunchers)
 		);
 	}, Telemetry::$TOPICS)));
+$verboseflags = [ 
+	"showconfig" => "Show loaded config at startup",
+	"querylog" => "Log DB queries",
+];
 
 $OPTS = \Zygor\Shell::better_getopt([
-	['f:','flavour:',      array_keys(Telemetry::$CFG['WOW_FLAVOUR_DATA'])],
-	['c:','crunchers:',    $valid_crunchers], // which crunchers to run (format: topic/crunchername or topic/number), default all
-	['',  'maxdays:',      999999], // use to limit how far back to crunch, for debugging only
-	['',  'start-day:',    null], // similar to maxdays, but explicit date
-	['',  'today-too',     false],
-	['',  'limit:',        null], // stop after N events
-	['',  'debug',         false],
-	['',  'debug-lua',     false],
-	['v', 'verbose',       false],
-	['',  'verboseflags:', []],
-	['',  'help',          false],
+	['f:', 'flavour:',      array_keys(Telemetry::$CFG['WOW_FLAVOUR_DATA'])],
+	['c:', 'crunchers:',    $valid_crunchers], // which crunchers to run (format: topic/crunchername or topic/number), default all
+	['',   'maxdays:',      999999], // use to limit how far back to crunch, for debugging only
+	['',   'start-day:',    null], // similar to maxdays, but explicit date
+	['',   'today-too',     false],
+	['',   'limit:',        null], // stop after N events
+	['',   'debug',         false],
+	['',   'debug-lua',     false],
+	['v::','verbose::',     false],
+	['',   'help',          false],
 ]);
 $FLAVOURS = (array)$OPTS['f'];
 if (substr($OPTS['start-day'],0,1)=="-") $OPTS['start-day']=date("Ymd",strtotime($OPTS['start-day']." days"));
@@ -73,8 +76,9 @@ if (array_diff($crunchers,$valid_crunchers)) {
 	throw new ErrorException("Invalid cruncher specified (".implode(",",$crunchers)."). Valid crunchers are: ".implode(", ",$valid_crunchers));
 }
 
+Telemetry::verify_verbose_flags($OPTS['verbose'], $verboseflags);
 Telemetry::startup($OPTS);
-Telemetry::dump_config();
+if ($OPTS['verbose']['showconfig']) Telemetry::dump_config();
 
 foreach ($FLAVOURS as $flav) TelemetryCrunch::crunch_flavour($flav,$crunchers);
 
