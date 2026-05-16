@@ -40,20 +40,33 @@ for %%E in (%errors%) do (
 		set /a test_count+=1
 		set error_num=%%A
 		set error_desc=%%B
-		
+
 		echo.
 		echo [Test !test_count!] Error Type !error_num!: !error_desc!
 		echo ---------------------------------------------------------------------------
-		
-		REM Run the test and capture output
-		php tests\test_error_handlers.php !error_num! 2>&1
+
+		REM Capture combined stdout+stderr so content can be checked regardless of exit code
+		c:\xampp\php5\php.exe tests\test_error_handlers.php !error_num! > "%TEMP%\teh_out.txt" 2>&1
 		set last_exit=!ERRORLEVEL!
-		
-		if !last_exit! equ 0 (
-			echo Result: Test script exited normally
+		type "%TEMP%\teh_out.txt"
+
+		REM Engine E_ERROR fatals (undefined function, null method call, timeout) bypass
+		REM set_error_handler entirely. The shutdown handler still fires and prints this line.
+		REM PHP 5.6 cannot override exit 255 for engine fatals, so output content is the
+		REM only reliable pass criterion for those cases.
+		findstr /c:"Terminating with status:" "%TEMP%\teh_out.txt" >nul 2>&1
+		set found_status=!ERRORLEVEL!
+
+		REM Determine pass/fail using sequential ifs to avoid nested else blocks
+		set "pass_msg="
+		if !last_exit! equ 0 set "pass_msg=Handler ran / error suppressed (clean exit)"
+		if not !last_exit! equ 0 if !found_status! equ 0 set "pass_msg=Shutdown handler caught fatal (exit !last_exit! expected for E_ERROR in PHP 5.6)"
+
+		if defined pass_msg (
+			echo [32mPassed:[0m !pass_msg!
 			set /a passed_count+=1
 		) else (
-			echo Result: Test script crashed/exited with code !last_exit!
+			echo [31mFailed:[0m Handler did NOT run - exit=!last_exit!, no status line in output
 			set /a failed_count+=1
 		)
 	)
@@ -68,5 +81,3 @@ echo Passed (handled): !passed_count!
 echo Failed (unhandled): !failed_count!
 echo ============================================================================
 echo.
-
-pause

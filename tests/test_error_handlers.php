@@ -26,6 +26,8 @@ chdir(dirname(__DIR__));
 require_once 'loader.inc.php';
 require_once 'includes/zygor.class.inc.php';
 
+use \Zygor\Telemetry\Telemetry;
+
 // Initialize Telemetry (sets up error/exception handlers)
 try {
     Telemetry::startup();
