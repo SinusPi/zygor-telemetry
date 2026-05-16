@@ -8,14 +8,12 @@ namespace Zygor\Telemetry;
 class Logger {
 	static $tag = "TELEMETRY";
 
-	static $verbose = false;
-	static $verbose_flags = [];
+	static $verbose = [];
 	static $log_path = null;
 
 	static function init($cfg) {
-		self::$verbose = $cfg['verbose'] ?: false;
+		self::$verbose = $cfg['verbose'] ?: [];
 		self::$tag = $cfg['tag'] ?: "TELEMETRY";
-		self::$verbose_flags = $cfg['verbose_flags'] ?: [];
 		self::$log_path = $cfg['log_path'] ?: null;
 		self::setup_db();
 	}
@@ -40,7 +38,7 @@ class Logger {
 	}
 
 	static function vflog($flag, $message, $level='INFO') {
-		if (self::$verbose && in_array($flag, self::$verbose_flags)) self::log("[$flag] <$level> $message", self::$tag, $level);
+		if (self::$verbose && in_array($flag, self::$verbose)) self::log("[$flag] <$level> $message", self::$tag, $level);
 	}
 
 	// set up DB schema for logging

@@ -51,10 +51,9 @@ try {
 
 // Re-init Logger with a temp log file so we can inspect file output
 Logger::init([
-	'tag'           => 'TEST',
-	'verbose'       => false,
-	'verbose_flags' => [],
-	'log_path'      => $tmp_log,
+	'tag'      => 'TEST',
+	'verbose'  => [],
+	'log_path' => $tmp_log,
 ]);
 
 // ---------------------------------------------------------------------------
@@ -81,10 +80,9 @@ echo "\n=== Logger Tests ===\n\n";
 // ---------------------------------------------------------------------------
 // 1. init() sets static properties
 // ---------------------------------------------------------------------------
-expect('init: tag set',           Logger::$tag,           'TEST');
-expect('init: verbose false',     Logger::$verbose,       false);
-expect('init: verbose_flags empty', Logger::$verbose_flags, []);
-expect('init: log_path set',      Logger::$log_path,      $tmp_log);
+expect('init: tag set',       Logger::$tag,      'TEST');
+expect('init: verbose empty', Logger::$verbose,  []);
+expect('init: log_path set',  Logger::$log_path, $tmp_log);
 
 // ---------------------------------------------------------------------------
 // 2. log() writes to file
@@ -95,7 +93,7 @@ $lines = log_lines_containing($sentinel);
 expect_true('log: line written to file', count($lines) === 1);
 // format check: timestamp, tag, level
 expect_true('log: file line contains [TEST]',  strpos($lines[0], '[TEST]') !== false);
-expect_true('log: file line contains <MAIN>',  strpos($lines[0], '<MAIN>') !== false);
+expect_true('log: file line contains <INFO>',  strpos($lines[0], '<INFO>') !== false);
 expect_true('log: file line contains sentinel', strpos($lines[0], $sentinel) !== false);
 // crude timestamp check: starts with 20YY-
 expect_true('log: file line starts with date', preg_match('/^20\d\d-/', $lines[0]) === 1);
@@ -121,55 +119,52 @@ $row = $q->fetch_array();
 expect('log: custom level in DB', $row[0], 'WARNING');
 
 // ---------------------------------------------------------------------------
-// 5. vlog() is suppressed when verbose = false
+// 5. vlog() is suppressed when verbose = [] (empty)
 // ---------------------------------------------------------------------------
 $sentinel3 = 'VLOG_SILENT_' . uniqid();
-Logger::$verbose = false;
+Logger::$verbose = [];
 Logger::vlog($sentinel3);
 expect('vlog: silent when verbose=false (file)', count(log_lines_containing($sentinel3)), 0);
 expect('vlog: silent when verbose=false (DB)',   db_log_count($sentinel3), 0);
 
 // ---------------------------------------------------------------------------
-// 6. vlog() emits when verbose = true
+// 6. vlog() emits when verbose is non-empty
 // ---------------------------------------------------------------------------
 $sentinel4 = 'VLOG_EMIT_' . uniqid();
-Logger::$verbose = true;
+Logger::$verbose = ['vlog'];
 Logger::vlog($sentinel4);
-expect('vlog: emits when verbose=true (file)', count(log_lines_containing($sentinel4)), 1);
-expect('vlog: emits when verbose=true (DB)',   db_log_count($sentinel4), 1);
-Logger::$verbose = false; // restore
+expect('vlog: emits when verbose non-empty (file)', count(log_lines_containing($sentinel4)), 1);
+expect('vlog: emits when verbose non-empty (DB)',   db_log_count($sentinel4), 1);
+Logger::$verbose = []; // restore
 
 // ---------------------------------------------------------------------------
-// 7. vflog() is suppressed when flag not in list
+// 7. vflog() is suppressed when flag not in verbose array
 // ---------------------------------------------------------------------------
 $sentinel5 = 'VFLOG_NOFLAG_' . uniqid();
-Logger::$verbose = true;
-Logger::$verbose_flags = ['other_flag'];
+Logger::$verbose = ['other_flag'];
 Logger::vflog('my_flag', $sentinel5);
 expect('vflog: silent when flag absent (file)', count(log_lines_containing($sentinel5)), 0);
 expect('vflog: silent when flag absent (DB)',   db_log_count($sentinel5), 0);
 
 // ---------------------------------------------------------------------------
-// 8. vflog() emits when flag is in list
+// 8. vflog() emits when flag is in verbose array
 // ---------------------------------------------------------------------------
 $sentinel6 = 'VFLOG_WITHFLAG_' . uniqid();
-Logger::$verbose_flags = ['my_flag'];
+Logger::$verbose = ['my_flag'];
 Logger::vflog('my_flag', $sentinel6);
 expect('vflog: emits when flag present (file)', count(log_lines_containing($sentinel6)), 1);
 expect('vflog: emits when flag present (DB)',   db_log_count($sentinel6), 1);
 
-Logger::$verbose = false;
-Logger::$verbose_flags = [];
+Logger::$verbose = [];
 
 // ---------------------------------------------------------------------------
-// 9. vflog() is suppressed when verbose = false even if flag matches
+// 9. vflog() is suppressed when verbose = [] even if flag would match
 // ---------------------------------------------------------------------------
 $sentinel7 = 'VFLOG_NOVERBOSE_' . uniqid();
-Logger::$verbose = false;
-Logger::$verbose_flags = ['my_flag'];
+Logger::$verbose = [];
 Logger::vflog('my_flag', $sentinel7);
-expect('vflog: silent when verbose=false (file)', count(log_lines_containing($sentinel7)), 0);
-expect('vflog: silent when verbose=false (DB)',   db_log_count($sentinel7), 0);
+expect('vflog: silent when verbose=[] (file)', count(log_lines_containing($sentinel7)), 0);
+expect('vflog: silent when verbose=[] (DB)',   db_log_count($sentinel7), 0);
 
 // ---------------------------------------------------------------------------
 // Cleanup

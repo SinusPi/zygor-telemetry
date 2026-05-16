@@ -63,16 +63,15 @@ class Telemetry {
 		self::init();
 		self::config($opts);
 
+		self::db_startup();
+
 		Logger::init([
 			'log_path'=>self::$CFG['TELEMETRY_ROOT']."/".self::$CFG['LOG_FILENAME'],
 			'verbose'=>self::$CFG['verbose'],
-			'verbose_flags'=>self::$CFG['verbose_flags']]
-		);
+		]);
 
 		self::load_topics();
 		self::dump_topics();
-
-		self::db_startup();
 
 		self::self_tests();
 
@@ -358,7 +357,6 @@ class Telemetry {
 		}
 		try {
 			self::db_create_tables();
-			Logger::setup_db();
 		} catch (\Exception $e) {
 			throw new \ErrorException("Failed to create or migrate database tables: ".$e->getMessage()."\n");
 			self::$db->disconnect();
