@@ -1,4 +1,6 @@
 <?php
+namespace Zygor\Telemetry;
+
 // One-time test script for Config class
 require_once __DIR__ . '/../classes/Config.class.php';
 
@@ -88,7 +90,7 @@ $c->add(['key' => 'value']);
 try {
 	$c['key'] = 'new_value';
 	$expect('ArrayAccess offsetSet throws', false, true);
-} catch (Exception $e) {
+} catch (\Exception $e) {
 	$expect('ArrayAccess offsetSet throws', true, true);
 }
 
@@ -98,7 +100,7 @@ $c->add(['key' => 'value']);
 try {
 	unset($c['key']);
 	$expect('ArrayAccess offsetUnset throws', false, true);
-} catch (Exception $e) {
+} catch (\Exception $e) {
 	$expect('ArrayAccess offsetUnset throws', true, true);
 }
 
